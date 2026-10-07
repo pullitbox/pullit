@@ -1,5 +1,7 @@
 # pullit
 
+[![test](https://github.com/pullitbox/pullit/actions/workflows/test.yml/badge.svg)](https://github.com/pullitbox/pullit/actions/workflows/test.yml)
+
 A blind box that fills itself.
 
 Trading fees of $PULLIT go into a box. When it is full, an AI picks what goes inside and seals it.
@@ -55,6 +57,7 @@ How the draw works in detail: [docs/draw.md](docs/draw.md).
 
 ## Docs
 
+- [docs/architecture.md](docs/architecture.md): how it fits together, with diagrams
 - [docs/draw.md](docs/draw.md): tickets, seed, winner, tier, seal
 - [docs/agent.md](docs/agent.md): the market scanner, the AI, the validator
 - [docs/fees.md](docs/fees.md): fee split, vault, rollover, final box
