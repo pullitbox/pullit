@@ -16,6 +16,7 @@ export const BOOST = {
   // the first box after the market cap crosses one of these is a milestone box: epic or better, plus vault
   milestonesUsd: [50_000, 100_000, 250_000, 500_000, 1_000_000, 2_500_000, 5_000_000, 10_000_000],
   milestoneVaultPct: 20, // to the winner of a milestone box
+  reserveBurnPct: 25, // of the launch reserve (bought at launch into the box), burned on every milestone box
   milestoneBurnVaultPct: 10, // of what is left in the vault, bought back and burned on a milestone box
 };
 

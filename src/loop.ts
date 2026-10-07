@@ -119,6 +119,8 @@ export interface State {
   milestoneQueue?: number[]; // market caps waiting for their milestone box, one box each
   burned?: { lamports: string; tokens: string }; // totals of all buybacks and burns
   burnPending?: boolean; // the box holds bought $PULLIT that still has to be burned
+  // $PULLIT bought into the box at launch. the bot never sells it: a quarter is burned on every milestone box
+  reserve?: { initial: string; left: string; burns: { at: string; sig: string; amount: string; milestone: number }[] };
   nextTeaseAt?: number; // before launch: when the next teaser goes out on x
   xPostedAt?: number[]; // times of the x posts of the last 24 hours, for the daily cap
   teaseUsed?: number[]; // hand-written teasers already posted this round
@@ -149,6 +151,7 @@ export interface State {
     nextMilestone?: number;
     entryUsd?: number; // bag needed to be in the draw for this box
     milestoneBox?: number; // the box that is filling is a milestone box for this market cap
+    reserve?: { initial: string; left: string }; // launch reserve, raw $PULLIT
     burned?: { lamports: string; tokens: string };
   };
 }
@@ -940,6 +943,51 @@ export class Bot {
     // sealed boxes are not posted on x: the daily posts are kept for wins that matter
   }
 
+  reserveLeft(): bigint {
+    return BigInt(this.state.reserve?.left ?? "0");
+  }
+
+  /**
+   * The launch reserve is whatever $PULLIT the box holds before the first box opens (bought at launch).
+   * Recorded once, then only ever burned, a quarter on every milestone box.
+   */
+  async recordReserve() {
+    if (this.dry || this.state.history.length > 0 || this.state.phase !== "filling") return;
+    const acc = await this.rpc.tokenAccount(this.box.publicKey, this.env.MINT!);
+    const amount = acc?.amount ?? 0n;
+    if (amount > 0n && amount.toString() !== this.state.reserve?.initial) {
+      this.state.reserve = { initial: amount.toString(), left: amount.toString(), burns: [] };
+      this.log(`launch reserve recorded: ${amount} raw $PULLIT in the box`);
+    }
+  }
+
+  /** On a milestone box: burns the next slice of the launch reserve. */
+  async burnReserve(milestone: number) {
+    const r = this.state.reserve;
+    if (!r || this.dry || BigInt(r.left) <= 0n || r.burns.some((b) => b.milestone === milestone)) return;
+    const slice = (BigInt(r.initial) * BigInt(BOOST.reserveBurnPct)) / 100n;
+    const amount = slice < BigInt(r.left) ? slice : BigInt(r.left);
+    try {
+      await this.guard?.();
+      const b = await burnAll(this.rpc, this.box, this.env.MINT!, 0n, amount);
+      if (!b) return;
+      r.left = (BigInt(r.left) - amount).toString();
+      r.burns.push({ at: new Date().toISOString(), sig: b.sig, amount: amount.toString(), milestone });
+      await this.checkpoint?.();
+      const leftPct = Number((BigInt(r.left) * 100n) / BigInt(r.initial));
+      await this.line(
+        "burn",
+        `${usdShort(milestone)} cap, so ${BOOST.reserveBurnPct}% of the launch reserve just got burned. ${leftPct}% of it left. the box bought it at launch and can only burn it, never sell`,
+        [`${BOOST.reserveBurnPct}%`],
+        `${usdShort(milestone)} cap. burned ${BOOST.reserveBurnPct}% of my launch bag. ${leftPct}% left. i told you i cant sell`,
+        undefined,
+        b.sig,
+      );
+    } catch (e) {
+      this.log(`reserve burn failed, will retry on the next milestone box: ${(e as Error).message}`);
+    }
+  }
+
   /** Throws if this tick no longer owns the lock (another tick took over). Checked before anything is paid. */
   guard?: () => Promise<void>;
 
@@ -1053,7 +1101,7 @@ export class Bot {
         let burnSig = "dry-run";
         if (!this.dry) {
           try {
-            burnSig = (await burnAll(this.rpc, this.box, this.env.MINT!))?.sig ?? "pending";
+            burnSig = (await burnAll(this.rpc, this.box, this.env.MINT!, this.reserveLeft()))?.sig ?? "pending";
           } catch (e) {
             this.log(`burn failed, will retry: ${(e as Error).message}`);
             burnSig = "pending";
@@ -1090,6 +1138,7 @@ export class Bot {
       fromVault: fromVault.toString(),
     };
     this.state.vaultLamports = (vault - fromVault - vaultBurned).toString();
+    if (p.milestone) await this.burnReserve(p.milestone);
 
     const extra = fromVault > 0n ? ` (${sol(fromVault)} from the vault)` : "";
     const both = `${sol(lamports)} sol of $${symbol}`;
@@ -1176,6 +1225,10 @@ export class Bot {
     if (this.state.pub) {
       this.state.pub.boxLamports = (left > 0n && !p.final ? left : 0n).toString();
       this.state.pub.burned = this.state.burned;
+      this.state.pub.reserve = this.state.reserve && {
+        initial: this.state.reserve.initial,
+        left: this.state.reserve.left,
+      };
       this.state.pub.thresholdLamports = boxSize(this.state.history.length, this.state.boxTarget).toString();
       this.state.pub.vaultLamports = this.state.vaultLamports;
     }
@@ -1280,10 +1333,11 @@ export class Bot {
       this.log(`mint set: ${this.env.MINT}`);
     }
     if (this.state.phase === "done") return;
+    await this.recordReserve();
     // a burn that failed earlier: whatever $PULLIT the box holds is burned now
     if (this.state.burnPending && !this.dry) {
       try {
-        const r = await burnAll(this.rpc, this.box, this.env.MINT);
+        const r = await burnAll(this.rpc, this.box, this.env.MINT, this.reserveLeft());
         this.state.burnPending = false;
         if (r) this.log(`burned leftover $PULLIT: ${r.amount} (${r.sig})`);
       } catch (e) {

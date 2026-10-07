@@ -33,6 +33,10 @@ Every payment is saved the moment it is signed, before it is sent, and again whe
 
 The bot can only buy. Every swap in the code starts from SOL, there is no parameter to swap anything else, and `test/executor.test.ts` fails if a second kind of swap ever appears.
 
+## Launch reserve
+
+At launch the box wallet buys $PULLIT for itself. The bot records that amount before the first box opens and never counts it as buyback. On every milestone box it burns 25% of the original reserve, until nothing is left. The usual buyback burns only what it just bought and leaves the reserve alone.
+
 ## Rollover
 
 Not every pull takes the whole box. Whatever is left stays in the box wallet and counts towards the next box, so the next one fills faster.

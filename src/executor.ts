@@ -233,15 +233,27 @@ export async function payout(
   return { sig: r.sig, mint, amount: r.outAmount };
 }
 
-/** Burns the box's whole balance of `mint`. Returns null if there is nothing to burn. */
-export async function burnAll(rpc: Rpc, box: Keypair, mint: string): Promise<{ sig: string; amount: string } | null> {
+/**
+ * Burns the box's balance of `mint` above `keep` (the launch reserve, burned on its own schedule),
+ * or exactly `exact` if given. Returns null if there is nothing to burn.
+ */
+export async function burnAll(
+  rpc: Rpc,
+  box: Keypair,
+  mint: string,
+  keep = 0n,
+  exact?: bigint,
+): Promise<{ sig: string; amount: string } | null> {
   let acc = null;
-  for (let i = 0; i < 8 && !acc?.amount; i++) {
+  const enough = (a: bigint) => (exact != null ? a >= exact : a > keep);
+  for (let i = 0; i < 8 && !(acc && enough(acc.amount)); i++) {
     acc = await rpc.tokenAccount(box.publicKey, mint);
-    if (!acc?.amount) await new Promise((r) => setTimeout(r, 1500)); // a fresh buy can take a moment to show
+    if (!(acc && enough(acc.amount))) await new Promise((r) => setTimeout(r, 1500)); // a fresh buy can take a moment
   }
-  if (!acc?.amount) return null;
+  if (!acc || !enough(acc.amount)) return null;
+  const amount = exact ?? acc.amount - keep;
+  if (amount <= 0n) return null;
   const { blockhash } = await rpc.latestBlockhash();
-  const tx = await buildTx(box, [burnIx(acc.program, acc.address, mint, box.publicKey, acc.amount)], blockhash);
-  return { sig: await rpc.sendAndConfirm(tx), amount: acc.amount.toString() };
+  const tx = await buildTx(box, [burnIx(acc.program, acc.address, mint, box.publicKey, amount)], blockhash);
+  return { sig: await rpc.sendAndConfirm(tx), amount: amount.toString() };
 }

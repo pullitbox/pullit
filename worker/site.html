@@ -320,7 +320,7 @@ dialog.small{width:min(500px,calc(100vw - 32px))}
 <section class="opened">
   <span class="lbl"><span class="px">opened</span><i>tap one: proof</i></span>
   <div class="tape" id="grid"><span class="empty" style="padding-left:14px">nothing opened yet. the first box opens at 0.15 sol</span></div>
-  <span class="stats"><b id="holders">-</b> holders · <b id="eligible">-</b> in the draw · <b id="given">0</b> sol given · <b id="burned">0</b> sol burned</span>
+  <span class="stats"><b id="holders">-</b> holders · <b id="eligible">-</b> in the draw · <b id="given">0</b> sol given · <b id="burned">0</b> sol burned<span id="resv" hidden> · reserve <b id="resvPct">100</b>% left</span></span>
 </section>
 
 
@@ -336,6 +336,7 @@ dialog.small{width:min(500px,calc(100vw - 32px))}
     <dt class="px">frenzy</dt><dd>more volume in the last hour, better odds for the next box</dd>
     <dt class="px">milestones</dt><dd>first box after 50K, 100K, 250K, 500K, 1M cap and up is epic or better, takes 20% of the vault, and burns 10% of what is left</dd>
     <dt class="px">burn</dt><dd>10% of every box buys $pullit and burns it. the bot cannot sell, only buy and burn</dd>
+    <dt class="px">reserve</dt><dd>the box bought $pullit at launch. it can only burn it: 25% on every milestone box</dd>
     <dt class="px">fees</dt><dd>80% to the box, 20% runs the agent and the team. leftovers roll into the next box</dd>
   </dl>
   <p class="fine">a bag counts up to 1% of supply, max 10% of all tickets per wallet. pools and our wallets are never in. if the box ever stops, everything left goes out in a final box. not financial advice. its a box.</p>
@@ -549,6 +550,9 @@ function render() {
   $('eligible').textContent = (p.eligible ?? '-').toLocaleString?.() ?? '-';
   $('given').textContent = fmt(sol(s.givenLamports), 2);
   $('burned').textContent = fmt(sol(s.burned?.lamports || '0'), 2);
+  const rv = p.reserve;
+  $('resv').hidden = !rv;
+  if (rv) $('resvPct').textContent = String(Math.round((Number(rv.left) / Number(rv.initial)) * 100));
   renderInside(id, pk, p);
 
   const st = $('state'); st.classList.toggle('packed', !!pk);
