@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { packBox, rollTier, validate, TIERS } from "../src/agent.ts";
+import { fresher, packBox, rollTier, validate, TIERS } from "../src/agent.ts";
 import type { ScanResult, Candidate } from "../src/scanner.ts";
 
 const cand = (symbol: string, mint: string, bucket: "fresh" | "established"): Candidate => ({
@@ -147,4 +147,19 @@ test("json is found inside a fenced or chatty model answer", async () => {
   assert.equal(jsonPart('```json\n{"a":1}\n```'), '{"a":1}');
   assert.equal(jsonPart('here you go: {"a":{"b":2}} enjoy'), '{"a":{"b":2}}');
   assert.throws(() => jsonPart(""));
+});
+
+test("fresher skips recent boxes and shrinks the window when thin", () => {
+  const list = ["A", "B", "C", "D", "E"].map((symbol) => ({ symbol }) as Candidate);
+  const keep = (l: Candidate[]) =>
+    l
+      .map((c) => c.symbol)
+      .sort()
+      .join("");
+  assert.equal(keep(fresher(list, ["X", "Y"])), "ABCDE");
+  assert.equal(keep(fresher(list, ["A", "Z", "B", "Y"])), "CDE");
+  // too few left: older boxes come back first, the newest stays out
+  assert.equal(keep(fresher(list, ["A", "Z", "B", "Y", "C", "W"])), "ADE");
+  assert.equal(keep(fresher(list, ["A", "B", "C", "D", "E", "X"])), "ABCD");
+  assert.equal(fresher(list, []).length, 5);
 });

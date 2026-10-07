@@ -173,7 +173,10 @@ export function validate(raw: unknown, scan: ScanResult): string[] {
 
 function fallback(scan: ScanResult, boxId: number, recent: string[]): BoxPlan {
   const pick = (list: Candidate[]) => {
-    const ok = list.filter((c) => !recent.includes(c.symbol)).slice(0, 4);
+    const ok = [...list]
+      .sort((a, b) => b.score - a.score)
+      .filter((c) => !recent.includes(c.symbol))
+      .slice(0, 4);
     return ok.length ? ok[Math.floor(Math.random() * ok.length)] : list[0];
   };
   const c = pick(scan.fresh);
@@ -192,6 +195,27 @@ function fallback(scan: ScanResult, boxId: number, recent: string[]): BoxPlan {
   };
 }
 
+/**
+ * Variety: coins from recent boxes are taken out. `recent` is oldest first. When a bucket is thin,
+ * the window shrinks from the oldest side, so the last boxes are still skipped even then.
+ * The rest is shuffled so the model does not just take whatever is listed first.
+ */
+export function fresher(list: Candidate[], recent: string[], min = 3, rnd = Math.random): Candidate[] {
+  let left = list;
+  for (let from = 0; from <= recent.length; from += 2) {
+    const skip = recent.slice(from);
+    left = list.filter((c) => !skip.includes(c.symbol));
+    // the last box is always skipped when anything else is left
+    if (left.length >= (skip.length <= 2 ? 1 : min)) break;
+  }
+  const out = [...(left.length ? left : list)];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(rnd() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
 /** Packs a box. Never throws on model problems: falls back to the top-scored safe picks. */
 export async function packBox(
   apiKey: string | undefined,
@@ -201,12 +225,7 @@ export async function packBox(
   model?: string,
 ): Promise<{ plan: BoxPlan; problems: string[] }> {
   if (scan.fresh.length === 0 || scan.established.length === 0) throw new Error("scanner returned an empty bucket");
-  // variety: coins from recent boxes are taken out, as long as enough others are left
-  const fresher = (list: Candidate[]) => {
-    const l = list.filter((c) => !recentSymbols.includes(c.symbol));
-    return l.length >= 3 ? l : list;
-  };
-  scan = { ...scan, fresh: fresher(scan.fresh), established: fresher(scan.established) };
+  scan = { ...scan, fresh: fresher(scan.fresh, recentSymbols), established: fresher(scan.established, recentSymbols) };
   if (!apiKey) return { plan: fallback(scan, boxId, recentSymbols), problems: ["no OPENROUTER_API_KEY"] };
   let problems: string[] = [];
   try {
