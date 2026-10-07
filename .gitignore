@@ -1,0 +1,5 @@
+.env
+node_modules
+out
+_to_delete
+.wrangler

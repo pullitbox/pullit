@@ -1,0 +1,654 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>pullit</title>
+<meta name="description" content="fees fill it. ai packs it. a holder opens it.">
+<meta property="og:title" content="pullit">
+<meta property="og:description" content="fees fill it. ai packs it. a holder opens it.">
+<meta name="theme-color" content="#0a090b">
+<link rel="icon" href="data:image/svg+xml,BOXSVG_URI">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen&family=Space+Mono:wght@400;700&display=swap">
+<style>
+:root{--bg:#0a090b;--panel:#141114;--log:#0f0d0f;--line:#2a2329;--ink:#120a10;--pink:#ff8dc0;--pink2:#ffa6cf;--shadow:#6a2a4c;--text:#f6eff9;--muted:#9a8f99;--dim:#5e555d;
+--mint:#7be0c3;--gold:#ffc94d;--common:#c9c2d6;--rare:#8ec5ff;--epic:#cfa8ff;--secret:#ffc94d}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{background:var(--bg);color:var(--text);font:14px/1.5 'Space Mono',ui-monospace,monospace;min-height:100vh;
+background-image:radial-gradient(rgba(255,141,192,.10) 1px,transparent 1.4px);background-size:8px 8px}
+a{color:var(--pink);text-decoration:none}a:hover{color:#ffc8e0}
+button,input{font:inherit;color:inherit}
+.px{font-family:'Silkscreen',monospace;letter-spacing:.01em}
+.wrap{width:100%;max-width:1140px;margin:0 auto;padding:18px 16px 26px;display:flex;flex-direction:column;gap:22px}
+.test{background:var(--gold);color:var(--ink);text-align:center;font-size:12px;padding:6px}
+
+header{display:flex;gap:12px;align-items:center;justify-content:space-between}
+.brand{display:flex;align-items:center;gap:10px;font-size:22px;color:var(--text)}
+.brand img{width:30px;image-rendering:pixelated}
+nav{display:flex;gap:8px;align-items:center;font-size:12px}
+.chip{background:transparent;border:2px solid var(--line);color:var(--muted);padding:8px 12px;min-height:40px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.chip:hover{border-color:var(--pink);color:var(--text)}
+.chip b{color:var(--text);font-weight:400}
+
+/* hero band */
+.band{background:var(--pink);color:var(--ink);padding:18px;box-shadow:8px 8px 0 var(--shadow);display:flex;flex-wrap:wrap;gap:22px;align-items:stretch}
+.stage{flex:0 1 340px;display:flex;gap:14px;align-items:flex-start;min-width:0}
+.boxwin{width:140px;height:140px;background:var(--ink);display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+.boxwin img{width:104px;image-rendering:pixelated;animation:bob 2.6s steps(6) infinite}
+.boxwin.packed img{animation:shake .6s steps(4) infinite}
+.bubble{position:relative;flex:1 1 auto;min-width:0;margin-top:8px;background:var(--text);color:var(--ink);padding:9px 11px;font-size:12px;line-height:1.45;box-shadow:3px 3px 0 var(--ink);min-height:64px}
+.bubble::after{content:'';position:absolute;left:-10px;top:14px;border:5px solid transparent;border-right-color:var(--text);border-bottom-color:var(--text)}
+.bubble .who{display:block;font-family:'Silkscreen',monospace;font-size:9px;color:#7d6c86}
+.meterbox{flex:1 1 380px;min-width:0;display:flex;flex-direction:column;gap:12px;justify-content:center}
+.toprow{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+.toprow .title{font-size:30px}
+.state{font-size:12px;background:var(--ink);color:var(--mint);padding:6px 10px}
+.state.packed{color:var(--gold)}
+.segs{display:grid;grid-template-columns:repeat(20,minmax(0,1fr));gap:4px}
+.segs i{height:30px;border:2px solid var(--ink);display:block}
+.segs i.on{background:var(--ink)}
+.segs i.now{background:var(--text);animation:blink 1s steps(2) infinite}
+.segs.packed i{background:var(--gold);animation:blink 1s steps(2) infinite}
+.sub{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;font-size:13px}
+.sub .bank{font-size:16px}
+.chips{display:flex;gap:8px;align-items:center}
+.safe{display:flex;align-items:center;gap:12px;background:var(--ink);padding:8px 10px;box-shadow:4px 4px 0 var(--shadow)}
+.safe .door{position:relative;flex:0 0 auto;width:44px;height:40px;background:var(--gold);border:3px solid #3a2a00;box-sizing:border-box;display:flex;align-items:center;justify-content:center}
+.safe .dial{position:relative;width:18px;height:18px;border-radius:50%;border:3px solid #3a2a00;box-sizing:border-box;animation:dial 3s steps(8) infinite}
+.safe .dial::after{content:'';position:absolute;left:50%;top:-1px;width:3px;height:7px;margin-left:-1.5px;background:#3a2a00}
+.safe .glint{position:absolute;right:4px;top:3px;width:4px;height:4px;background:#fff;animation:glint 2.2s steps(6) infinite}
+.safe .txt{display:flex;flex-direction:column;line-height:1.1;min-width:0}
+.safe .k{font-family:'Silkscreen',monospace;font-size:9px;color:var(--muted)}
+.safe .v{font-family:'Silkscreen',monospace;font-size:20px;color:var(--gold)}
+.safe .w{font-size:9px;color:var(--muted)}
+@keyframes dial{to{transform:rotate(360deg)}}
+@keyframes glint{0%,60%,100%{opacity:0}70%{opacity:1}}
+.act{flex:0 1 220px;display:flex;flex-direction:column;gap:8px;justify-content:center;min-width:0}
+.buy{background:var(--ink);color:var(--text);box-shadow:4px 4px 0 var(--shadow);padding:13px 11px;font-size:16px;letter-spacing:.06em;text-align:center}
+.buy:hover{background:#2a1424;color:#fff}
+.buy:active{transform:translate(2px,2px);box-shadow:2px 2px 0 var(--shadow)}
+.check{display:flex;border:2px solid var(--line);margin-top:4px}
+.check input{flex:1;min-width:0;background:var(--panel);border:0;color:var(--text);font-size:12px;padding:10px;outline:none}
+.check input::placeholder{color:var(--dim)}
+.check button{background:var(--pink);color:var(--ink);border:0;padding:0 14px;font-size:11px;cursor:pointer;min-height:42px}
+.answer{font-size:11px;color:var(--muted);min-height:16px}
+.answer b{color:var(--text)}
+.answer b{font-weight:700}
+
+/* log + tiers */
+.mid{display:flex;flex-wrap:wrap;gap:20px;align-items:stretch}
+.log{flex:999 1 560px;min-width:0;border:2px solid var(--line);background:var(--log);display:flex;flex-direction:column}
+.loghead{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:2px solid var(--line);font-size:12px;color:var(--muted)}
+.loghead .px{color:var(--text)}
+.live{color:var(--pink);animation:blink 1s steps(2) infinite}
+.log ol{list-style:none;margin:0;padding:14px;display:flex;flex-direction:column;gap:9px;font-size:13px;max-height:390px;overflow:auto}
+.log li{display:grid;grid-template-columns:42px 54px 1fr;gap:10px;line-height:1.5;align-items:baseline}
+.log .t{color:var(--dim)}
+.log .tag{font-family:'Silkscreen',monospace;font-size:10px;border:1px solid;text-align:center;padding:1px 0}
+.log .m{color:var(--muted)}
+.log .m.hi{color:var(--text)}.log .m.rd{color:#ff6b6b}.log .m.mt{color:var(--mint)}.log .m.pk{color:var(--pink)}.log .m.gd{color:var(--gold)}
+.log .m a.tx{color:var(--pink);text-decoration:none;margin-left:6px;white-space:nowrap}.log .m a.tx:hover{text-decoration:underline}
+.log .cur::after{content:'_';animation:blink 1s steps(2) infinite;color:var(--pink)}
+.inside{flex:1 1 320px;min-width:0;display:flex;flex-direction:column;gap:10px}
+.inside .h{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.inside h2{margin:0;font-size:14px;font-weight:400}
+.inside .note{font-size:11px;color:var(--muted)}
+.cap{width:34px;height:34px;border-radius:50%;border:3px solid var(--bg);flex:0 0 auto}
+/* the belt */
+.belt{position:relative;flex:0 0 auto;background:#3a162c;padding:6px;box-shadow:6px 6px 0 var(--shadow);cursor:pointer;user-select:none}
+.belt .glass{position:relative;height:170px;overflow:hidden;background-image:radial-gradient(rgba(255,255,255,.05) 1px,transparent 1.4px),linear-gradient(180deg,#1d1422,#0c0a0d 75%);background-size:6px 6px,auto}
+.belt .glass::after{content:'';position:absolute;left:14px;top:10px;width:8px;height:44px;background:rgba(255,255,255,.08);pointer-events:none}
+.track{position:absolute;left:0;bottom:30px;display:flex;align-items:flex-end;gap:14px;will-change:transform}
+.floor{position:absolute;left:0;right:0;bottom:0;height:30px;background:#120a10}
+.floor .tread{position:absolute;left:0;right:0;top:0;height:8px;background:repeating-linear-gradient(90deg,#3a2a38 0 12px,#1c141c 12px 24px)}
+.floor .rollers{position:absolute;left:0;right:0;top:12px;height:14px;background:radial-gradient(circle at 7px 7px,#3a2a38 5px,#120a10 5.5px) 0 0/28px 14px repeat-x}
+.marker{position:absolute;left:50%;top:0;bottom:30px;width:2px;margin-left:-1px;background:repeating-linear-gradient(180deg,rgba(255,141,192,.55) 0 6px,transparent 6px 12px);pointer-events:none;z-index:3}
+.marker::before{content:'';position:absolute;left:-7px;top:0;border:8px solid transparent;border-top:10px solid var(--pink);border-bottom:0}
+.marker .lbl{position:absolute;left:12px;top:2px;font-family:'Silkscreen',monospace;font-size:10px;color:var(--pink);white-space:nowrap}
+.belt.rolling .marker{animation:blink .4s steps(2) infinite}
+.belt .hint{position:absolute;right:8px;top:6px;font-size:10px;color:var(--dim);z-index:3}
+.result{position:absolute;left:8px;right:8px;top:8px;z-index:4;background:var(--text);color:var(--ink);padding:7px 10px;font-size:12px;box-shadow:3px 3px 0 var(--ink);transform:translateY(-160%);opacity:0;transition:transform .35s steps(5),opacity .2s}
+.result.show{transform:translateY(0);opacity:1}
+.result b{font-family:'Silkscreen',monospace;font-weight:400}
+
+/* pixel gift box */
+.gbox{--s:40px;position:relative;display:flex;flex-direction:column;align-items:center;flex:0 0 auto;transform-origin:50% 100%}
+.gbox .bow{position:relative;width:calc(var(--s)*.56);height:calc(var(--s)*.17);z-index:3}
+.gbox .bow::before,.gbox .bow::after{content:'';position:absolute;bottom:0;width:45%;height:100%;background:var(--mint);border:2px solid var(--ink);box-sizing:border-box}
+.gbox .bow::before{left:0;transform:skewY(18deg)}.gbox .bow::after{right:0;transform:skewY(-18deg)}
+.gbox .lid{position:relative;z-index:2;width:calc(var(--s)*1.22 + 8px);height:calc(var(--s)*.24);background:var(--c);border:3px solid var(--ink);box-sizing:border-box;transition:transform .45s steps(5)}
+.gbox .lid::before{content:'';position:absolute;left:50%;top:0;bottom:0;width:calc(var(--s)*.16);margin-left:calc(var(--s)*-.08);background:var(--mint)}
+.gbox .lid::after{content:'';position:absolute;left:3px;top:2px;width:30%;height:3px;background:rgba(255,255,255,.5)}
+.gbox .bod{position:relative;width:calc(var(--s)*1.22);height:calc(var(--s)*.8);background:var(--c);border:3px solid var(--ink);border-top:0;box-sizing:border-box;display:flex;align-items:center;justify-content:center;box-shadow:inset calc(var(--s)*-.16) 0 0 rgba(0,0,0,.16)}
+.gbox .bod::before{content:'';position:absolute;left:50%;top:0;bottom:0;width:calc(var(--s)*.16);margin-left:calc(var(--s)*-.08);background:var(--mint)}
+.gbox .tag{position:relative;font-family:'Silkscreen',monospace;font-size:calc(var(--s)*.34);line-height:1;color:var(--ink);background:var(--text);padding:1px 3px;border:2px solid var(--ink)}
+.gbox .sh{width:calc(var(--s)*1.22 + 4px);height:5px;background:rgba(0,0,0,.45);border-radius:50%;margin-top:2px}
+.gbox.epic{filter:drop-shadow(0 0 5px rgba(207,168,255,.55))}
+.gbox.secret{animation:goldglow 1.2s steps(4) infinite}
+.gbox.open{animation:none;transform:scale(1.35) translateY(-6px);z-index:5}
+.gbox.open .lid{transform:translate(10px,calc(var(--s)*-.75)) rotate(24deg)}
+.gbox.open .bow{transform:translate(10px,calc(var(--s)*-.75)) rotate(24deg)}
+.gbox.open::before{content:'';position:absolute;left:50%;top:40%;width:150px;height:150px;margin:-75px 0 0 -75px;background:repeating-conic-gradient(from 0deg,var(--c) 0 10deg,transparent 10deg 30deg);opacity:.35;border-radius:50%;animation:rays 4s linear infinite;z-index:-1;-webkit-mask:radial-gradient(circle,#000 30%,transparent 70%);mask:radial-gradient(circle,#000 30%,transparent 70%)}
+.gbox.dim{opacity:.35;transition:opacity .4s}
+@keyframes goldglow{50%{filter:drop-shadow(0 0 9px rgba(255,201,77,.9)) brightness(1.1)}}
+@keyframes rays{to{transform:rotate(360deg)}}
+.pop{position:absolute;left:50%;bottom:60%;transform:translateX(-50%);z-index:6;font-family:'Silkscreen',monospace;font-size:12px;color:var(--ink);background:var(--c);border:3px solid var(--ink);padding:4px 8px;white-space:nowrap;box-shadow:3px 3px 0 var(--ink);animation:popup .7s steps(7) both}
+@keyframes popup{0%{transform:translate(-50%,40px) scale(.3);opacity:0}60%{transform:translate(-50%,-14px) scale(1.1);opacity:1}100%{transform:translate(-50%,-6px) scale(1)}}
+.bit{position:absolute;left:50%;top:45%;width:6px;height:6px;background:var(--c);z-index:4;animation:burst .9s steps(9) forwards}
+@keyframes burst{to{transform:translate(var(--dx),var(--dy));opacity:0}}
+@keyframes hop{0%,62%,100%{transform:translateY(0)}70%{transform:translateY(-9px)}80%{transform:translateY(0)}86%{transform:translateY(-3px)}}
+
+/* odds plaques */
+.oddsrow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.oddsrow .o{background:var(--panel);border:2px solid var(--line);border-bottom:4px solid var(--c);padding:9px 4px 8px;text-align:center;display:flex;flex-direction:column;gap:2px}
+.oddsrow .nm{font-family:'Silkscreen',monospace;font-size:11px;color:var(--c)}
+.oddsrow .pc{font-family:'Silkscreen',monospace;font-size:20px;line-height:1}
+.oddsrow .o.secret{animation:pulsegold 1.6s steps(4) infinite}
+@keyframes pulsegold{50%{box-shadow:0 0 12px rgba(255,201,77,.45)}}
+
+@keyframes wob{0%,70%,100%{transform:rotate(0)}80%{transform:rotate(-8deg)}90%{transform:rotate(8deg)}}
+@keyframes glow{50%{box-shadow:0 0 0 2px var(--c),0 0 0 6px color-mix(in srgb,var(--c) 35%,transparent),inset -6px -6px 0 rgba(0,0,0,.18)}}
+
+/* opened tape */
+.opened{display:flex;align-items:stretch;border:2px solid var(--line);background:var(--panel);min-width:0}
+.opened .lbl{flex:0 0 auto;padding:10px 12px;font-size:11px;color:var(--muted);border-right:2px solid var(--line);display:flex;align-items:center}
+.opened .tape{flex:1 1 auto;overflow:hidden;white-space:nowrap;display:flex;align-items:center;min-width:0}
+.opened .run{display:inline-flex;gap:28px;padding-left:16px;animation:marq 45s linear infinite}
+.opened .tape:hover .run{animation-play-state:paused}
+.opened .run a{color:var(--text);font-size:12px;display:inline-flex;align-items:center;gap:7px}
+.opened .run a .cap{width:16px;height:16px;border-width:2px}
+.opened .run .d{color:var(--dim)}
+.opened .run .it{display:inline-flex;align-items:center;gap:8px}
+.opened .run a.tx{color:var(--pink);font-size:11px}.opened .run .tx.test{color:var(--dim);font-size:11px}
+.log .m .tx.test{color:var(--dim);margin-left:6px;white-space:nowrap}
+.opened .stats{flex:0 0 auto;padding:10px 12px;font-size:11px;color:var(--muted);border-left:2px solid var(--line);display:flex;align-items:center;gap:4px}
+.opened .stats b{color:var(--text);font-weight:400}
+@keyframes marq{to{transform:translateX(-50%)}}
+.empty{color:var(--muted);font-size:12px}
+footer{font-size:11px;color:var(--dim);display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px}
+
+/* sheets */
+dialog{background:var(--bg);color:var(--text);border:3px solid var(--pink);box-shadow:8px 8px 0 var(--shadow);padding:0;width:min(580px,calc(100vw - 32px));max-height:calc(100vh - 40px)}
+dialog::backdrop{background:rgba(5,4,6,.8)}
+.sheet{padding:18px;display:flex;flex-direction:column;gap:12px;font-size:13px}
+.sheet h2{margin:0;font-size:20px;font-weight:400;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.sheet h3{margin:4px 0 0;font-size:13px;font-weight:400;color:var(--muted)}
+.sheet .x{background:none;border:2px solid var(--line);width:40px;height:40px;cursor:pointer;color:var(--muted)}
+.sheet dl{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:0}
+.sheet dt{color:var(--muted)}
+.sheet dd{margin:0;word-break:break-all}
+.sheet ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:6px}
+.sheet table{border-collapse:collapse;font-size:12px}
+.sheet td{padding:4px 10px 4px 0}
+.sheet .muted{color:var(--muted)}
+.sheet pre{margin:0;background:var(--panel);border:2px solid var(--line);padding:10px;white-space:pre-wrap;word-break:break-all;font-size:12px}
+.pbtn{background:var(--pink);color:var(--ink);border:0;box-shadow:4px 4px 0 var(--shadow);padding:12px 16px;cursor:pointer;align-self:flex-start}
+.pbtn:disabled{opacity:.4;cursor:default}
+.ok{color:var(--mint)}.bad{color:#ff6b6b}
+.t-common{color:var(--common)}.t-rare{color:var(--rare)}.t-epic{color:var(--epic)}.t-secret{color:var(--secret)}
+
+@keyframes bob{50%{transform:translateY(-8px) rotate(-2deg)}}
+@keyframes shake{25%{transform:translateX(-3px) rotate(-3deg)}75%{transform:translateX(3px) rotate(3deg)}}
+@keyframes blink{50%{opacity:.3}}
+@media (min-width:900px) and (min-height:540px){
+  html,body{height:100%;overflow:hidden}
+  .wrap{height:100vh;gap:14px;padding-top:14px;padding-bottom:14px}
+  .band{padding:14px;flex-wrap:nowrap}
+  .boxwin{width:116px;height:116px}.boxwin img{width:86px}
+  .segs i{height:24px}
+  .toprow .title{font-size:26px}
+  .meterbox{gap:9px}
+  .mid{flex:1 1 auto;min-height:0;flex-wrap:nowrap}
+
+  .inside{gap:8px}
+  .log{min-height:0}
+  .log ol{max-height:none;flex:1 1 auto;min-height:0}
+  .inside{min-height:0}
+
+}
+@media (min-width:900px) and (max-height:720px){
+  .belt .glass{height:140px}
+  .oddsrow .o{padding:6px 4px 5px}
+  .inside{overflow:hidden}
+}
+@media (min-width:900px) and (max-height:660px){
+  .wrap{gap:10px;padding-top:10px;padding-bottom:10px}
+  .belt .glass{height:118px}
+  .track{--k:.78}
+  .oddsrow .o{padding:4px 4px 3px}.oddsrow .pc{font-size:16px}
+  .answer{display:none}
+  .check button{min-height:36px}.check input{padding:7px 10px}
+  .inside .h{display:none}
+}
+@media (max-width:760px){
+  .wrap{gap:18px}
+  .band{padding:14px;gap:16px}
+  .stage{flex-basis:100%}
+  .boxwin{width:110px;height:110px}.boxwin img{width:82px}
+  .toprow .title{font-size:24px}
+  .segs{gap:3px}.segs i{height:22px;border-width:2px}
+  .act{flex-basis:100%}
+  #caText{display:none}
+  .brand{font-size:18px}
+  .log li{grid-template-columns:38px 48px 1fr;gap:8px;font-size:12px}
+  .opened{flex-wrap:wrap}
+  .opened .stats{order:-1;flex-basis:100%;border-left:0;border-bottom:2px solid var(--line)}
+  .opened .tape{flex-basis:0;padding:10px 0}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="test px" id="testBar" hidden>test mode. simulated fees, no real prizes</div>
+<div class="wrap">
+<header>
+  <a class="brand px" href="/"><img src="data:image/svg+xml,BOXSVG_URI" alt="">pullit</a>
+  <nav>
+    <button class="chip" id="ca" type="button" title="copy contract address">ca <b id="caText">soon</b></button>
+    <a class="chip" href="https://x.com/Pullitbox" target="_blank" rel="noopener">x</a>
+    <a class="chip" id="gh" href="#" target="_blank" rel="noopener" hidden>github</a>
+    <button class="chip" type="button" data-open="rules">rules</button>
+  </nav>
+</header>
+
+<section class="band">
+  <div class="stage">
+    <div class="boxwin" id="boxwin"><img src="data:image/svg+xml,BOXSVG_URI" alt="pullit, a pink pixel box with a mint bow"></div>
+    <div class="bubble" aria-live="polite"><span class="who">the box</span><span id="say">waking up</span></div>
+  </div>
+  <div class="meterbox">
+    <div class="toprow"><span class="title px" id="boxTitle">box #1</span><span class="state px" id="state">-</span></div>
+    <div class="segs" id="segs"></div>
+    <div class="sub"><span class="bank px" id="bank">-</span><span id="subText">opens when full</span></div>
+  </div>
+  <div class="act">
+    <div class="safe" title="the vault. grows every box. something opens it">
+      <div class="door"><div class="dial"></div><div class="glint"></div></div>
+      <div class="txt"><span class="k">the vault</span><span class="v" id="vault">0 sol</span><span class="w">something opens it</span></div>
+    </div>
+    <a class="buy px" id="buy" href="https://x.com/Pullitbox" target="_blank" rel="noopener">buy $pullit</a>
+  </div>
+</section>
+
+<div class="mid">
+  <section class="log">
+    <div class="loghead"><span class="px">the keepers log</span><span><span class="live">●</span> live</span></div>
+    <ol id="feed"></ol>
+  </section>
+  <section class="inside">
+    <div class="h"><h2 class="px" id="insideTitle">whats in box #1</h2><span class="note" id="insideNote">nobody knows. not even us</span></div>
+    <div class="oddsrow" id="oddsrow"></div>
+    <div class="belt" id="belt" title="tap for a practice pull"><div class="glass" id="glass">
+      <div class="track" id="track"></div>
+      <div class="floor"><div class="tread"></div><div class="rollers"></div></div>
+      <div class="marker"><span class="lbl">your pull</span></div>
+      <span class="hint">tap to try</span>
+      <div class="result" id="result"></div>
+    </div></div>
+    <form class="check" id="check">
+      <label for="wallet" class="px" style="position:absolute;left:-9999px">your wallet</label>
+      <input id="wallet" placeholder="paste your wallet, see your tickets" autocomplete="off" spellcheck="false">
+      <button type="submit" class="px">tickets</button>
+    </form>
+    <div class="answer on" id="answer">hold $20 for 15 min. thats your ticket</div>
+  </section>
+</div>
+
+<section class="opened">
+  <span class="lbl px">opened</span>
+  <div class="tape" id="grid"><span class="empty" style="padding-left:14px">nothing opened yet. the first box opens at 0.15 sol</span></div>
+  <span class="stats"><b id="holders">-</b> holders · <b id="eligible">-</b> in the draw · <b id="given">0</b> sol given</span>
+</section>
+
+
+</div>
+
+<dialog id="rules"><div class="sheet">
+  <h2 class="px">rules<button class="x" type="button" data-close aria-label="close">x</button></h2>
+  <ul>
+    <li>trading fees fill the box. 80% goes in, 20% keeps the agent running and the team building. a tenth of what goes in is set aside in the vault. something opens the vault. you will see</li>
+    <li>when the box is full, an ai picks two coins: a fresh runner and a runner of the meta. it seals them. nobody sees them until the box opens</li>
+    <li>the box locks to a future solana block. that block picks the holder and the tier. nobody knows it in advance, us included</li>
+  </ul>
+  <table>
+    <tr><td class="t-common px">common</td><td>50%</td><td>a slice of the box in a fresh runner</td></tr>
+    <tr><td class="t-rare px">rare</td><td>30%</td><td>a bigger slice in a meta runner</td></tr>
+    <tr><td class="t-epic px">epic</td><td>15%</td><td>???</td></tr>
+    <tr><td class="t-secret px">secret</td><td>5%</td><td>???</td></tr>
+  </table>
+  <ul>
+    <li>whatever a pull leaves in the box rolls into the next one</li>
+    <li>hold $20+ for 15 min and youre in. longer hold, more tickets, up to 3x at 24h. a bag counts up to 1% of supply, and no wallet gets more than 10% of all tickets</li>
+    <li>pools and our own wallets are never in the draw</li>
+    <li>if the box ever stops, everything left, vault included, goes out in a final box</li>
+  </ul>
+  <h3 class="px">what the bot can do</h3>
+  <ul>
+    <li>claim fees, split them, buy the prize, send it to the winner. thats it</li>
+    <li>it has no code to sell $pullit and no way to send the box anywhere except a winner</li>
+  </ul>
+  <dl id="wallets"></dl>
+  <p class="muted" style="margin:0">not financial advice. a prize can be worth less than you think. its a box.</p>
+</div></dialog>
+
+<dialog id="boxSheet"><div class="sheet" id="boxBody"></div></dialog>
+
+<script>
+const GITHUB = '';
+const Q = location.search;
+const $ = (id) => document.getElementById(id);
+const TIERS = [
+  { key: 'common', pct: 50, what: 'fresh runners' },
+  { key: 'rare', pct: 30, what: 'meta runners' },
+  { key: 'epic', pct: 15, what: '' },
+  { key: 'secret', pct: 5, what: '' }
+];
+const COLOR = { common: '#c9c2d6', rare: '#8ec5ff', epic: '#cfa8ff', secret: '#ffc94d' };
+const TAG = { fee: '#7be0c3', scan: '#9a8f99', pick: '#8ec5ff', box: '#ff8dc0', draw: '#ffc94d', win: '#ff8dc0', sent: '#9a8f99', info: '#9a8f99', roast: '#ff6b6b', hold: '#7be0c3', x: '#f4eef2' };
+const MSG = { x: 'hi', pick: 'hi', box: 'pk', win: 'pk', draw: 'gd', roast: 'rd', hold: 'mt' };
+const capBg = (t) => `linear-gradient(180deg,${COLOR[t]} 50%,#f6eff9 50%)`;
+const short = (a) => (a ? a.slice(0, 4) + '…' + a.slice(-4) : '-');
+const sol = (l) => Number(l || 0) / 1e9;
+const fmt = (n, d = 3) => { const s = n.toFixed(d); return s.includes('.') ? s.replace(/0+$/, '').replace(/\.$/, '') : s; };
+const acct = (a) => 'https://solscan.io/account/' + a;
+const hhmm = (iso) => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+const ago = (iso) => { const m = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60000)); return m < 60 ? m + 'm' : m < 1440 ? Math.round(m / 60) + 'h' : Math.round(m / 1440) + 'd'; };
+const el = (tag, props = {}, ...kids) => { const e = document.createElement(tag); Object.assign(e, props); e.append(...kids); return e; };
+const api = (path, extra = '') => fetch(path + (Q ? Q + (extra ? '&' + extra : '') : extra ? '?' + extra : ''), { cache: 'no-store' }).then((r) => r.json());
+const cap = (t, size) => el('span', { className: 'cap', style: `background:${capBg(t)};box-shadow:0 0 0 2px ${COLOR[t]}` + (size ? `;width:${size}px;height:${size}px` : '') });
+
+if (GITHUB) { $('gh').href = GITHUB; $('gh').hidden = false; }
+for (let i = 0; i < 20; i++) $('segs').append(el('i'));
+TIERS.forEach((t) => $('oddsrow').append(el('div', { className: 'o ' + t.key, style: `--c:${COLOR[t.key]}`, title: t.what || '???' },
+  el('span', { className: 'nm', textContent: t.key }), el('span', { className: 'pc', textContent: t.pct + '%' }))));
+
+let S = null, mint = '', said = '';
+function say(t) { if (t !== said) { said = t; $('say').textContent = t; } }
+
+$('ca').onclick = () => {
+  if (!mint) return;
+  navigator.clipboard.writeText(mint).then(() => { $('caText').textContent = 'copied'; setTimeout(() => ($('caText').textContent = short(mint)), 1200); });
+};
+
+// ---------- the belt: boxes ride past at the real odds; the block stops it ----------
+const Belt = (() => {
+  const SIZE = { common: 40, rare: 52, epic: 64, secret: 78 };
+  const GAP = 14;
+  const glass = $('glass'), track = $('track'), beltEl = $('belt'), result = $('result');
+  const box = (tier, s) => {
+    const b = el('div', { className: 'gbox ' + tier, style: `--c:${COLOR[tier]};--s:calc(${s}px * var(--k, 1))` },
+      el('div', { className: 'bow' }), el('div', { className: 'lid' }),
+      el('div', { className: 'bod' }, el('span', { className: 'tag', textContent: '?' })), el('div', { className: 'sh' }));
+    b.dataset.tier = tier; return b;
+  };
+  // 50 boxes in exact proportion (30 / 14 / 5 / 1), shuffled, laid out twice
+  const deck = () => { const d = [...Array(30).fill('common'), ...Array(14).fill('rare'), ...Array(5).fill('epic'), 'secret'];
+    for (let i = d.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [d[i], d[j]] = [d[j], d[i]]; } return d; };
+  [...deck(), ...deck()].forEach((t) => track.append(box(t, SIZE[t])));
+
+  // boxes grow with the window, so a tall window is filled, not empty on top
+  const IDLE = 38, FAST = 420;
+  let x = 0, speed = IDLE, want = IDLE, last = performance.now(), stop = null, busy = false, onDone = null;
+  const width = (n) => n.getBoundingClientRect().width;
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    if (stop) {
+      const t = Math.min(1, (now - stop.t0) / stop.ms);
+      const e = 1 - Math.pow(1 - t, 4);
+      x = stop.x0 - stop.dist * e;
+      if (t >= 1) { const s = stop; stop = null; speed = 0; want = 0; s.done(); }
+    } else {
+      speed += (want - speed) * Math.min(1, dt * 3);
+      x -= speed * dt;
+      // recycle boxes that left on the left
+      let first = track.firstElementChild;
+      while (first && -x > width(first) + GAP) { x += width(first) + GAP; track.append(first); first = track.firstElementChild; }
+    }
+    track.style.transform = `translateX(${x}px)`;
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  function stopOn(tier, done) {
+    const mid = glass.getBoundingClientRect().left + glass.clientWidth / 2;
+    const v = Math.max(speed, 80);
+    const minAhead = v * 2.4 / 4;
+    let target = null, dist = 0;
+    for (const n of track.children) {
+      const r = n.getBoundingClientRect();
+      const c = r.left + r.width / 2 - mid;
+      if (c > minAhead && n.dataset.tier === tier) { target = n; dist = c; break; }
+    }
+    if (!target) { done(null); return; }
+    stop = { x0: x, dist, t0: performance.now(), ms: Math.max(2400, Math.min(4800, (4 * dist / v) * 1000)), done: () => done(target) };
+  }
+  function reveal(target, html, ms, label) {
+    [...track.children].forEach((n) => n !== target && n.classList.add('dim'));
+    target.classList.add('open');
+    const extras = [el('span', { className: 'pop', textContent: label || '?' })];
+    const n = { common: 10, rare: 16, epic: 24, secret: 40 }[target.dataset.tier];
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2, d = 40 + Math.random() * 70;
+      extras.push(el('i', { className: 'bit', style: `--dx:${Math.cos(a) * d}px;--dy:${Math.sin(a) * d - 20}px;animation-delay:${Math.random() * 0.15}s;background:${Math.random() < 0.3 ? '#f6eff9' : 'var(--c)'}` }));
+    }
+    target.append(...extras);
+    result.replaceChildren(...html); result.classList.add('show');
+    setTimeout(() => {
+      result.classList.remove('show'); target.classList.remove('open');
+      extras.forEach((e) => e.remove());
+      [...track.children].forEach((n) => n.classList.remove('dim'));
+      busy = false; want = IDLE; beltEl.classList.remove('rolling'); if (onDone) onDone();
+    }, ms);
+  }
+  return {
+    get busy() { return busy; },
+    rolling(on) { if (busy && !on) return; beltEl.classList.toggle('rolling', on); want = on ? FAST : IDLE; },
+    land(tier, html, ms = 9000, label, cb) {
+      busy = true; onDone = cb; want = FAST; beltEl.classList.add('rolling');
+      setTimeout(() => stopOn(tier, (target) => { if (!target) { busy = false; want = IDLE; return; } reveal(target, html, ms, label); }), 900);
+    },
+  };
+})();
+
+// tap the belt for a practice pull at the real odds
+const PRACTICE = {
+  common: 'common. a fresh runner. could be the next one, could be dust',
+  rare: 'rare. a meta runner. the boring adult choice',
+  epic: 'epic. you will find out what that means when it happens for real',
+  secret: 'secret. 1 in 50. screenshot it, it was fake',
+};
+$('belt').onclick = () => {
+  if (Belt.busy || (S && S.pending)) return;
+  const r = Math.random() * 100;
+  const t = r < 50 ? 'common' : r < 80 ? 'rare' : r < 95 ? 'epic' : 'secret';
+  Belt.land(t, [el('b', { className: 't-' + t, textContent: 'practice: ' }), PRACTICE[t]], 5000, t === 'common' || t === 'rare' ? '$???' : '???');
+};
+
+function renderInside(id, packed) {
+  $('insideTitle').textContent = 'whats in box #' + id;
+  $('insideNote').textContent = packed ? 'sealed ' + short(packed.seal) : 'nobody knows. not even us';
+  Belt.rolling(!!packed);
+}
+
+function render() {
+  const s = S; if (!s) return;
+  const p = s.pub || {};
+  if (p.mint && p.mint !== mint) { mint = p.mint; $('caText').textContent = short(mint); $('buy').href = 'https://pump.fun/coin/' + mint; }
+  $('testBar').hidden = !s.dry;
+  const pk = s.pending;
+  const id = pk ? pk.boxId : s.nextBoxId || 1;
+  $('boxTitle').textContent = s.phase === 'done' ? 'all done' : 'box #' + id;
+  const have = sol(p.boxLamports), need = sol(p.thresholdLamports);
+  const pct = pk ? 1 : need ? Math.min(1, have / need) : 0;
+  const on = Math.floor(pct * 20);
+  $('segs').classList.toggle('packed', !!pk);
+  [...$('segs').children].forEach((c, i) => { c.className = pk ? '' : i < on ? 'on' : i === on ? 'now' : ''; });
+  $('boxwin').classList.toggle('packed', !!pk);
+  $('vault').textContent = fmt(sol(s.vaultLamports), 2) + ' sol';
+  $('holders').textContent = (p.holders ?? '-').toLocaleString?.() ?? '-';
+  $('eligible').textContent = (p.eligible ?? '-').toLocaleString?.() ?? '-';
+  $('given').textContent = fmt(sol(s.givenLamports), 2);
+  renderInside(id, pk);
+
+  const st = $('state'); st.classList.toggle('packed', !!pk);
+  const last = s.history && s.history[0];
+  if (render.seen === undefined) render.seen = last ? last.boxId : 0;
+  else if (last && last.boxId > render.seen) {
+    render.seen = last.boxId;
+    const t = last.draw.tier;
+    Belt.land(t, [el('b', { className: 't-' + t, textContent: t + ' ' }), `${short(last.draw.winner)} · ${fmt(sol(last.prize?.lamports), 3)} sol of $${last.prize?.symbol || '?'}`], 12000, '$' + (last.prize?.symbol || '?'));
+  }
+  if (!mint) { st.textContent = 'soon'; $('bank').textContent = '-'; $('subText').textContent = 'not live yet'; say('not live yet. soon'); }
+  else if (s.phase === 'done') { st.textContent = 'closed'; $('bank').textContent = 'empty'; $('subText').textContent = 'the final box is open'; say('that was the final box. thanks for holding me'); }
+  else if (pk) {
+    const left = Math.round(70 - (Date.now() - Date.parse(pk.at)) / 1000);
+    st.textContent = left > 0 ? `opens in ~${left}s` : 'opening…';
+    $('bank').textContent = fmt(sol(pk.budgetLamports)) + ' sol inside';
+    $('subText').textContent = 'block ' + pk.targetSlot.toLocaleString('en-US') + ' picks the holder';
+    say(pk.posts?.[0] || 'packed and sealed. even i cant peek');
+  } else {
+    st.textContent = 'filling';
+    $('bank').textContent = need ? `${fmt(have)} / ${fmt(need, 2)} sol` : '-';
+    $('subText').textContent = 'opens when full';
+    const fresh = last && Date.now() - Date.parse(last.at) < 10 * 60_000;
+    if (fresh) say(last.posts?.[last.posts.length - 1] || '');
+    else { const n = Math.round(pct * 100); say(n < 30 ? 'im mostly air right now. trades fill me' : n < 80 ? `${n}% full. i can feel it` : `${n}%. almost. dont leave`); }
+  }
+
+  // log: lines that arrive while the page is open are typed out one by one
+  const feed = s.feed || [];
+  const fkey = feed.length ? feed[0].at + feed.length : '';
+  if (fkey !== render.fkey) {
+    const first = render.fkey === undefined;
+    render.fkey = fkey;
+    render.lines = render.lines || new Set();
+    const line = (f, typed) => {
+      const m = el('span', { className: 'm ' + (MSG[f.tag] || ''), textContent: typed ? '' : f.m });
+      const li = el('li', {},
+        el('span', { className: 't', textContent: hhmm(f.at) }),
+        el('span', { className: 'tag', textContent: f.tag, style: `color:${TAG[f.tag] || '#9a8f99'};border-color:${TAG[f.tag] || '#9a8f99'}` }), m);
+      const tx = () => { if (f.tag === 'win' && (!f.tx || f.tx === 'dry-run')) m.append(el('span', { className: 'tx test', textContent: 'tx (test)' })); else if (f.tx) m.append(el('a', { className: 'tx', href: 'https://solscan.io/tx/' + f.tx, target: '_blank', rel: 'noopener', textContent: 'tx ↗' })); };
+      if (!typed) tx();
+      return { li, m, text: f.m, typed, tx };
+    };
+    const items = [...feed].reverse().map((f) => { const k = f.at + f.m; const isNew = !first && !render.lines.has(k); render.lines.add(k); return line(f, isNew); });
+    const cur = el('li', {}, el('span', { className: 't', textContent: hhmm(new Date().toISOString()) }), el('span'), el('span', { className: 'm cur', textContent: pk ? 'waiting for block ' + pk.targetSlot.toLocaleString('en-US') : mint ? 'waiting for fees' : 'waiting for launch' }));
+    const fresh = items.filter((x) => x.typed);
+    fresh.forEach((x) => (x.li.style.display = 'none'));
+    $('feed').replaceChildren(...items.map((x) => x.li), cur);
+    const down = () => requestAnimationFrame(() => { $('feed').scrollTop = $('feed').scrollHeight; });
+    down();
+    clearTimeout(render.typing);
+    let i = 0;
+    const next = () => {
+      const x = fresh[i++]; if (!x) return;
+      x.li.style.display = ''; down();
+      let n = 0;
+      const step = () => { n += 2; x.m.textContent = x.text.slice(0, n); if (n < x.text.length) render.typing = setTimeout(step, 18); else { x.tx(); down(); render.typing = setTimeout(next, 500); } };
+      step();
+    };
+    next();
+  }
+
+  // opened tape
+  const h = s.history || [];
+  const hkey = h.map((b) => b.boxId).join(',');
+  if (h.length && hkey !== render.hkey) {
+    render.hkey = hkey;
+    const txOf = (b) => b.prize?.sig && b.prize.sig !== 'dry-run'
+      ? el('a', { className: 'tx', href: 'https://solscan.io/tx/' + b.prize.sig, target: '_blank', rel: 'noopener', textContent: 'tx ↗' })
+      : el('span', { className: 'tx test', textContent: 'tx (test)' });
+    const items = () => h.slice(0, 20).map((b) => el('span', { className: 'it' }, el('a', { href: '#box-' + b.boxId },
+      cap(b.draw.tier), el('span', { className: 'd', textContent: '#' + b.boxId }), short(b.draw.winner),
+      el('span', { className: 't-' + b.draw.tier, textContent: `${fmt(sol(b.prize?.lamports), 2)} sol of $${b.prize?.symbol || '?'}` }),
+      el('span', { className: 'd', textContent: ago(b.at) })), txOf(b)));
+    $('grid').replaceChildren(el('div', { className: 'run' }, ...items(), ...items()));
+  }
+
+  const dl = $('wallets'); dl.replaceChildren();
+  for (const [k, v] of [['box', p.box], ['team', p.team], ['dev', p.dev]]) if (v) dl.append(el('dt', { textContent: k }), el('dd', {}, el('a', { href: acct(v), target: '_blank', rel: 'noopener', textContent: v })));
+}
+
+async function load() { try { S = await api('/api/state'); render(); } catch { say('cant reach the box right now. try again in a sec'); } }
+load(); setInterval(load, 5_000); setInterval(() => S && S.pending && render(), 1000);
+
+$('check').onsubmit = async (e) => {
+  e.preventDefault();
+  const a = $('wallet').value.trim(), out = $('answer'); out.classList.add('on');
+  if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(a)) { out.textContent = 'thats not a solana wallet'; return; }
+  out.textContent = 'checking…';
+  try {
+    const r = await api('/api/wallet', 'a=' + a);
+    out.replaceChildren();
+    if (r.status === 'in') out.append('youre in. ', el('b', { textContent: Math.round(r.tickets).toLocaleString() + ' tickets' }), ` · ${r.sharePct}% · ${r.multiplier}x`);
+    else if (r.status === 'waiting') out.append('almost. in after ', el('b', { textContent: r.minutesLeft + ' more min' }));
+    else if (r.status === 'excluded') out.append('pool or our wallet. not in the draw');
+    else out.append('not in yet. hold $20+ for 15 min');
+  } catch { out.textContent = 'couldnt check right now'; }
+};
+
+document.querySelectorAll('[data-open]').forEach((b) => (b.onclick = () => $(b.dataset.open).showModal()));
+document.addEventListener('click', (e) => {
+  if (e.target.matches('[data-close]')) e.target.closest('dialog').close();
+  if (e.target.tagName === 'DIALOG') e.target.close();
+});
+$('boxSheet').addEventListener('close', () => { if (location.hash.startsWith('#box-')) history.replaceState(null, '', location.pathname + location.search); });
+
+async function sha256(s) {
+  const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
+  return [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, '0')).join('');
+}
+async function recompute(b) {
+  const list = b.rows.filter((r) => r.tickets > 0).sort((x, y) => (x.owner < y.owner ? -1 : 1));
+  const total = list.reduce((a, r) => a + r.tickets, 0);
+  const seed = await sha256(`${b.draw.blockhash}:${b.boxId}`);
+  const roll = (parseInt(seed.slice(0, 13), 16) / 2 ** 52) * total;
+  let acc = 0, winner = list[list.length - 1]?.owner;
+  for (const r of list) { acc += r.tickets; if (roll < acc) { winner = r.owner; break; } }
+  const n = parseInt(seed.slice(13, 21), 16) % 100;
+  let t = 0, tier = 'common';
+  for (const x of TIERS) { t += x.pct; if (n < t) { tier = x.key; break; } }
+  const seal = b.salt ? await sha256(`${b.plan.common.mint}|${b.plan.rare.mint}|${b.salt}`) : '';
+  return { seed, winner, tier, total, seal };
+}
+async function openBox(id) {
+  const body = $('boxBody');
+  body.replaceChildren(el('h2', { className: 'px', textContent: 'box #' + id }), el('div', { className: 'muted', textContent: 'loading…' }));
+  $('boxSheet').showModal();
+  let b; try { b = await api('/api/box', 'id=' + id); } catch { b = null; }
+  if (!b || b.error) { body.lastChild.textContent = 'no such box'; return; }
+  const d = b.draw, pr = b.prize || {};
+  const link = (href, text) => el('a', { href, target: '_blank', rel: 'noopener', textContent: text });
+  const dl = el('dl', {},
+    el('dt', { textContent: 'winner' }), el('dd', {}, link(acct(d.winner), d.winner)),
+    el('dt', { textContent: 'pulled' }), el('dd', {}, el('span', { className: 'px t-' + d.tier, textContent: d.tier }), ` ${fmt(sol(pr.lamports))} sol of $${pr.symbol || '?'}`,
+      pr.fromVault && pr.fromVault !== '0' ? ` (${fmt(sol(pr.fromVault))} from the vault)` : '',
+      pr.sig && pr.sig !== 'dry-run' ? el('span', {}, ' · ', link('https://solscan.io/tx/' + pr.sig, 'tx')) : ' (test)'),
+    el('dt', { textContent: 'inside' }), el('dd', {}, el('span', { className: 't-common', textContent: '$' + b.plan.common.symbol }), ' and ', el('span', { className: 't-rare', textContent: '$' + b.plan.rare.symbol })),
+    el('dt', { textContent: 'seal' }), el('dd', { textContent: b.seal || '-' }),
+    el('dt', { textContent: 'box' }), el('dd', { textContent: `${fmt(sol(b.budgetLamports))} sol, ${b.eligible} holders in the draw` }),
+    el('dt', { textContent: 'block' }), el('dd', {}, link('https://solscan.io/block/' + d.slot, String(d.slot))),
+    el('dt', { textContent: 'blockhash' }), el('dd', { textContent: d.blockhash }),
+    el('dt', { textContent: 'seed' }), el('dd', { textContent: d.seed }));
+  const how = el('pre', { textContent: `seal = sha256(common mint | rare mint | salt)\nseed = sha256(blockhash:${b.boxId})\nwinner = weighted pick by tickets, wallets sorted a-z\ntier = seed[13..21] mod 100 → 50 / 30 / 15 / 5` });
+  const res = el('div', { className: 'muted', textContent: b.rows.length ? '' : 'ticket list for this box isnt stored, cant recompute' });
+  const btn = el('button', { className: 'pbtn px', type: 'button', textContent: 'check it myself', disabled: !b.rows.length });
+  btn.onclick = async () => {
+    res.textContent = 'recomputing…';
+    const r = await recompute(b);
+    const okDraw = r.seed === d.seed && r.winner === d.winner && r.tier === d.tier;
+    const okSeal = !b.salt || r.seal === b.seal;
+    res.replaceChildren(
+      el('div', {}, el('span', { className: okSeal ? 'ok' : 'bad', textContent: okSeal ? 'seal matches. ' : 'seal mismatch. ' }), 'the coins were picked before the block'),
+      el('div', {}, el('span', { className: okDraw ? 'ok' : 'bad', textContent: okDraw ? 'draw matches. ' : 'draw mismatch. ' }), `${b.rows.length} wallets, ${Math.round(r.total).toLocaleString()} tickets → ${short(r.winner)}, ${r.tier}`));
+  };
+  body.replaceChildren(el('h2', { className: 'px' }, 'box #' + b.boxId, el('button', { className: 'x', type: 'button', textContent: 'x', ariaLabel: 'close', onclick: () => $('boxSheet').close() })), dl, how, btn, res);
+}
+function route() { const m = location.hash.match(/^#box-(\d+)$/); if (m) openBox(Number(m[1])); }
+window.addEventListener('hashchange', route); route();
+</script>
+</body>
+</html>

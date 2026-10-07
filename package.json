@@ -1,0 +1,26 @@
+{
+  "name": "pullit",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.6"
+  },
+  "scripts": {
+    "scan": "node --experimental-strip-types --no-warnings --env-file-if-exists=.env scripts/scan.ts",
+    "test": "node --experimental-strip-types --no-warnings --test test/*.test.ts",
+    "holders": "node --experimental-strip-types --no-warnings --env-file-if-exists=.env scripts/holders.ts",
+    "xcheck": "node --experimental-strip-types --no-warnings --env-file-if-exists=.env scripts/xcheck.ts",
+    "zcheck": "node --experimental-strip-types --no-warnings --env-file-if-exists=.env scripts/zcheck.ts",
+    "pack": "node --experimental-strip-types --no-warnings --env-file-if-exists=.env scripts/pack.ts",
+    "testbox": "node --experimental-strip-types --no-warnings --env-file-if-exists=.env scripts/testbox.ts",
+    "bot": "node --experimental-strip-types --no-warnings --env-file-if-exists=.env scripts/run.ts",
+    "secrets": "node --experimental-strip-types --no-warnings --env-file-if-exists=.env scripts/secrets.ts",
+    "deploy": "npm run site && npx wrangler deploy",
+    "logs": "npx wrangler tail --format pretty",
+    "site": "node --experimental-strip-types --no-warnings scripts/build-site.ts",
+    "preview": "node --experimental-strip-types --no-warnings scripts/preview.ts",
+    "verify": "node --experimental-strip-types --no-warnings scripts/verify.ts",
+    "quips": "node --experimental-strip-types --no-warnings --env-file-if-exists=.env scripts/quips.ts"
+  },
+  "license": "MIT"
+}
