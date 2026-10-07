@@ -119,7 +119,7 @@ export interface State {
   milestoneQueue?: number[]; // market caps waiting for their milestone box, one box each
   burned?: { lamports: string; tokens: string }; // totals of all buybacks and burns
   burnPending?: boolean; // the box holds bought $PULLIT that still has to be burned
-  // $PULLIT bought into the box at launch. the bot never sells it: a quarter is burned on every milestone box
+  // $PULLIT bought into the box at launch. the bot never sells it: 10% is burned at 50K, 125K, 200K and 350K cap
   reserve?: { initial: string; left: string; burns: { at: string; sig: string; amount: string; milestone: number }[] };
   nextTeaseAt?: number; // before launch: when the next teaser goes out on x
   xPostedAt?: number[]; // times of the x posts of the last 24 hours, for the daily cap
@@ -503,6 +503,8 @@ export class Bot {
       );
       if (text) await this.post(text, [], false, true); // a milestone is worth a post
     }
+    // the launch reserve burns at its own caps, whether or not a box is opening
+    for (const cap of BOOST.reserveBurnAtUsd) if (mcap >= cap) await this.burnReserve(cap);
     if (this.state.pub) {
       this.state.pub.frenzy = level;
       this.state.pub.odds = o;
@@ -949,7 +951,7 @@ export class Bot {
 
   /**
    * The launch reserve is whatever $PULLIT the box holds before the first box opens (bought at launch).
-   * Recorded once, then only ever burned, a quarter on every milestone box.
+   * Recorded once, then only ever burned: 10% of it at each cap in BOOST.reserveBurnAtUsd.
    */
   async recordReserve() {
     if (this.dry || this.state.history.length > 0 || this.state.phase !== "filling") return;
@@ -961,7 +963,7 @@ export class Bot {
     }
   }
 
-  /** On a milestone box: burns the next slice of the launch reserve. */
+  /** When the market cap crosses one of the reserve caps: burns the next slice of the launch reserve. */
   async burnReserve(milestone: number) {
     const r = this.state.reserve;
     if (!r || this.dry || BigInt(r.left) <= 0n || r.burns.some((b) => b.milestone === milestone)) return;
@@ -977,7 +979,7 @@ export class Bot {
       const leftPct = Number((BigInt(r.left) * 100n) / BigInt(r.initial));
       await this.line(
         "burn",
-        `${usdShort(milestone)} cap, so ${BOOST.reserveBurnPct}% of the launch reserve just got burned. ${leftPct}% of it left. the box bought it at launch and can only burn it, never sell`,
+        `$PULLIT crossed ${usdShort(milestone)} cap, so ${BOOST.reserveBurnPct}% of the launch reserve just got burned. ${leftPct}% of it left. the box bought it at launch and can only burn it, never sell`,
         [`${BOOST.reserveBurnPct}%`],
         `${usdShort(milestone)} cap. burned ${BOOST.reserveBurnPct}% of my launch bag. ${leftPct}% left. i told you i cant sell`,
         undefined,
@@ -1138,7 +1140,6 @@ export class Bot {
       fromVault: fromVault.toString(),
     };
     this.state.vaultLamports = (vault - fromVault - vaultBurned).toString();
-    if (p.milestone) await this.burnReserve(p.milestone);
 
     const extra = fromVault > 0n ? ` (${sol(fromVault)} from the vault)` : "";
     const both = `${sol(lamports)} sol of $${symbol}`;

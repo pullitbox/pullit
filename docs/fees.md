@@ -35,7 +35,7 @@ The bot can only buy. Every swap in the code starts from SOL, there is no parame
 
 ## Launch reserve
 
-At launch the box wallet buys $PULLIT for itself. The bot records that amount before the first box opens and never counts it as buyback. On every milestone box it burns 25% of the original reserve, until nothing is left. The usual buyback burns only what it just bought and leaves the reserve alone.
+At launch the box wallet buys $PULLIT for itself. The bot records that amount before the first box opens and never counts it as buyback. When the market cap crosses 50K, 125K, 200K and 350K it burns 10% of the original reserve each time. The usual buyback burns only what it just bought and leaves the reserve alone.
 
 ## Rollover
 
