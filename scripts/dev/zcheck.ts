@@ -2,7 +2,7 @@
 // Usage: npm run zcheck
 //        npm run zcheck -- --post "box #0"
 
-import { findXAccount, listAccounts, zernioPost } from "../src/zernio.ts";
+import { findXAccount, listAccounts, zernioPost } from "../../src/zernio.ts";
 
 const key = process.env.ZERNIO_API_KEY;
 if (!key) throw new Error("Set ZERNIO_API_KEY in .env");

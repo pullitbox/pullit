@@ -2,6 +2,8 @@
 
 The agent decides what goes in the box. It never touches money directly: it returns a choice, the code checks it, and only then does anything happen.
 
+While a box fills, the agent re-scans the market every 10 minutes and keeps a shortlist of the top 5 fresh and top 5 meta runners. It tells the log how the list changed (how many came in, how many dropped out), never which coins. When the box is full it scans once more and packs from what is running at that moment.
+
 ## Scanner
 
 `src/scanner.ts` pulls the market from Jupiter Tokens v2 (top trending, top traded and top organic lists over 5m, 1h, 6h, 24h, plus recent tokens) and splits it in two buckets:

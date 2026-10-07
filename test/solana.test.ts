@@ -1,6 +1,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { b58decode, b58encode, buildTransferTx, keypairFromSecret, signSerializedTx } from "../src/solana.ts";
+import {
+  b58decode,
+  b58encode,
+  buildTransferTx,
+  buildTx,
+  burnIx,
+  keypairFromSecret,
+  signSerializedTx,
+} from "../src/solana.ts";
 import { shouldRunFinalBox } from "../src/fees.ts";
 
 async function newKeypairSecret(): Promise<string> {
@@ -61,4 +69,43 @@ test("final box only after grace period and when fees dry up", () => {
   assert.equal(shouldRunFinalBox(busy, launched, now), false);
   assert.equal(shouldRunFinalBox(dry, launched, now), true);
   assert.equal(shouldRunFinalBox([], now - 2 * H, now), false); // grace
+});
+
+test("the generic tx builder makes the same bytes as the transfer builder", async () => {
+  const kp = await keypairFromSecret(await newKeypairSecret());
+  const to = (await keypairFromSecret(await newKeypairSecret())).publicKey;
+  const bh = "11111111111111111111111111111111";
+  const data = new Uint8Array(12);
+  new DataView(data.buffer).setUint32(0, 2, true);
+  new DataView(data.buffer).setBigUint64(4, 777n, true);
+  const ix = {
+    programId: "11111111111111111111111111111111",
+    keys: [
+      { pubkey: kp.publicKey, signer: true, writable: true },
+      { pubkey: to, signer: false, writable: true },
+    ],
+    data,
+  };
+  assert.deepEqual(await buildTx(kp, [ix], bh), await buildTransferTx(kp, [{ to, lamports: 777n }], bh));
+});
+
+test("burn instruction: index 8, amount little endian, owner signs", () => {
+  const ix = burnIx("TokenProgram", "Acc", "Mint", "Owner", 258n);
+  assert.deepEqual([...ix.data], [8, 2, 1, 0, 0, 0, 0, 0, 0]);
+  assert.deepEqual(
+    ix.keys.map((k) => [k.pubkey, k.signer, k.writable]),
+    [
+      ["Acc", false, true],
+      ["Mint", false, true],
+      ["Owner", true, false],
+    ],
+  );
+});
+
+test("a signed tx knows its own id before it is sent", async () => {
+  const { txSignature } = await import("../src/solana.ts");
+  const kp = await keypairFromSecret(await newKeypairSecret());
+  const tx = await buildTransferTx(kp, [{ to: kp.publicKey, lamports: 1n }], "11111111111111111111111111111111");
+  assert.equal(b58decode(txSignature(tx)).length, 64);
+  assert.deepEqual(b58decode(txSignature(tx)), tx.slice(1, 65));
 });

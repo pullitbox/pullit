@@ -1,6 +1,6 @@
 // Asks the agent for sample log lines, to hear its voice before going live.
 //   npm run quips
-import { quip } from "../src/agent.ts";
+import { quip } from "../../src/agent.ts";
 
 const key = process.env.OPENROUTER_API_KEY;
 if (!key) throw new Error("OPENROUTER_API_KEY missing in .env");
@@ -26,7 +26,7 @@ const events: [string, string[], string?][] = [
     "nothing happened for a while. say something on your own, like a bored box with opinions. box #8 is 41% full. vault holds 1.240 sol. 188 of 412 holders are in the draw. it is 3:00 utc",
     [],
   ],
-  ["412 holders, 188 of them are in the draw (you need $20 held for 15 minutes)", ["188"]],
+  ["412 holders, 188 of them are in the draw (you need $20 held for 7 minutes)", ["188"]],
 ];
 const recent: string[] = [];
 for (const [facts, must, wallet] of events) {

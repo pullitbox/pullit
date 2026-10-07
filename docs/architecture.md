@@ -11,11 +11,13 @@ flowchart LR
   D -->|20%| TM[team wallet]
   B -->|10% of inflow, tracked| V[(vault)]
   B -->|prize, swapped by Jupiter| W[winner wallet]
-  V -->|secret pull only| W
+  B -->|10% of each box: buy $PULLIT| X[burn]
+  V -->|secret pulls, milestone boxes, final box| W
+  V -->|milestone burn| X
 ```
 
 - the bot only ever sends box SOL to a draw winner, swapped into the prize coin in the same transaction
-- the bot never trades or moves $PULLIT. it only reads balances to count tickets
+- the bot only buys. it buys $PULLIT only to burn it. every swap goes from SOL to a token, never back
 - all three wallets are public. they are listed on the site
 
 ## One box, step by step

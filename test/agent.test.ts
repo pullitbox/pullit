@@ -141,3 +141,10 @@ test("a leftover placeholder is rejected", async () => {
   const { checkQuip } = await import("../src/agent.ts");
   assert.ok(checkQuip("{w} claimed 0.1 sol in fees", [], []).includes("left a placeholder in"));
 });
+
+test("json is found inside a fenced or chatty model answer", async () => {
+  const { jsonPart } = await import("../src/agent.ts");
+  assert.equal(jsonPart('```json\n{"a":1}\n```'), '{"a":1}');
+  assert.equal(jsonPart('here you go: {"a":{"b":2}} enjoy'), '{"a":{"b":2}}');
+  assert.throws(() => jsonPart(""));
+});

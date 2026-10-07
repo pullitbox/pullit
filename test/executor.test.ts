@@ -8,8 +8,8 @@ const plan = { common: { mint: "C1", symbol: "C" }, rare: { mint: "R1", symbol: 
 test("tiers take their share of the box, secret also a quarter of the vault", () => {
   const bank = 1_000_000_000n,
     vault = 400_000_000n;
-  assert.deepEqual(prizeSplit("common", bank, vault), { fromBank: 300_000_000n, fromVault: 0n });
-  assert.deepEqual(prizeSplit("rare", bank, vault), { fromBank: 600_000_000n, fromVault: 0n });
+  assert.deepEqual(prizeSplit("common", bank, vault), { fromBank: 500_000_000n, fromVault: 0n });
+  assert.deepEqual(prizeSplit("rare", bank, vault), { fromBank: 750_000_000n, fromVault: 0n });
   assert.deepEqual(prizeSplit("epic", bank, vault), { fromBank: bank, fromVault: 0n });
   assert.deepEqual(prizeSplit("secret", bank, vault), { fromBank: bank, fromVault: 100_000_000n });
 });
@@ -28,4 +28,21 @@ test("seal is stable and changes with the contents", async () => {
   assert.equal(a, await sealOf(plan, "s"));
   assert.notEqual(a, await sealOf({ ...plan, rare: { ...plan.rare, mint: "R2" } }, "s"));
   assert.match(a, /^[0-9a-f]{64}$/);
+});
+
+test("a milestone box also takes its cut of the vault", () => {
+  assert.deepEqual(prizeSplit("epic", 1000n, 400n, false, 20), { fromBank: 1000n, fromVault: 80n });
+  assert.deepEqual(prizeSplit("secret", 1000n, 400n, false, 20), { fromBank: 1000n, fromVault: 180n });
+});
+
+test("the bot cannot sell: every swap in the code starts from SOL", async () => {
+  const { readdirSync, readFileSync } = await import("node:fs");
+  const code = readdirSync("src")
+    .map((f) => readFileSync(`src/${f}`, "utf8"))
+    .join("\n");
+  // the only place an input token is chosen for a Jupiter swap, and it is always SOL
+  const inputs = [...code.matchAll(/inputMint[:=]\s*([^,\n}]+)/g)].map((m) => m[1].trim());
+  assert.deepEqual(inputs, ["MINTS.SOL"]);
+  // no other swap API is called anywhere
+  assert.equal((code.match(/api\.jup\.ag\/swap/g) ?? []).length, 2); // order + execute in buyInto/quote
 });

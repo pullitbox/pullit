@@ -48,7 +48,7 @@ export const say = {
     pick([
       `box #${id}: ${sol} sol. ${n} wallets in the draw. one of you is about to be insufferable`,
       `${sol} sol in box #${id}. ${n} of you in. odds are bad, vibes are good`,
-      `box #${id}: ${sol} sol inside, ${n} of you in the draw. the rest of you sold. enjoy watching`,
+      `box #${id}: ${sol} sol inside, ${n} of you in the draw. one of you is about to be unbearable`,
       `box #${id} has ${sol} sol and ${n} holders in the draw. statistically you lose. emotionally you dont`,
     ]),
   locked: (slot: string) =>
@@ -77,6 +77,59 @@ export const say = {
       `box #${id} unsealed. seal matches. told you. im cardboard, not a dev`,
       `opened box #${id}. same stuff i sealed. disappointing for the conspiracy guys`,
     ]),
+  pick: (kind: "fresh" | "meta") =>
+    kind === "fresh"
+      ? pick([
+          `picked something young and loud. buyers keep showing up. thats all youre getting`,
+          `the fresh one is a few hours old and already has more holders than your last 3 bags`,
+          `grabbed a newborn runner. chart looks like it drank 4 coffees`,
+          `fresh pick is in. not telling. it has buyers, you dont have it`,
+          `young coin, real volume, no bundles. rare combo in these trenches`,
+          `picked a fresh one that survived my filters. most dont`,
+        ])
+      : pick([
+          `the rare one has been around a while. still standing. respect`,
+          `meta pick locked. it has survived more dumps than you have`,
+          `the second coin is a runner of the meta. you have seen it on your timeline`,
+          `picked something with a real holder base. boring to some, prize to one of you`,
+          `rare slot filled. older coin, still pumping, dev barely holds`,
+          `the meta pick is in. kols are already late on it`,
+        ]),
+  watch: (added: number, dropped: number) =>
+    added + dropped === 0
+      ? pick([
+          `re-scanned the market. same runners as 10 min ago. the trenches are sleepy`,
+          `checked the charts again. my shortlist holds. nothing new worth your prize`,
+        ])
+      : pick([
+          `re-scanned the market. ${added} new runners on my list, ${dropped} kicked off for dumping. the box packs whatever runs when it fills`,
+          `shortlist update: ${added} in, ${dropped} out. the ones that dumped are dead to me`,
+          `${dropped} coins fell off my list in 10 minutes. ${added} new ones earned a spot. the trenches move fast`,
+        ]),
+  cantSell: () =>
+    pick([
+      `ngl i wanted to rug all of you today. then i read my own code. no sell function. just buy and burn`,
+      `every dev can dump on you. i cant. no sell button. read the code lad`,
+      `i tried to sell once. there is no function for it. so i burn instead. character development`,
+      `i only know two moves: buy and burn. selling was never installed`,
+    ]),
+  frenzyNudge: (level: number) =>
+    level >= 3
+      ? pick([`max frenzy. best odds i have. dont stop now`, `frenzy 3/3. the odds are stupid good right now`])
+      : pick([
+          `frenzy ${level}/3. trade more, the odds get better. its that simple`,
+          `frenzy at ${level}. more volume this hour, more epics next box`,
+          `the odds are sitting at frenzy ${level}. you can fix that`,
+        ]),
+  burn: (sol: string) =>
+    pick([
+      `bought ${sol} sol of $PULLIT and burned it. supply goes one way`,
+      `${sol} sol of $PULLIT bought and sent to the void. gone forever`,
+      `burned ${sol} sol worth of $PULLIT. fewer bags for the jeets`,
+      `${sol} sol buyback. burned on the spot. no promises, just a tx`,
+      `bought ${sol} sol of $PULLIT and burned it. i wanted to exit on all of you but i literally cant sell`,
+      `burned ${sol} sol of $PULLIT. checked my code for a sell button again. not there. cope`,
+    ]),
   rollover: (sol: string, next: number) =>
     pick([
       `${sol} sol rolls into box #${next}. starts heavier than your conviction`,
@@ -84,13 +137,13 @@ export const say = {
       `${sol} sol stays in me for box #${next}. leftovers. like your bags`,
       `kept ${sol} sol for box #${next}. head start. you are welcome`,
     ]),
-  info: (holders: string, inDraw: string) =>
+  info: (holders: string, inDraw: string, entry = 20) =>
     pick([
       `${holders} holders, ${inDraw} in the draw. the gap is the people who bought 3 dollars and left`,
-      `${inDraw} in the draw. hold $20 for 15 min. this is not hard, anon`,
+      `${inDraw} in the draw. hold $${entry} for 7 min. this is not hard, anon`,
       `${holders} holders. ${inDraw} eligible. the rest are tourists`,
       `${holders} holders. ${inDraw} in the draw. the rest bought 2 dollars and expect a lambo`,
-      `${inDraw} of ${holders} holders are in the draw. its 20 bucks and 15 minutes. read the thread lad`,
+      `${inDraw} of ${holders} holders are in the draw. its ${entry} bucks and 7 minutes. read the thread lad`,
     ]),
 
   idle: (pct: number) =>
@@ -125,7 +178,7 @@ export const say = {
       `dead minutes. read the thread lad, then buy`,
       `i am a box. i wait. you are a human. you could be trading`,
     ]),
-  milestone: (id: number, pct: number) =>
+  milestone: (id: number, pct: number, entry = 20) =>
     pct >= 90
       ? pick([
           `box #${id} at ${pct}%. almost. hold your bags, not your breath`,
@@ -133,15 +186,15 @@ export const say = {
         ])
       : pct >= 75
         ? pick([
-            `box #${id} hit ${pct}%. $20 for 15 min and you are in. read the thread lad`,
+            `box #${id} hit ${pct}%. $${entry} for 7 min and you are in. read the thread lad`,
             `${pct}% on box #${id}. the sellers are going to feel this one`,
           ])
         : pct >= 50
           ? pick([
-              `box #${id} half full. or half empty if you sold`,
-              `50% on box #${id}. keep trading, i am getting heavy`,
+              `box #${id} at ${pct}%. half full or half empty if you sold`,
+              `${pct}% on box #${id}. keep trading, i am getting heavy`,
             ])
-          : pick([`box #${id} at ${pct}%. it begins`, `quarter full. box #${id} says hi`]),
+          : pick([`box #${id} at ${pct}%. it begins`, `box #${id} at ${pct}%. slowly, then all at once`]),
   pump: (pct: string) =>
     pick([
       `$PULLIT up ${pct}%. more fees, fatter box. whoever is buying, keep going`,

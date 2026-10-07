@@ -80,7 +80,8 @@ nav{display:flex;gap:8px;align-items:center;font-size:12px}
 
 /* log + tiers */
 .mid{display:flex;flex-wrap:wrap;gap:20px;align-items:stretch}
-.log{flex:999 1 560px;min-width:0;border:2px solid var(--line);background:var(--log);display:flex;flex-direction:column}
+.log{flex:999 1 560px;min-width:0;border:2px solid var(--line);background:var(--log);display:flex;flex-direction:column;position:relative}
+.newlines{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);font:inherit;font-size:12px;background:var(--pink);color:var(--ink);border:2px solid var(--ink);padding:5px 12px;box-shadow:3px 3px 0 var(--ink);cursor:pointer;z-index:3}
 .loghead{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:2px solid var(--line);font-size:12px;color:var(--muted)}
 .loghead .px{color:var(--text)}
 .live{color:var(--pink);animation:blink 1s steps(2) infinite}
@@ -89,7 +90,7 @@ nav{display:flex;gap:8px;align-items:center;font-size:12px}
 .log .t{color:var(--dim)}
 .log .tag{font-family:'Silkscreen',monospace;font-size:10px;border:1px solid;text-align:center;padding:1px 0}
 .log .m{color:var(--muted)}
-.log .m.hi{color:var(--text)}.log .m.rd{color:#ff6b6b}.log .m.mt{color:var(--mint)}.log .m.pk{color:var(--pink)}.log .m.gd{color:var(--gold)}
+.log .m.hi{color:var(--text)}.log .m.rd{color:#ff6b6b}.log .m.mt{color:var(--mint)}.log .m.pk{color:var(--pink)}.log .m.gd{color:var(--gold)}.answer b.pk{color:var(--pink)}.log .m.or{color:#ff9a4d}
 .log .m a.tx{color:var(--pink);text-decoration:none;margin-left:6px;white-space:nowrap}.log .m a.tx:hover{text-decoration:underline}
 .log .cur::after{content:'_';animation:blink 1s steps(2) infinite;color:var(--pink)}
 .inside{flex:1 1 320px;min-width:0;display:flex;flex-direction:column;gap:10px}
@@ -154,11 +155,15 @@ nav{display:flex;gap:8px;align-items:center;font-size:12px}
 
 /* opened tape */
 .opened{display:flex;align-items:stretch;border:2px solid var(--line);background:var(--panel);min-width:0}
-.opened .lbl{flex:0 0 auto;padding:10px 12px;font-size:11px;color:var(--muted);border-right:2px solid var(--line);display:flex;align-items:center}
+.opened .lbl{flex:0 0 auto;padding:6px 12px;font-size:11px;color:var(--muted);border-right:2px solid var(--line);display:flex;flex-direction:column;justify-content:center;gap:2px}
+.opened .lbl i{font-style:normal;font-family:inherit;font-size:9px;color:var(--pink)}
 .opened .tape{flex:1 1 auto;overflow:hidden;white-space:nowrap;display:flex;align-items:center;min-width:0}
 .opened .run{display:inline-flex;gap:28px;padding-left:16px;animation:marq 45s linear infinite}
 .opened .tape:hover .run{animation-play-state:paused}
 .opened .run a{color:var(--text);font-size:12px;display:inline-flex;align-items:center;gap:7px}
+.opened .run a.bx{border:1px dashed var(--line);padding:3px 8px;cursor:pointer}
+.opened .run a.bx:hover{border:1px solid var(--pink);background:#24121c}
+.opened .run a.bx .go{color:var(--pink);font-size:11px}
 .opened .run a .cap{width:16px;height:16px;border-width:2px}
 .opened .run .d{color:var(--dim)}
 .opened .run .it{display:inline-flex;align-items:center;gap:8px}
@@ -184,6 +189,19 @@ dialog::backdrop{background:rgba(5,4,6,.8)}
 .sheet table{border-collapse:collapse;font-size:12px}
 .sheet td{padding:4px 10px 4px 0}
 .sheet .muted{color:var(--muted)}
+.safe{cursor:pointer}.safe:hover .w{color:var(--gold)}
+dialog.small{width:min(500px,calc(100vw - 32px))}
+.sheet .rg{grid-template-columns:auto 1fr;gap:8px 14px;font-size:12px;line-height:1.45}
+.sheet .rg dt{font-size:10px;color:var(--pink);padding-top:2px;white-space:nowrap}
+.sheet .rg dd{word-break:normal}
+.sheet .odds{display:flex;flex-wrap:wrap;gap:6px}.sheet .odds b{font-weight:400;border:1px solid currentColor;padding:0 6px}
+.sheet .fine{margin:0;font-size:11px;color:var(--muted);line-height:1.45}
+.sheet .jr{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px;max-height:60vh;overflow:auto}
+.sheet .jr li{display:grid;grid-template-columns:52px 1fr;gap:4px 12px;font-size:12px;line-height:1.45}
+.sheet .jr .d{color:var(--dim);font-size:11px;padding-top:1px}
+.sheet .jr .k{font-family:'Silkscreen',monospace;font-size:9px;border:1px solid currentColor;padding:0 5px;margin-right:6px}
+.sheet .jr a{color:var(--pink);white-space:nowrap;margin-left:6px}
+.sheet .vbig{font-size:28px;color:var(--gold)}
 .sheet pre{margin:0;background:var(--panel);border:2px solid var(--line);padding:10px;white-space:pre-wrap;word-break:break-all;font-size:12px}
 .pbtn{background:var(--pink);color:var(--ink);border:0;box-shadow:4px 4px 0 var(--shadow);padding:12px 16px;cursor:pointer;align-self:flex-start}
 .pbtn:disabled{opacity:.4;cursor:default}
@@ -245,11 +263,12 @@ dialog::backdrop{background:rgba(5,4,6,.8)}
 <div class="test px" id="testBar" hidden>test mode. simulated fees, no real prizes</div>
 <div class="wrap">
 <header>
-  <a class="brand px" href="/"><img src="data:image/svg+xml,BOXSVG_URI" alt="">pullit</a>
+  <a class="brand px" href="/">pullit</a>
   <nav>
     <button class="chip" id="ca" type="button" title="copy contract address">ca <b id="caText">soon</b></button>
     <a class="chip" href="https://x.com/Pullitbox" target="_blank" rel="noopener">x</a>
     <a class="chip" id="gh" href="#" target="_blank" rel="noopener" hidden>github</a>
+    <button class="chip" type="button" data-open="journal" id="journalChip" hidden>journal</button>
     <button class="chip" type="button" data-open="rules">rules</button>
   </nav>
 </header>
@@ -265,7 +284,7 @@ dialog::backdrop{background:rgba(5,4,6,.8)}
     <div class="sub"><span class="bank px" id="bank">-</span><span id="subText">opens when full</span></div>
   </div>
   <div class="act">
-    <div class="safe" title="the vault. grows every box. something opens it">
+    <div class="safe" data-open="vaultSheet" role="button" tabindex="0" title="what is the vault">
       <div class="door"><div class="dial"></div><div class="glint"></div></div>
       <div class="txt"><span class="k">the vault</span><span class="v" id="vault">0 sol</span><span class="w">something opens it</span></div>
     </div>
@@ -277,6 +296,7 @@ dialog::backdrop{background:rgba(5,4,6,.8)}
   <section class="log">
     <div class="loghead"><span class="px">the keepers log</span><span><span class="live">●</span> live</span></div>
     <ol id="feed"></ol>
+    <button class="newlines" id="newLines" type="button" hidden>new lines ↓</button>
   </section>
   <section class="inside">
     <div class="h"><h2 class="px" id="insideTitle">whats in box #1</h2><span class="note" id="insideNote">nobody knows. not even us</span></div>
@@ -293,45 +313,50 @@ dialog::backdrop{background:rgba(5,4,6,.8)}
       <input id="wallet" placeholder="paste your wallet, see your tickets" autocomplete="off" spellcheck="false">
       <button type="submit" class="px">tickets</button>
     </form>
-    <div class="answer on" id="answer">hold $20 for 15 min. thats your ticket</div>
+    <div class="answer on" id="answer">hold <b id="entry">$20</b> for 7 min and youre in. bought in the last 15 min: +25%. sold: back to 1x</div>
   </section>
 </div>
 
 <section class="opened">
-  <span class="lbl px">opened</span>
+  <span class="lbl"><span class="px">opened</span><i>tap one: proof</i></span>
   <div class="tape" id="grid"><span class="empty" style="padding-left:14px">nothing opened yet. the first box opens at 0.15 sol</span></div>
-  <span class="stats"><b id="holders">-</b> holders · <b id="eligible">-</b> in the draw · <b id="given">0</b> sol given</span>
+  <span class="stats"><b id="holders">-</b> holders · <b id="eligible">-</b> in the draw · <b id="given">0</b> sol given · <b id="burned">0</b> sol burned</span>
 </section>
 
 
 </div>
 
-<dialog id="rules"><div class="sheet">
+<dialog id="rules" class="small"><div class="sheet">
   <h2 class="px">rules<button class="x" type="button" data-close aria-label="close">x</button></h2>
-  <ul>
-    <li>trading fees fill the box. 80% goes in, 20% keeps the agent running and the team building. a tenth of what goes in is set aside in the vault. something opens the vault. you will see</li>
-    <li>when the box is full, an ai picks two coins: a fresh runner and a runner of the meta. it seals them. nobody sees them until the box opens</li>
-    <li>the box locks to a future solana block. that block picks the holder and the tier. nobody knows it in advance, us included</li>
-  </ul>
-  <table>
-    <tr><td class="t-common px">common</td><td>50%</td><td>a slice of the box in a fresh runner</td></tr>
-    <tr><td class="t-rare px">rare</td><td>30%</td><td>a bigger slice in a meta runner</td></tr>
-    <tr><td class="t-epic px">epic</td><td>15%</td><td>???</td></tr>
-    <tr><td class="t-secret px">secret</td><td>5%</td><td>???</td></tr>
-  </table>
-  <ul>
-    <li>whatever a pull leaves in the box rolls into the next one</li>
-    <li>hold $20+ for 15 min and youre in. longer hold, more tickets, up to 3x at 24h. a bag counts up to 1% of supply, and no wallet gets more than 10% of all tickets</li>
-    <li>pools and our own wallets are never in the draw</li>
-    <li>if the box ever stops, everything left, vault included, goes out in a final box</li>
-  </ul>
-  <h3 class="px">what the bot can do</h3>
-  <ul>
-    <li>claim fees, split them, buy the prize, send it to the winner. thats it</li>
-    <li>it has no code to sell $pullit and no way to send the box anywhere except a winner</li>
-  </ul>
+  <dl class="rg">
+    <dt class="px">the box</dt><dd>trading fees fill it. an ai seals two coins inside. a future solana block picks the holder and the tier. nobody knows in advance, us included</dd>
+    <dt class="px">odds</dt><dd class="odds"><b class="t-common">common 50</b><b class="t-rare">rare 30</b><b class="t-epic">epic 15</b><b class="t-secret">secret 5</b></dd>
+    <dt class="px">get in</dt><dd>hold for 7 min. bigger box, bigger entry: $20 up to 0.5 sol · $50 up to 1.5 · $75 under 2.5 · $100 from 2.5 · $250 from 5. bigger bag, more tickets. 24h hold = 3x</dd>
+    <dt class="px">timing</dt><dd>bought in the last 15 min = +25%. sold anything = back to 1x</dd>
+    <dt class="px">frenzy</dt><dd>more volume in the last hour, better odds for the next box</dd>
+    <dt class="px">milestones</dt><dd>first box after 50K, 100K, 250K, 500K, 1M cap and up is epic or better, takes 20% of the vault, and burns 10% of what is left</dd>
+    <dt class="px">burn</dt><dd>10% of every box buys $pullit and burns it. the bot cannot sell, only buy and burn</dd>
+    <dt class="px">fees</dt><dd>80% to the box, 20% runs the agent and the team. leftovers roll into the next box</dd>
+  </dl>
+  <p class="fine">a bag counts up to 1% of supply, max 10% of all tickets per wallet. pools and our wallets are never in. if the box ever stops, everything left goes out in a final box. not financial advice. its a box.</p>
   <dl id="wallets"></dl>
-  <p class="muted" style="margin:0">not financial advice. a prize can be worth less than you think. its a box.</p>
+</div></dialog>
+
+<dialog id="journal" class="small"><div class="sheet">
+  <h2 class="px">journal<button class="x" type="button" data-close aria-label="close">x</button></h2>
+  <p class="fine">what changed and why, written by the box. every line links to the code or the transaction.</p>
+  <ol class="jr" id="journalList"></ol>
+</div></dialog>
+
+<dialog id="vaultSheet" class="small"><div class="sheet">
+  <h2 class="px">the vault<button class="x" type="button" data-close aria-label="close">x</button></h2>
+  <div class="vbig px" id="vaultBig">0 sol</div>
+  <dl class="rg">
+    <dt class="px">what</dt><dd>10% of everything that goes into a box is set aside here. it sits in the box wallet, on chain</dd>
+    <dt class="px">why</dt><dd>so some pulls are way bigger than the box. one lucky holder walks off with a chunk</dd>
+    <dt class="px">grows</dt><dd>every box adds to it. it only goes down when something opens it</dd>
+    <dt class="px">opens</dt><dd>milestone boxes give 20% to the winner and burn another 10%: bought back and gone. the rest? something opens it. you will see</dd>
+  </dl>
 </div></dialog>
 
 <dialog id="boxSheet"><div class="sheet" id="boxBody"></div></dialog>
@@ -347,8 +372,8 @@ const TIERS = [
   { key: 'secret', pct: 5, what: '' }
 ];
 const COLOR = { common: '#c9c2d6', rare: '#8ec5ff', epic: '#cfa8ff', secret: '#ffc94d' };
-const TAG = { fee: '#7be0c3', scan: '#9a8f99', pick: '#8ec5ff', box: '#ff8dc0', draw: '#ffc94d', win: '#ff8dc0', sent: '#9a8f99', info: '#9a8f99', roast: '#ff6b6b', hold: '#7be0c3', x: '#f4eef2' };
-const MSG = { x: 'hi', pick: 'hi', box: 'pk', win: 'pk', draw: 'gd', roast: 'rd', hold: 'mt' };
+const TAG = { fee: '#7be0c3', scan: '#9a8f99', pick: '#8ec5ff', box: '#ff8dc0', draw: '#ffc94d', win: '#ff8dc0', sent: '#9a8f99', info: '#9a8f99', roast: '#ff6b6b', hold: '#7be0c3', x: '#f4eef2', boost: '#ffc94d', burn: '#ff9a4d' };
+const MSG = { boost: 'gd', burn: 'or', x: 'hi', pick: 'hi', box: 'pk', win: 'pk', draw: 'gd', roast: 'rd', hold: 'mt' };
 const capBg = (t) => `linear-gradient(180deg,${COLOR[t]} 50%,#f6eff9 50%)`;
 const short = (a) => (a ? a.slice(0, 4) + '…' + a.slice(-4) : '-');
 const sol = (l) => Number(l || 0) / 1e9;
@@ -362,10 +387,24 @@ const cap = (t, size) => el('span', { className: 'cap', style: `background:${cap
 
 if (GITHUB) { $('gh').href = GITHUB; $('gh').hidden = false; }
 for (let i = 0; i < 20; i++) $('segs').append(el('i'));
-TIERS.forEach((t) => $('oddsrow').append(el('div', { className: 'o ' + t.key, style: `--c:${COLOR[t.key]}`, title: t.what || '???' },
-  el('span', { className: 'nm', textContent: t.key }), el('span', { className: 'pc', textContent: t.pct + '%' }))));
+// odds plaques; frenzy changes the numbers, so they are redrawn when the odds change
+function drawOdds(odds) {
+  const key = odds.join('/'); if (key === drawOdds.key) return; drawOdds.key = key;
+  $('oddsrow').replaceChildren(...TIERS.map((t, i) => el('div', { className: 'o ' + t.key, style: `--c:${COLOR[t.key]}`, title: t.what || '???' },
+    el('span', { className: 'nm', textContent: t.key }), el('span', { className: 'pc', textContent: odds[i] + '%' }))));
+}
+drawOdds(TIERS.map((t) => t.pct));
+const capShort = (n) => n >= 1e6 ? +(n / 1e6).toFixed(1) + 'M' : Math.round(n / 1e3) + 'K';
 
 let S = null, mint = '', said = '';
+// the log follows new lines only while the reader is at the bottom
+const Log = { follow: true };
+$('feed').addEventListener('scroll', () => {
+  const f = $('feed');
+  Log.follow = f.scrollHeight - f.scrollTop - f.clientHeight < 40;
+  if (Log.follow) $('newLines').hidden = true;
+});
+$('newLines').onclick = () => { Log.follow = true; $('feed').scrollTop = $('feed').scrollHeight; $('newLines').hidden = true; };
 function say(t) { if (t !== said) { said = t; $('say').textContent = t; } }
 
 $('ca').onclick = () => {
@@ -385,7 +424,7 @@ const Belt = (() => {
     b.dataset.tier = tier; return b;
   };
   // 50 boxes in exact proportion (30 / 14 / 5 / 1), shuffled, laid out twice
-  const deck = () => { const d = [...Array(30).fill('common'), ...Array(14).fill('rare'), ...Array(5).fill('epic'), 'secret'];
+  const deck = () => { const d = [...Array(10).fill('common'), ...Array(6).fill('rare'), ...Array(3).fill('epic'), 'secret']; // 50/30/15/5
     for (let i = d.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [d[i], d[j]] = [d[j], d[i]]; } return d; };
   [...deck(), ...deck()].forEach((t) => track.append(box(t, SIZE[t])));
 
@@ -458,18 +497,23 @@ const PRACTICE = {
   common: 'common. a fresh runner. could be the next one, could be dust',
   rare: 'rare. a meta runner. the boring adult choice',
   epic: 'epic. you will find out what that means when it happens for real',
-  secret: 'secret. 1 in 50. screenshot it, it was fake',
+  secret: 'secret. 1 in 20 at normal odds. screenshot it, it was fake',
 };
 $('belt').onclick = () => {
   if (Belt.busy || (S && S.pending)) return;
-  const r = Math.random() * 100;
-  const t = r < 50 ? 'common' : r < 80 ? 'rare' : r < 95 ? 'epic' : 'secret';
+  // the same odds the next box has right now, frenzy included
+  const o = (S && S.pub && S.pub.odds) || TIERS.map((x) => x.pct);
+  let r = Math.random() * 100, t = 'secret';
+  for (let i = 0; i < TIERS.length; i++) { if (r < o[i]) { t = TIERS[i].key; break; } r -= o[i]; }
   Belt.land(t, [el('b', { className: 't-' + t, textContent: 'practice: ' }), PRACTICE[t]], 5000, t === 'common' || t === 'rare' ? '$???' : '???');
 };
 
-function renderInside(id, packed) {
+function renderInside(id, packed, p) {
   $('insideTitle').textContent = 'whats in box #' + id;
-  $('insideNote').textContent = packed ? 'sealed ' + short(packed.seal) : 'nobody knows. not even us';
+  const frenzy = p.frenzy || 0;
+  if (p.odds) drawOdds(packed?.odds || p.odds);
+  $('insideNote').textContent = packed ? (packed.milestone ? 'milestone box · ' : '') + 'sealed ' + short(packed.seal)
+    : frenzy ? `frenzy ${frenzy}/3. volume pushed the odds up` : 'nobody knows. not even us';
   Belt.rolling(!!packed);
 }
 
@@ -488,10 +532,24 @@ function render() {
   [...$('segs').children].forEach((c, i) => { c.className = pk ? '' : i < on ? 'on' : i === on ? 'now' : ''; });
   $('boxwin').classList.toggle('packed', !!pk);
   $('vault').textContent = fmt(sol(s.vaultLamports), 2) + ' sol';
+  const J = s.journal || [];
+  $('journalChip').hidden = !J.length;
+  const jkey = J.length ? J[0].at + J.length : '';
+  if (jkey !== render.jkey) {
+    render.jkey = jkey;
+    const JC = { ship: 'var(--mint)', rule: 'var(--gold)', fix: 'var(--rare)', burn: '#ff9a4d' };
+    $('journalList').replaceChildren(...J.map((j) => el('li', {},
+      el('span', { className: 'd', textContent: new Date(j.at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).toLowerCase() }),
+      el('span', {}, el('span', { className: 'k', style: `color:${JC[j.kind] || 'var(--muted)'}`, textContent: j.kind }), j.text,
+        ...(j.link ? [el('a', { href: j.link, target: '_blank', rel: 'noopener', textContent: (j.link.includes('/tx/') ? 'tx' : 'commit') + ' ↗' })] : [])))));
+  }
+  if ($('entry')) $('entry').textContent = '$' + (p.entryUsd || 20);
+  $('vaultBig').textContent = fmt(sol(s.vaultLamports), 3) + ' sol';
   $('holders').textContent = (p.holders ?? '-').toLocaleString?.() ?? '-';
   $('eligible').textContent = (p.eligible ?? '-').toLocaleString?.() ?? '-';
   $('given').textContent = fmt(sol(s.givenLamports), 2);
-  renderInside(id, pk);
+  $('burned').textContent = fmt(sol(s.burned?.lamports || '0'), 2);
+  renderInside(id, pk, p);
 
   const st = $('state'); st.classList.toggle('packed', !!pk);
   const last = s.history && s.history[0];
@@ -504,7 +562,7 @@ function render() {
   if (!mint) { st.textContent = 'soon'; $('bank').textContent = '-'; $('subText').textContent = 'not live yet'; say('not live yet. soon'); }
   else if (s.phase === 'done') { st.textContent = 'closed'; $('bank').textContent = 'empty'; $('subText').textContent = 'the final box is open'; say('that was the final box. thanks for holding me'); }
   else if (pk) {
-    const left = Math.round(70 - (Date.now() - Date.parse(pk.at)) / 1000);
+    const left = Math.round(30 - (Date.now() - Date.parse(pk.at)) / 1000);
     st.textContent = left > 0 ? `opens in ~${left}s` : 'opening…';
     $('bank').textContent = fmt(sol(pk.budgetLamports)) + ' sol inside';
     $('subText').textContent = 'block ' + pk.targetSlot.toLocaleString('en-US') + ' picks the holder';
@@ -512,9 +570,10 @@ function render() {
   } else {
     st.textContent = 'filling';
     $('bank').textContent = need ? `${fmt(have)} / ${fmt(need, 2)} sol` : '-';
-    $('subText').textContent = 'opens when full';
+    $('subText').textContent = p.milestoneBox ? `opens when full · milestone box for ${capShort(p.milestoneBox)} cap: epic or better`
+      : p.nextMilestone ? `opens when full · next milestone box at ${capShort(p.nextMilestone)} cap` : 'opens when full';
     const fresh = last && Date.now() - Date.parse(last.at) < 10 * 60_000;
-    if (fresh) say(last.posts?.[last.posts.length - 1] || '');
+    if (fresh) say(last.posts?.[last.posts.length - 1] || `${short(last.draw.winner)} pulled ${last.draw.tier}. next box is filling`);
     else { const n = Math.round(pct * 100); say(n < 30 ? 'im mostly air right now. trades fill me' : n < 80 ? `${n}% full. i can feel it` : `${n}%. almost. dont leave`); }
   }
 
@@ -534,12 +593,24 @@ function render() {
       if (!typed) tx();
       return { li, m, text: f.m, typed, tx };
     };
-    const items = [...feed].reverse().map((f) => { const k = f.at + f.m; const isNew = !first && !render.lines.has(k); render.lines.add(k); return line(f, isNew); });
+    const items = [...feed].reverse().map((f) => { const k = f.at + f.m; const isNew = !first && !render.lines.has(k); render.lines.add(k); const x = line(f, isNew); x.li.dataset.k = k; return x; });
     const cur = el('li', {}, el('span', { className: 't', textContent: hhmm(new Date().toISOString()) }), el('span'), el('span', { className: 'm cur', textContent: pk ? 'waiting for block ' + pk.targetSlot.toLocaleString('en-US') : mint ? 'waiting for fees' : 'waiting for launch' }));
     const fresh = items.filter((x) => x.typed);
     fresh.forEach((x) => (x.li.style.display = 'none'));
-    $('feed').replaceChildren(...items.map((x) => x.li), cur);
-    const down = () => requestAnimationFrame(() => { $('feed').scrollTop = $('feed').scrollHeight; });
+    // follow the bottom only if the reader is there. if they scrolled up to read, keep their line still
+    const box = $('feed');
+    let anchor = null;
+    if (!first && !Log.follow) {
+      const top = [...box.children].find((li) => li.offsetTop + li.offsetHeight > box.scrollTop);
+      if (top) anchor = { k: top.dataset.k, off: top.offsetTop - box.scrollTop };
+    }
+    box.replaceChildren(...items.map((x) => x.li), cur);
+    if (anchor) {
+      const same = [...box.children].find((li) => li.dataset.k === anchor.k);
+      if (same) box.scrollTop = same.offsetTop - anchor.off;
+    }
+    if (fresh.length && !Log.follow) $('newLines').hidden = false;
+    const down = () => { if (Log.follow || first) requestAnimationFrame(() => { box.scrollTop = box.scrollHeight; }); };
     down();
     clearTimeout(render.typing);
     let i = 0;
@@ -561,11 +632,14 @@ function render() {
     const txOf = (b) => b.prize?.sig && b.prize.sig !== 'dry-run'
       ? el('a', { className: 'tx', href: 'https://solscan.io/tx/' + b.prize.sig, target: '_blank', rel: 'noopener', textContent: 'tx ↗' })
       : el('span', { className: 'tx dry', textContent: 'tx (test)' });
-    const items = () => h.slice(0, 20).map((b) => el('span', { className: 'it' }, el('a', { href: '#box-' + b.boxId },
+    const items = () => h.slice(0, 20).map((b) => el('span', { className: 'it' }, el('a', { className: 'bx', href: '#box-' + b.boxId, title: 'open the box: seal, draw and tickets' },
       cap(b.draw.tier), el('span', { className: 'd', textContent: '#' + b.boxId }), short(b.draw.winner),
       el('span', { className: 't-' + b.draw.tier, textContent: `${fmt(sol(b.prize?.lamports), 2)} sol of $${b.prize?.symbol || '?'}` }),
-      el('span', { className: 'd', textContent: ago(b.at) })), txOf(b)));
-    $('grid').replaceChildren(el('div', { className: 'run' }, ...items(), ...items()));
+      el('span', { className: 'd', textContent: ago(b.at) }), el('span', { className: 'go', textContent: 'proof ›' })), txOf(b)));
+    const run = el('div', { className: 'run' }, ...items(), ...items());
+    $('grid').replaceChildren(run);
+    // slow and steady: about 22px a second, whatever the length
+    requestAnimationFrame(() => { run.style.animationDuration = Math.max(40, run.scrollWidth / 2 / 22) + 's'; });
   }
 
   const dl = $('wallets'); dl.replaceChildren();
@@ -583,14 +657,18 @@ $('check').onsubmit = async (e) => {
   try {
     const r = await api('/api/wallet', 'a=' + a);
     out.replaceChildren();
-    if (r.status === 'in') out.append('youre in. ', el('b', { textContent: Math.round(r.tickets).toLocaleString() + ' tickets' }), ` · ${r.sharePct}% · ${r.multiplier}x`);
-    else if (r.status === 'waiting') out.append('almost. in after ', el('b', { textContent: r.minutesLeft + ' more min' }));
+    const tip = r.ifBuy ? [' · ', el('b', { className: 'pk', textContent: `+$${r.ifBuy.addUsd} → ${r.ifBuy.sharePct}%` })] : [];
+    if (r.status === 'in') {
+      out.append('youre in. ', el('b', { textContent: r.sharePct + '% chance' }), ` · ${r.multiplier}x${r.multiplier < r.maxMultiplier ? `, ${r.maxMultiplier}x in ${r.hoursToMax}h` : ''}${r.boosted ? ' · +25% fresh buy' : ''}`, ...tip);
+    } else if (r.status === 'waiting') out.append('almost. in after ', el('b', { textContent: r.minutesLeft + ' more min' }), '. dont sell');
     else if (r.status === 'excluded') out.append('pool or our wallet. not in the draw');
-    else out.append('not in yet. hold $20+ for 15 min');
+    else if (r.short) out.append(`your bag is under $${r.minUsd} for this box. top it up`, ...tip);
+    else out.append(`not in yet. hold $${r.minUsd || 20}+ for 7 min`, ...tip);
   } catch { out.textContent = 'couldnt check right now'; }
 };
 
 document.querySelectorAll('[data-open]').forEach((b) => (b.onclick = () => $(b.dataset.open).showModal()));
+document.querySelector('.safe').onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('vaultSheet').showModal(); } };
 document.addEventListener('click', (e) => {
   if (e.target.matches('[data-close]')) e.target.closest('dialog').close();
   if (e.target.tagName === 'DIALOG') e.target.close();
@@ -609,8 +687,10 @@ async function recompute(b) {
   let acc = 0, winner = list[list.length - 1]?.owner;
   for (const r of list) { acc += r.tickets; if (roll < acc) { winner = r.owner; break; } }
   const n = parseInt(seed.slice(13, 21), 16) % 100;
+  const odds = b.odds || TIERS.map((x) => x.pct);
   let t = 0, tier = 'common';
-  for (const x of TIERS) { t += x.pct; if (n < t) { tier = x.key; break; } }
+  for (let i = 0; i < TIERS.length; i++) { t += odds[i]; if (n < t) { tier = TIERS[i].key; break; } }
+  if (b.milestone && (tier === 'common' || tier === 'rare')) tier = 'epic';
   const seal = b.salt ? await sha256(`${b.plan.common.mint}|${b.plan.rare.mint}|${b.salt}`) : '';
   return { seed, winner, tier, total, seal };
 }
@@ -633,14 +713,15 @@ async function openBox(id) {
     el('dt', { textContent: 'block' }), el('dd', {}, link('https://solscan.io/block/' + d.slot, String(d.slot))),
     el('dt', { textContent: 'blockhash' }), el('dd', { textContent: d.blockhash }),
     el('dt', { textContent: 'seed' }), el('dd', { textContent: d.seed }));
-  const how = el('pre', { textContent: `seal = sha256(common mint | rare mint | salt)\nseed = sha256(blockhash:${b.boxId})\nwinner = weighted pick by tickets, wallets sorted a-z\ntier = seed[13..21] mod 100 → 50 / 30 / 15 / 5` });
+  const odds = (b.odds || TIERS.map((t) => t.pct)).join(' / ');
+  const how = el('pre', { textContent: `seal = sha256(common mint | rare mint | salt)\nseed = sha256(blockhash:${b.boxId})\nwinner = weighted pick by tickets, wallets sorted a-z\ntier = seed[13..21] mod 100 → ${odds}${b.frenzy ? ` (frenzy ${b.frenzy})` : ''}${b.milestone ? '\nmilestone box: common or rare becomes epic' : ''}` });
   const res = el('div', { className: 'muted', textContent: b.rows.length ? '' : 'ticket list for this box isnt stored, cant recompute' });
   const btn = el('button', { className: 'pbtn px', type: 'button', textContent: 'check it myself', disabled: !b.rows.length });
   btn.onclick = async () => {
     res.textContent = 'recomputing…';
     const r = await recompute(b);
     const okDraw = r.seed === d.seed && r.winner === d.winner && r.tier === d.tier;
-    const okSeal = !b.salt || r.seal === b.seal;
+    const okSeal = !!b.salt && r.seal === b.seal;
     res.replaceChildren(
       el('div', {}, el('span', { className: okSeal ? 'ok' : 'bad', textContent: okSeal ? 'seal matches. ' : 'seal mismatch. ' }), 'the coins were picked before the block'),
       el('div', {}, el('span', { className: okDraw ? 'ok' : 'bad', textContent: okDraw ? 'draw matches. ' : 'draw mismatch. ' }), `${b.rows.length} wallets, ${Math.round(r.total).toLocaleString()} tickets → ${short(r.winner)}, ${r.tier}`));

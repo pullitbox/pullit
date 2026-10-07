@@ -2,9 +2,9 @@
 // Usage: npm run pack            (box #1)
 //        BOX=7 npm run pack
 
-import { fetchUniverse } from "../src/jupiter.ts";
-import { scan } from "../src/scanner.ts";
-import { packBox } from "../src/agent.ts";
+import { fetchUniverse } from "../../src/jupiter.ts";
+import { scan } from "../../src/scanner.ts";
+import { packBox } from "../../src/agent.ts";
 
 const { JUP_API_KEY, OPENROUTER_API_KEY, OPENROUTER_MODEL } = process.env;
 if (!JUP_API_KEY) throw new Error("JUP_API_KEY missing");

@@ -1,10 +1,10 @@
 // Local preview of the market scanner.
-// Usage: JUP_API_KEY=... node scripts/scan.ts            (table)
-//        JUP_API_KEY=... node scripts/scan.ts --json     (raw JSON)
+// Usage: JUP_API_KEY=... node scripts/dev/scan.ts            (table)
+//        JUP_API_KEY=... node scripts/dev/scan.ts --json     (raw JSON)
 
 import { mkdirSync, writeFileSync } from "node:fs";
-import { fetchUniverse } from "../src/jupiter.ts";
-import { scan, type Candidate } from "../src/scanner.ts";
+import { fetchUniverse } from "../../src/jupiter.ts";
+import { scan, type Candidate } from "../../src/scanner.ts";
 
 const key = process.env.JUP_API_KEY;
 if (!key) {

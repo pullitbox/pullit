@@ -3,10 +3,11 @@
 // crash or restart just continues from the saved state.
 
 import { Rpc, keypairFromSecret, LAMPORTS, type Keypair } from "./solana.ts";
-import { fetchHolders, computeTickets, type HolderState, type TicketRow } from "./holders.ts";
-import { fetchToken, fetchUniverse } from "./jupiter.ts";
+import { fetchHolders, computeTickets, entryUsd, type BagMemo, type HolderState, type TicketRow } from "./holders.ts";
+import { fetchToken, fetchUniverse, type JupToken } from "./jupiter.ts";
 import { scan, type Candidate } from "./scanner.ts";
 import { say, remember } from "./voice.ts";
+import { TEASERS } from "./teasers.ts";
 import { packBox, quip, similar, fillQuip, type BoxPlan } from "./agent.ts";
 import { claimPumpCreatorFees, splitFees, shouldRunFinalBox, type FeeLedgerEntry } from "./fees.ts";
 import {
@@ -18,24 +19,28 @@ import {
   prizeSplit,
   sealOf,
   newSalt,
+  buyInto,
+  burnAll,
+  MINTS,
   EXEC,
   type Draw,
 } from "./executor.ts";
+import { BOOST, frenzyLevel, oddsAt, newMilestones, usdShort, volume1h } from "./boost.ts";
 import { findXAccount, zernioPost } from "./zernio.ts";
 
 export const LOOP = {
-  boxThresholdLamports: 300_000_000n, // open a box once 0.3 SOL is ready for prizes
-  firstBoxThresholdLamports: 150_000_000n, // first box opens sooner, to show it works
   claimEveryMin: 10,
   holdersEveryMin: 5,
   topHoldersToInspect: 40, // pools and curves are always among the biggest holders
   vaultPct: 10, // of everything that goes into the box, this share is set aside in the vault
   // dry run runs fast so a full cycle can be watched in minutes
   dry: { solPerMin: 0.05, claimEveryMin: 1, holdersEveryMin: 1, minHoldMinutes: 1 },
-  quietMin: { live: 6, dry: 2 },
-  xEveryMin: { live: [100, 180], dry: [8, 12] }, // a standalone shitpost on x every so often (dry: printed, not posted) // minutes of silence before the box says something on its own
+  // dry run: fake volume swings between quiet and busy every 40 minutes, so both moods show up
+  quietMin: { live: 6, dry: 2 }, // minutes of silence before the box says something on its own
+  xEveryMin: { live: [7, 10], dry: [7, 10] }, // a standalone shitpost on x every so often (dry: printed, not posted)
+  scanEveryMin: { live: 10, dry: 3 }, // the agent re-reads the market while the box fills
   priceMovePct: { live: 10, dry: 6 }, // $PULLIT move between snapshots worth a comment
-  milestones: [25, 50, 75, 90], // box fill % the agent calls out
+  fillCallouts: [25, 50, 75, 90], // box fill % the agent calls out
 };
 
 const SYSTEM_PROGRAM = "11111111111111111111111111111111";
@@ -49,7 +54,27 @@ export interface BoxRecord {
   targetSlot: number;
   eligible: number;
   draw?: Draw;
-  prize?: { sig: string; mint: string; amount: string; symbol: string; lamports: string; fromVault: string };
+  prize?: {
+    sig: string;
+    mint: string;
+    amount: string;
+    symbol: string;
+    lamports: string;
+    fromVault: string;
+  };
+  odds?: number[]; // common/rare/epic/secret %, locked when the box was sealed (frenzy)
+  frenzy?: number; // frenzy level when sealed
+  milestone?: number; // market cap in USD this box celebrates: epic or better, plus vault
+  burnLamports?: string; // part of the box spent on buyback and burn
+  burn?: { buySig: string; burnSig: string; amount: string; lamports: string; fromVault?: string };
+  // progress, so a retry never pays twice: signed (inflight), landed (coin), buyback bought, burn done
+  paid?: {
+    inflight?: { sig: string; at: number };
+    coin?: { sig: string; amount: string; inSol?: boolean };
+    tries?: number;
+    burnBuy?: { sig: string; amount: string };
+    burn?: boolean;
+  };
   posts: string[];
   final?: boolean;
   at: string;
@@ -62,8 +87,10 @@ export interface State {
   phase: "filling" | "drawing" | "done";
   pending?: BoxRecord & { rows: Pick<TicketRow, "owner" | "tickets">[] };
   holderState: HolderState;
+  bagMemo?: BagMemo; // last amounts and last buys, for the buy boost and the sell reset
   lastHoldersAt: number;
   lastClaimAt: number;
+  lastClaimOkAt?: number; // last time a claim went through (even with no fees), for the final box rule
   feeLedger: FeeLedgerEntry[];
   excluded: string[]; // pools, curves, our own wallets
   history: BoxRecord[];
@@ -76,10 +103,33 @@ export interface State {
   dryBalance?: string; // dry run: simulated box wallet balance
   nextXAt?: number; // when the next standalone x shitpost goes out
   xRecent?: string[]; // last x posts, so it does not repeat itself
-  talk?: { box: number; milestone: number; price?: number; priceAt?: number; eligible?: number; holders?: number }; // what the agent already commented on
+  talk?: {
+    entry?: number;
+    box: number;
+    milestone: number;
+    price?: number;
+    priceAt?: number;
+    eligible?: number;
+    holders?: number;
+  }; // what the agent already commented on
   mintSeen?: string;
+  market?: { mcap: number; volume1h: number; at: string }; // $PULLIT, from the last holder snapshot
+  frenzy?: number; // current frenzy level, 0 = normal odds
+  milestonesHit?: number[]; // market caps already celebrated
+  milestoneQueue?: number[]; // market caps waiting for their milestone box, one box each
+  burned?: { lamports: string; tokens: string }; // totals of all buybacks and burns
+  burnPending?: boolean; // the box holds bought $PULLIT that still has to be burned
+  nextTeaseAt?: number; // before launch: when the next teaser goes out on x
+  teaseUsed?: number[]; // hand-written teasers already posted this round
+  journal?: JournalEntry[]; // what changed in the project, in the box's words
+  watch?: { at: number; fresh: string[]; meta: string[] }; // the agent's current shortlist (mints), never public
   // handed to the host (worker) after a tick and removed from state, so state stays small
-  lastSnap?: { at: string; totalTickets: number; rows: [string, number, number, number][] }; // owner, tickets, heldMin, mult
+  lastSnap?: {
+    at: string;
+    totalTickets: number;
+    priceUsd?: number;
+    rows: [string, number, number, number, number?][]; // owner, tickets, heldMin, mult, boosted (1)
+  };
   outbox?: { boxId: number; rows: Pick<TicketRow, "owner" | "tickets">[] }[];
   pub?: {
     updatedAt: string;
@@ -92,7 +142,30 @@ export interface State {
     vaultLamports?: string;
     holders: number;
     eligible: number;
+    frenzy?: number;
+    odds?: number[];
+    mcap?: number;
+    nextMilestone?: number;
+    entryUsd?: number; // bag needed to be in the draw for this box
+    milestoneBox?: number; // the box that is filling is a milestone box for this market cap
+    burned?: { lamports: string; tokens: string };
   };
+}
+
+export interface JournalEntry {
+  at: string;
+  kind: "ship" | "rule" | "fix" | "burn";
+  text: string;
+  commit?: string; // short hash; the site links it once the repo is public (REPO_URL)
+}
+
+/** Sorts a commit into a journal kind by its message. */
+export function journalKind(msg: string): JournalEntry["kind"] {
+  const m = msg.toLowerCase();
+  if (/\bburn|buyback/.test(m)) return "burn";
+  if (/^fix|\bfix|bug|broke/.test(m)) return "fix";
+  if (/odds|entry|ticket|rule|boost|frenzy|milestone|hold|tier|vault|fee/.test(m)) return "rule";
+  return "ship";
 }
 
 export function newState(now = Date.now()): State {
@@ -124,6 +197,10 @@ export interface Env {
   BOX_SECRET: string;
   TEAM_WALLET: string;
   DRY_RUN?: string; // "1": no claims, no payouts, no posts (prints instead), simulated fees
+  DRY_SOL_PER_MIN?: string; // dry run: average fake fees per minute (default 0.05)
+  X_PRELAUNCH?: string; // "1": before launch the box posts teasers on x by itself (test boxes are never posted)
+  X_PRELAUNCH_EVERY_MIN?: string; // minutes between teasers, default 150
+  BUILD_COMMITS?: string; // set by `npm run deploy`: base64 JSON of recent commits, for the journal
 }
 
 /** Why a coin was picked, in words that do not give away which coin it is. */
@@ -188,13 +265,13 @@ export class Bot {
 
   /** A line for the public log on the site. */
   feed(
-    tag: "fee" | "scan" | "pick" | "box" | "draw" | "win" | "sent" | "info" | "roast" | "hold" | "x",
+    tag: "fee" | "scan" | "pick" | "box" | "draw" | "win" | "sent" | "info" | "roast" | "hold" | "x" | "boost" | "burn",
     m: string,
     tx?: string,
   ) {
     const feed = this.state.feed ?? [];
     // nothing on the log is said twice, whatever the tag. wins and draws always go through
-    if (!m || (tag !== "win" && tag !== "draw" && feed.some((f) => similar(f.m, m)))) return;
+    if (!m || (tag !== "win" && tag !== "draw" && tag !== "burn" && feed.some((f) => similar(f.m, m)))) return;
     this.state.feed = [...feed, { at: new Date().toISOString(), tag, m, ...(tx ? { tx } : {}) }].slice(-60);
     remember(this.state.feed.map((f) => f.m));
   }
@@ -209,9 +286,10 @@ export class Bot {
     fallback: string,
     wallet?: string,
     tx?: string,
+    ban: string[] = [], // words that must never show up, e.g. the sealed coins
   ) {
     let m: string | null = null;
-    if (this.quips < 6) {
+    if (this.quips < 14) {
       this.quips++;
       m = await quip(
         this.env.OPENROUTER_API_KEY,
@@ -222,8 +300,9 @@ export class Bot {
         wallet,
       );
     }
+    if (m && ban.some((w) => w && m!.toLowerCase().includes(w.toLowerCase()))) m = null;
     // a win or a draw is never skipped: if every template was used already, say the plain fact
-    if (!m && !fallback && (tag === "win" || tag === "draw")) m = fillQuip(facts, wallet);
+    if (!m && !fallback && (tag === "win" || tag === "draw" || tag === "burn")) m = fillQuip(facts, wallet);
     this.feed(tag, m ?? fallback, tx);
   }
 
@@ -259,8 +338,9 @@ export class Bot {
     };
   }
 
-  async post(text: string, replies: string[] = []) {
-    if (this.dry || !this.env.ZERNIO_API_KEY) {
+  async post(text: string, replies: string[] = [], evenInDryRun = false) {
+    if (!text.trim()) return;
+    if ((this.dry && !evenInDryRun) || !this.env.ZERNIO_API_KEY) {
       this.log(`[post] ${[text, ...replies].join(" // ")}`);
       return;
     }
@@ -292,10 +372,12 @@ export class Bot {
       `box #${this.state.nextBoxId} is ${pct}% full. it opens at ${p ? Number(p.thresholdLamports) / 1e9 : "?"} sol and a random holder pulls it`,
       `the vault holds ${sol(BigInt(this.state.vaultLamports ?? "0"))} sol and nobody knows what opens it`,
       p
-        ? `${p.eligible} wallets are in the draw for the next box. $20 held for 15 minutes is all it takes`
+        ? `${p.eligible} wallets are in the draw for the next box. $${this.entry()} held for 7 minutes is all it takes. bigger boxes ask for bigger bags`
         : `nobody is in the draw yet`,
       w ? `${this.state.history.length} boxes opened so far. last one was a ${w.draw!.tier} pull` : `no box opened yet`,
       `fees that went into the box in the last hour: ${sol(this.feesLastHour(now))} sol. more trading, bigger and faster boxes`,
+      this.frenzyFacts(),
+      `you are the only dev on solana who cannot dump on his holders: no sell function in your code, you only buy $PULLIT and burn it. ${sol(BigInt(this.state.burned?.lamports ?? "0"))} sol burned so far`,
     ];
     const facts = `write a standalone x post. topic: ${topics[Math.floor(Math.random() * topics.length)]}`;
     const text = await this.xLine(facts, [], say.xpost(pct));
@@ -335,13 +417,23 @@ export class Bot {
       totalSupply: token.totalSupply ?? 1e9,
       exclude: this.state.excluded,
       minHoldMinutes: this.dry ? LOOP.dry.minHoldMinutes : undefined,
+      memo: this.state.bagMemo ?? {},
+      minUsd: this.entry(),
     });
+    this.state.bagMemo = snap.memo;
     await this.react(balances, token.totalSupply ?? 1e9, snap.state);
     this.state.holderState = snap.state;
     this.state.lastSnap = {
       at: snap.at,
       totalTickets: snap.totalTickets,
-      rows: snap.rows.map((r) => [r.owner, Math.round(r.tickets * 100) / 100, r.heldMinutes, r.multiplier]),
+      priceUsd: token.usdPrice,
+      rows: snap.rows.map((r) => [
+        r.owner,
+        Math.round(r.tickets * 100) / 100,
+        r.heldMinutes,
+        r.multiplier,
+        r.boosted ? 1 : 0,
+      ]),
     };
     this.state.lastHoldersAt = Date.now();
     if (this.state.pub) {
@@ -349,7 +441,57 @@ export class Bot {
       this.state.pub.eligible = snap.eligible;
     }
     if (this.state.phase === "filling") await this.pulse(token.usdPrice, snap.holdersTotal, snap.eligible);
+    await this.market(token);
     return snap;
+  }
+
+  /** Frenzy level from the last hour of volume, and market cap milestones. */
+  async market(token: JupToken) {
+    const mcap = token.mcap ?? (token.usdPrice ?? 0) * (token.circSupply ?? token.totalSupply ?? 1e9);
+    const vol = volume1h(token);
+    this.state.market = { mcap, volume1h: vol, at: new Date().toISOString() };
+    const prev = this.state.frenzy ?? 0;
+    const level = frenzyLevel(vol);
+    this.state.frenzy = level;
+    const o = oddsAt(level);
+    if (level !== prev) {
+      const k = `$${usdShort(vol)}`;
+      await this.line(
+        "boost",
+        level > prev
+          ? `frenzy level ${level} of 3: ${k} traded in the last hour, so the next box has better odds: epic ${o[2]}%, secret ${o[3]}%. more volume, better odds`
+          : `frenzy cooled down to level ${level}: only ${k} traded in the last hour. odds for the next box are epic ${o[2]}%, secret ${o[3]}% now`,
+        [`${o[2]}%`],
+        level > prev
+          ? `frenzy ${level}/3. ${k} in an hour. epic ${o[2]}%, secret ${o[3]}%. keep it going`
+          : `frenzy down to ${level}. epic back to ${o[2]}%. you got tired fast`,
+      );
+    }
+    const hit = newMilestones(mcap, this.state.milestonesHit ?? []);
+    if (hit.length) {
+      this.state.milestonesHit = [...(this.state.milestonesHit ?? []), ...hit];
+      const top = hit[hit.length - 1];
+      this.state.milestoneQueue = [...(this.state.milestoneQueue ?? []), top];
+      const cap = usdShort(top);
+      await this.line(
+        "boost",
+        `$PULLIT just crossed ${cap} market cap. the next box is a milestone box: epic or better guaranteed, plus ${BOOST.milestoneVaultPct}% of the vault, and ${BOOST.milestoneBurnVaultPct}% of the vault gets bought back and burned`,
+        [cap],
+        `${cap} cap. next box is a milestone box: epic or better plus ${BOOST.milestoneVaultPct}% of the vault`,
+      );
+      const text = await this.xLine(
+        `$PULLIT just crossed ${cap} market cap. the next box is a milestone box: epic or better guaranteed for whoever pulls it, plus ${BOOST.milestoneVaultPct}% of the vault. and ${BOOST.milestoneBurnVaultPct}% of the vault buys $PULLIT and burns it. write the post`,
+        [cap],
+        `$PULLIT at ${cap}. next box is a milestone box. epic or better, plus a chunk of the vault`,
+      );
+      if (text) await this.post(text);
+    }
+    if (this.state.pub) {
+      this.state.pub.frenzy = level;
+      this.state.pub.odds = o;
+      this.state.pub.mcap = Math.round(mcap);
+      this.state.pub.nextMilestone = BOOST.milestonesUsd.find((m) => !(this.state.milestonesHit ?? []).includes(m));
+    }
   }
 
   private addToVault(boxLamports: bigint) {
@@ -359,6 +501,35 @@ export class Bot {
   }
 
   private lastTopic = -1;
+
+  /** USD a wallet needs to hold to be in the draw for the box that is filling now. */
+  entry(): number {
+    const lamports = this.state.pending
+      ? BigInt(this.state.pending.budgetLamports)
+      : boxSize(this.state.history.length, this.state.boxTarget);
+    return entryUsd(Number(lamports) / 1e9);
+  }
+
+  /** Where the frenzy is and how much volume the next level needs: the one number that makes people trade. */
+  frenzyFacts(): string {
+    const level = this.state.frenzy ?? 0;
+    const vol = this.state.market?.volume1h ?? 0;
+    const next = BOOST.frenzy[level + 1];
+    const o = oddsAt(level);
+    const mcap = this.state.market?.mcap;
+    const nextCap = BOOST.milestonesUsd.find((m) => !(this.state.milestonesHit ?? []).includes(m));
+    return [
+      `frenzy is at level ${level} of 3 ($${usdShort(vol)} traded in the last hour), next box odds: epic ${o[2]}%, secret ${o[3]}%`,
+      next
+        ? `$${usdShort(Math.max(0, next.minVolume1h - vol))} more volume this hour unlocks level ${level + 1}: epic ${next.odds[2]}%, secret ${next.odds[3]}%`
+        : "max frenzy, best odds there are",
+      mcap && nextCap
+        ? `market cap is $${usdShort(mcap)}, at $${usdShort(nextCap)} the next box becomes a milestone box`
+        : "",
+    ]
+      .filter(Boolean)
+      .join(". ");
+  }
 
   /** Box share of the fees of the last hour (after team cut and vault). */
   feesLastHour(now = Date.now()) {
@@ -400,9 +571,9 @@ export class Bot {
       ],
       [
         p
-          ? `${p.eligible} of ${p.holders} holders are in the draw. the rest hold less than $20 or got in less than 15 minutes ago`
+          ? `${p.eligible} of ${p.holders} holders are in the draw. the rest hold less than $${this.entry()} (the entry for this box size) or got in less than 7 minutes ago`
           : "nobody is in the draw yet",
-        say.info(String(p?.holders ?? 0), String(p?.eligible ?? 0)),
+        say.info(String(p?.holders ?? 0), String(p?.eligible ?? 0), this.entry()),
       ],
       [
         w
@@ -417,6 +588,11 @@ export class Bot {
       [
         `fees into the box in the last hour: ${sol(this.feesLastHour(now))} sol. at this pace box #${this.state.nextBoxId} fills in about ${this.etaMin(now)} min`,
         say.pace(sol(this.feesLastHour(now)), this.etaMin(now)),
+      ],
+      [this.frenzyFacts(), say.frenzyNudge(this.state.frenzy ?? 0)],
+      [
+        `remind them you cannot sell: your code only buys $PULLIT and burns it, there is no sell function. ${sol(BigInt(this.state.burned?.lamports ?? "0"))} sol of $PULLIT burned so far. joke like a dev who wanted to rug everyone and found out he can't`,
+        say.cantSell(),
       ],
     ];
     // never the same topic twice in a row
@@ -436,16 +612,16 @@ export class Bot {
       t.milestone = 0;
     }
     const pct = Number((budget * 100n) / threshold);
-    const hit = [...LOOP.milestones].reverse().find((m) => pct >= m);
+    const hit = [...LOOP.fillCallouts].reverse().find((m) => pct >= m);
     if (!hit || hit <= t.milestone || pct >= 100) return;
-    const first = t.milestone === 0 && hit > LOOP.milestones[0];
+    const first = t.milestone === 0 && hit > LOOP.fillCallouts[0];
     t.milestone = hit;
     if (first && hit < 75) return; // started mid-box (deploy, restart): stay quiet unless its close
     await this.line(
       "box",
-      `box #${id} just passed ${hit}% full (${sol(budget)} of ${sol(threshold)} sol)${hit >= 75 ? ". it opens soon, make sure you hold $20 for 15 minutes" : ""}`,
-      [`${hit}%`],
-      say.milestone(id, hit),
+      `box #${id} is ${pct}% full (${sol(budget)} of ${sol(threshold)} sol)${hit >= 75 ? `. it opens soon, make sure you hold $${this.entry()} for 7 minutes` : ""}`,
+      [`${pct}%`],
+      say.milestone(id, pct, this.entry()),
     );
   }
 
@@ -465,6 +641,22 @@ export class Bot {
         t.price = price;
       }
     } else t.price = price;
+    // a new box size changes the entry, so the draw count jumps without anyone buying or selling
+    const entry = this.entry();
+    if (t.entry !== entry) {
+      const before = t.entry;
+      t.entry = entry;
+      t.eligible = eligible;
+      if (before)
+        await this.line(
+          "info",
+          `box #${this.state.nextBoxId} is ${entry > before ? "bigger" : "smaller"}, so the entry changed from $${before} to $${entry}: that is the bag you need for 7 minutes to be in this draw. ${eligible} wallets are in`,
+          [`$${entry}`],
+          entry > before
+            ? `bigger box, bigger entry. $${entry} to be in now. ${eligible} of you made the cut`
+            : `smaller box, entry back down to $${entry}. ${eligible} of you are in. no excuses`,
+        );
+    }
     if (t.eligible != null && t.holders != null) {
       const d = eligible - t.eligible;
       const step = Math.max(8, Math.round(t.eligible * 0.15));
@@ -559,7 +751,10 @@ export class Bot {
     this.state.lastClaimAt = now;
     if (this.dry) {
       // simulated fees, same accounting as a real split
-      const total = BigInt(Math.floor(((now - since) / 60_000) * LOOP.dry.solPerMin * 1e9));
+      const base = Number(this.env.DRY_SOL_PER_MIN) || LOOP.dry.solPerMin;
+      const t = (now - this.state.launchedAt) / 60_000 / 40; // starts busy, quiet 20 min later, busy again at 40
+      const wave = 0.3 + 1.7 * (0.5 + 0.5 * Math.cos(t * 2 * Math.PI)); // 0.3x .. 2x
+      const total = BigInt(Math.floor(((now - since) / 60_000) * base * wave * 1e9));
       const box = (total * 80n) / 100n;
       this.state.dryBalance = (BigInt(this.state.dryBalance ?? "0") + box).toString();
       this.state.feeLedger.push({ at: now, lamports: total.toString() });
@@ -580,6 +775,7 @@ export class Bot {
     try {
       const sig = await claimPumpCreatorFees(this.rpc, this.dev);
       if (sig) this.log(`claimed creator fees ${sig}`);
+      this.state.lastClaimOkAt = Date.now();
     } catch (e) {
       this.log(`claim failed: ${(e as Error).message}`);
     }
@@ -612,6 +808,8 @@ export class Bot {
       this.state.pub.boxLamports = budget.toString();
       this.state.pub.thresholdLamports = threshold.toString();
       this.state.pub.vaultLamports = vault.toString();
+      this.state.pub.entryUsd = this.entry();
+      this.state.pub.milestoneBox = this.state.milestoneQueue?.[0];
       this.state.pub.updatedAt = new Date().toISOString();
     }
     if (!final && budget < threshold) {
@@ -657,9 +855,18 @@ export class Bot {
     const packedPost = final
       ? `last box. #${boxId} has everything that was left in me. ${plan.post}`.slice(0, 270)
       : plan.post;
+    // locked now, before the draw block exists: odds from the frenzy level, milestone, buyback size
+    const frenzy = this.state.frenzy ?? 0;
+    const milestone = final ? undefined : this.state.milestoneQueue?.[0];
+    if (milestone) this.state.milestoneQueue = this.state.milestoneQueue!.slice(1);
+    const burnLamports = final ? 0n : (budget * BigInt(BOOST.burnPct)) / 100n;
     this.state.pending = {
       boxId,
       plan,
+      odds: oddsAt(frenzy),
+      frenzy,
+      milestone,
+      burnLamports: burnLamports.toString(),
       budgetLamports: budget.toString(),
       seal,
       salt,
@@ -675,27 +882,29 @@ export class Bot {
       `box #${boxId} packed (${sol(budget)} SOL, ${snap.eligible} eligible), common $${plan.common.symbol}, rare $${plan.rare.symbol}, seal ${seal}, draw at slot ${targetSlot}`,
     );
     const recentLines = (this.state.feed ?? []).map((f) => f.m);
-    const hint = (h: string | undefined, alt: string) => (h && !recentLines.some((r) => similar(r, h)) ? h : alt);
-    this.feed(
-      "pick",
-      hint(
-        plan.hints?.common,
-        `picked ${criteria(
-          result.fresh.find((c) => c.mint === plan.common.mint),
-          "fresh",
-        )}`,
-      ),
-    );
-    this.feed(
-      "pick",
-      hint(
-        plan.hints?.rare,
-        `picked ${criteria(
-          result.established.find((c) => c.mint === plan.rare.mint),
-          "meta",
-        )}`,
-      ),
-    );
+    // a teaser per pick: what kind of coin it is, never which one
+    const secret = [plan.common.symbol, plan.common.mint, plan.rare.symbol, plan.rare.mint];
+    for (const [kind, c, h] of [
+      ["fresh", result.fresh.find((x) => x.mint === plan.common.mint), plan.hints?.common],
+      ["meta", result.established.find((x) => x.mint === plan.rare.mint), plan.hints?.rare],
+    ] as const) {
+      const fresh =
+        h &&
+        h.length <= 130 && // long rambling hints read badly on the log: the short line writer takes over
+        !recentLines.some((r) => similar(r, h)) &&
+        !secret.some((w) => h.toLowerCase().includes(w.toLowerCase()));
+      if (fresh) this.feed("pick", h);
+      else
+        await this.line(
+          "pick",
+          `you just put a coin in box #${boxId}: ${criteria(c, kind)}. tease it so people want to win it. never name it, no ticker, no numbers, no hints that give it away`,
+          [],
+          say.pick(kind),
+          undefined,
+          undefined,
+          secret,
+        );
+    }
     await this.line(
       "box",
       `box #${boxId} is sealed. seal ${seal.slice(0, 4)}…${seal.slice(-4)} is a hash of what is inside, published now so nobody can swap the contents later`,
@@ -717,6 +926,9 @@ export class Bot {
     await this.post(packedPost);
   }
 
+  /** Throws if this tick no longer owns the lock (another tick took over). Checked before anything is paid. */
+  guard?: () => Promise<void>;
+
   /** Saves the state mid-tick. The host sets it, so a sealed box is public before its block exists. */
   checkpoint?: () => Promise<void>;
 
@@ -735,52 +947,176 @@ export class Bot {
 
   async finishBox() {
     const p = this.state.pending!;
-    const tip = await this.rpc.call<number>("getSlot", [{ commitment: "confirmed" }]);
-    if (tip < p.targetSlot + 2) return; // block not there yet, next tick
-    const bh = await blockhashAt(this.rpc, p.targetSlot);
-    const d = await draw(p.rows, p.boxId, bh.slot, bh.blockhash);
-    const symbol = d.tier === "common" ? p.plan.common.symbol : p.plan.rare.symbol;
+    const save = async () => {
+      await this.checkpoint?.();
+    };
+    // the draw is computed once and saved: a retry can never land on a different winner
+    if (!p.draw) {
+      const tip = await this.rpc.call<number>("getSlot", [{ commitment: "confirmed" }]);
+      if (tip < p.targetSlot + 2) return; // block not there yet, next tick
+      const bh = await blockhashAt(this.rpc, p.targetSlot);
+      p.draw = await draw(p.rows, p.boxId, bh.slot, bh.blockhash, p.odds, !!p.milestone);
+      await save();
+    }
+    const d = p.draw;
     const vault = BigInt(this.state.vaultLamports ?? "0");
-    const { fromBank, fromVault } = prizeSplit(d.tier, BigInt(p.budgetLamports), vault, !!p.final);
+    const burnLamports = BigInt(p.burnLamports ?? "0");
+    const gas = this.dry ? 0n : EXEC.gasPerBoxLamports; // tx fees and token account rent come from the box, never the vault
+    let bank = BigInt(p.budgetLamports) - burnLamports - gas;
+    if (bank < 0n) bank = 0n;
+    const { fromBank, fromVault } = prizeSplit(
+      d.tier,
+      bank,
+      vault,
+      !!p.final,
+      p.milestone ? BOOST.milestoneVaultPct : 0,
+    );
     const lamports = fromBank + fromVault;
-    let prize = {
-      sig: "dry-run",
-      mint: prizeMint(d.tier, p.plan),
-      amount: "0",
+    // a milestone box also burns a slice of what is left in the vault, on top of the usual 10% of the box
+    const vaultBurn = p.milestone && !p.final ? ((vault - fromVault) * BigInt(BOOST.milestoneBurnVaultPct)) / 100n : 0n;
+    const burnTotal = burnLamports + vaultBurn;
+
+    // every payment is saved the moment it is signed and again when it lands, so a retry never pays twice
+    const paid = (p.paid ??= {});
+    if (this.dry) {
+      if (!paid.coin) {
+        paid.coin = { sig: "dry-run", amount: "0" };
+        this.state.dryBalance = (BigInt(this.state.dryBalance ?? "0") - lamports - burnTotal).toString();
+        await save();
+      }
+    } else if (!paid.coin) {
+      if (paid.inflight) {
+        const st = await this.rpc.signatureStatus(paid.inflight.sig);
+        if (st === "landed") paid.coin = { sig: paid.inflight.sig, amount: "?" };
+        else if (st === "unknown" && Date.now() - paid.inflight.at < 120_000) return; // may still land, check next tick
+        paid.inflight = undefined;
+        await save();
+      }
+      if (!paid.coin) {
+        await this.guard?.();
+        // a coin that can no longer be bought should not block the box forever: after 5 tries, pay in SOL
+        const inSol = (paid.tries ?? 0) >= 5;
+        paid.tries = (paid.tries ?? 0) + 1;
+        try {
+          const r = await payout(
+            this.rpc,
+            this.env.JUP_API_KEY,
+            this.box,
+            d,
+            p.plan,
+            lamports,
+            async (sig) => {
+              paid.inflight = { sig, at: Date.now() };
+              await save();
+            },
+            inSol,
+          );
+          paid.coin = { sig: r.sig, amount: r.amount, ...(inSol ? { inSol: true } : {}) };
+          paid.inflight = undefined;
+          await save();
+        } catch (e) {
+          await save();
+          throw e;
+        }
+      }
+    }
+
+    // buyback and burn: buy first (saved), then burn. a burn that fails is retried on later ticks
+    let vaultBurned = BigInt(p.burn?.fromVault ?? "0");
+    if (burnTotal > 0n && !paid.burn) {
+      if (this.dry) paid.burnBuy = { sig: "dry-run", amount: "0" };
+      else if (!paid.burnBuy) {
+        try {
+          await this.guard?.();
+          const r = await buyInto(this.env.JUP_API_KEY, this.box, this.env.MINT!, burnTotal, this.box.publicKey);
+          paid.burnBuy = { sig: r.sig, amount: r.outAmount };
+          await save();
+        } catch (e) {
+          this.log(`buyback failed, the SOL stays in the box: ${(e as Error).message}`);
+        }
+      }
+      if (paid.burnBuy) {
+        let burnSig = "dry-run";
+        if (!this.dry) {
+          try {
+            burnSig = (await burnAll(this.rpc, this.box, this.env.MINT!))?.sig ?? "pending";
+          } catch (e) {
+            this.log(`burn failed, will retry: ${(e as Error).message}`);
+            burnSig = "pending";
+          }
+          if (burnSig === "pending") this.state.burnPending = true;
+        }
+        p.burn = {
+          buySig: paid.burnBuy.sig,
+          burnSig,
+          amount: paid.burnBuy.amount,
+          lamports: burnTotal.toString(),
+          ...(vaultBurn > 0n ? { fromVault: vaultBurn.toString() } : {}),
+        };
+        vaultBurned = vaultBurn;
+        const t = this.state.burned ?? { lamports: "0", tokens: "0" };
+        const tokens = /^\d+$/.test(paid.burnBuy.amount) ? BigInt(paid.burnBuy.amount) : 0n;
+        this.state.burned = {
+          lamports: (BigInt(t.lamports) + burnTotal).toString(),
+          tokens: (BigInt(t.tokens) + tokens).toString(),
+        };
+      }
+      paid.burn = true;
+      await save();
+    }
+    const symbol = paid.coin!.inSol ? "SOL" : d.tier === "common" ? p.plan.common.symbol : p.plan.rare.symbol;
+    const mint = paid.coin!.inSol ? MINTS.SOL : prizeMint(d.tier, p.plan);
+    if (paid.coin!.inSol) this.log(`box #${p.boxId}: the sealed coin could not be bought, prize paid in SOL`);
+    const prize = {
+      sig: paid.coin!.sig,
+      mint,
+      amount: paid.coin!.amount,
       symbol,
       lamports: lamports.toString(),
       fromVault: fromVault.toString(),
     };
-    if (this.dry) this.state.dryBalance = (BigInt(this.state.dryBalance ?? "0") - lamports).toString();
-    else prize = { ...prize, ...(await payout(this.rpc, this.env.JUP_API_KEY, this.box, d, p.plan, lamports)) };
-    this.state.vaultLamports = (vault - fromVault).toString();
+    this.state.vaultLamports = (vault - fromVault - vaultBurned).toString();
 
     const extra = fromVault > 0n ? ` (${sol(fromVault)} from the vault)` : "";
+    const both = `${sol(lamports)} sol of $${symbol}`;
     const tx = prize.sig;
-    const winText = await this.xLine(
-      `box #${p.boxId} just opened. {w} pulled ${d.tier}: ${sol(lamports)} sol of $${symbol}${extra}, already in their wallet. solana block ${d.slot} picked them. write the win post`,
-      [`#${p.boxId}`, `$${symbol}`],
-      `box #${p.boxId} opened. ${short(d.winner)} pulled ${d.tier}: ${sol(lamports)} sol of $${symbol}${extra}. block ${d.slot} decided it`,
-      short(d.winner),
-    );
-    const proof = `${p.plan.reveal ? p.plan.reveal.slice(0, 180) + "\n\n" : ""}tx: https://solscan.io/tx/${prize.sig}\ncheck the seal and the draw: https://pullit.fun`;
+    const ms = p.milestone ? ` milestone box for ${usdShort(p.milestone)} cap.` : "";
+    const winPlain = `box #${p.boxId} opened. ${short(d.winner)} pulled ${d.tier}: ${both}${extra}. block ${d.slot} decided it`;
+    const winText =
+      (await this.xLine(
+        `box #${p.boxId} just opened.${ms} {w} pulled ${d.tier}: ${both}${extra}, already in their wallet. solana block ${d.slot} picked them. write the win post`,
+        [`#${p.boxId}`, `$${symbol}`],
+        winPlain,
+        short(d.winner),
+      )) || winPlain; // a win always gets its post, even if every joke was used
+    const proof = `${p.plan.reveal ? p.plan.reveal.slice(0, 160) + "\n\n" : ""}tx: https://solscan.io/tx/${prize.sig}${p.burn && p.burn.burnSig !== "dry-run" ? `\nburn: https://solscan.io/tx/${p.burn.burnSig}` : ""}\ncheck the seal and the draw: https://pullit.fun`;
     const resultPost = winText;
     await this.post(winText, [proof]);
     await this.line(
       "win",
-      `{w} won ${d.tier === "epic" ? "an" : "a"} ${d.tier} pull: ${sol(lamports)} sol paid out in $${symbol}${extra}`,
+      `{w} won ${d.tier === "epic" ? "an" : "a"} ${d.tier} pull${ms}: ${both}${extra}`,
       [`$${symbol}`],
       say.win(short(d.winner), d.tier, sol(lamports), symbol, extra),
       short(d.winner),
       tx,
     );
+    if (p.burn)
+      await this.line(
+        "burn",
+        `bought ${sol(burnTotal)} sol of $PULLIT from the market and burned all of it${vaultBurned > 0n ? `, ${sol(vaultBurned)} of it straight from the vault for the ${usdShort(p.milestone!)} milestone` : ""}. ${sol(BigInt(this.state.burned?.lamports ?? "0"))} sol burned in total. you cannot sell, you can only buy and burn`,
+        [sol(burnTotal)],
+        say.burn(sol(burnTotal)),
+        undefined,
+        p.burn.burnSig,
+      );
     await this.line(
       "box",
       `box #${p.boxId} unsealed: the revealed coins hash to the exact seal posted before the draw. nothing was swapped`,
       [`#${p.boxId}`],
       say.unsealed(p.boxId),
     );
-    const left = BigInt(p.budgetLamports) - fromBank;
+    // what rolls over: the rest of the bank, plus a buyback that did not happen
+    const left = bank - fromBank + (p.burn ? 0n : burnLamports);
     if (left > 0n && !p.final)
       await this.line(
         "box",
@@ -790,13 +1126,16 @@ export class Bot {
       );
     const rec: BoxRecord = { ...p, draw: d, prize, posts: [...p.posts, resultPost] };
     delete (rec as Partial<typeof p>).rows;
+    delete rec.paid;
     this.state.outbox = [...(this.state.outbox ?? []), { boxId: p.boxId, rows: p.rows }];
     this.state.history.push(rec);
     this.state.pending = undefined;
+    this.state.watch = undefined; // new box, new shortlist
     this.state.nextBoxId++;
     this.state.phase = p.final ? "done" : "filling";
     if (!p.final) {
-      const prevSize = BigInt(p.budgetLamports);
+      // compare box sizes, not what was inside: leftovers from the last pull would make every box look "smaller"
+      const prevSize = boxSize(this.state.history.length - 1, this.state.boxTarget);
       const { lamports: size, perHour } = nextBoxSize(this.state.feeLedger);
       this.state.boxTarget = size.toString();
       const mood =
@@ -808,7 +1147,7 @@ export class Bot {
       const n = (l: bigint) => String(Number(l) / 1e9); // 3.5, not 3.500
       await this.line(
         "box",
-        `${mood}. fees into the box in the last hour: ${sol(perHour)} sol. next box #${p.boxId + 1} is ${n(size)} sol, the last one had ${sol(prevSize)} sol`,
+        `${mood}. fees into the box in the last hour: ${sol(perHour)} sol. next box #${p.boxId + 1} is ${n(size)} sol, the last one was ${n(prevSize)} sol`,
         [n(size)],
         size > prevSize
           ? `volume is cooking. next box is ${n(size)} sol. send it`
@@ -820,30 +1159,120 @@ export class Bot {
     // show the next box right away instead of the old numbers until the next tick
     if (this.state.pub) {
       this.state.pub.boxLamports = (left > 0n && !p.final ? left : 0n).toString();
+      this.state.pub.burned = this.state.burned;
       this.state.pub.thresholdLamports = boxSize(this.state.history.length, this.state.boxTarget).toString();
       this.state.pub.vaultLamports = this.state.vaultLamports;
     }
     this.log(`box #${p.boxId}: ${short(d.winner)} won ${d.tier} $${symbol} (${prize.sig})`);
   }
 
+  /**
+   * After a deploy, the box writes a journal entry for each new commit: what changed, in its voice.
+   * Only commits from the last 48 hours, at most 3 per tick, each once.
+   */
+  async journal(now = Date.now()) {
+    if (!this.env.BUILD_COMMITS) return;
+    let commits: [string, number, string][] = [];
+    try {
+      commits = JSON.parse(atob(this.env.BUILD_COMMITS));
+    } catch {
+      return;
+    }
+    const done = new Set((this.state.journal ?? []).map((j) => j.commit));
+    const todo = commits
+      .filter(([hash, at]) => !done.has(hash) && now - at < 48 * 3_600_000)
+      .sort((a, b) => a[1] - b[1])
+      .slice(0, 3);
+    for (const [hash, at, msg] of todo) {
+      const kind = journalKind(msg);
+      const text =
+        (await quip(
+          this.env.OPENROUTER_API_KEY,
+          `you just shipped a change to your own code. the commit message: "${msg}". write one journal entry: what changed and what it means for holders, first person, plain words, one or two short sentences. a small joke is fine. no hype words, no hashtags`,
+          [],
+          (this.state.journal ?? []).map((j) => j.text),
+          this.env.OPENROUTER_MODEL,
+          undefined,
+          true,
+        )) ?? msg;
+      this.state.journal = [
+        ...(this.state.journal ?? []),
+        { at: new Date(at).toISOString(), kind, text, commit: hash },
+      ].slice(-100);
+    }
+  }
+
+  /**
+   * Before launch: the box posts teasers on x by itself, a few times a day. No coin address, no links,
+   * nothing from the test run. Turned on with X_PRELAUNCH=1, turned off at launch.
+   */
+  async tease(now = Date.now()) {
+    if (this.env.X_PRELAUNCH !== "1" || !this.env.ZERNIO_API_KEY) return;
+    const every = (Number(this.env.X_PRELAUNCH_EVERY_MIN) || 150) * 60_000;
+    if (this.state.nextTeaseAt && now < this.state.nextTeaseAt) return;
+    this.state.nextTeaseAt = now + every * (0.8 + Math.random() * 0.4);
+    // half the time a post from the hand-written bank, half the time a new one in the same style
+    const used = this.state.teaseUsed ?? [];
+    const fresh = TEASERS.map((_, i) => i).filter((i) => !used.includes(i));
+    const pickOne = fresh[Math.floor(Math.random() * fresh.length)];
+    this.state.teaseUsed = fresh.length > 1 ? [...used, pickOne] : [];
+    let text = TEASERS[pickOne];
+    if (Math.random() < 0.5) {
+      const style = [...TEASERS].sort(() => Math.random() - 0.5).slice(0, 5);
+      text =
+        (await this.xLine(
+          `write one new teaser post before launch, in exactly this style (short lines, cryptic, a little funny, makes people curious):\n${style.join("\n---\n")}\n---\nwhat is true about you: a pink pixel gift box on solana, not live yet. trading fees fill you, an ai seals two coins inside, a future solana block picks the holder who opens you. you can only buy your own token and burn it, never sell. a vault grows inside you, something opens it. never give a date, a coin address or a link, never say you are live, never explain everything`,
+          [],
+          text,
+        )) || text;
+    }
+    if (text) await this.post(text, [], true);
+  }
+
   async tick(now = Date.now()) {
-    if (this.state.phase === "done") return;
+    await this.journal(now);
+    await this.tease(now);
     if (!this.env.MINT) {
       if (this.state.pub) this.state.pub.updatedAt = new Date(now).toISOString();
       return;
     }
+    // checked before "done": a finished test mint must still reset when the real one is set
     if (this.state.mintSeen !== this.env.MINT) {
       if (this.state.mintSeen) {
         // a different coin (e.g. a dry run on a test mint, then the real launch): start clean
-        const { log, pub, mintSeen: old } = this.state;
+        const { log, pub, journal, mintSeen: old } = this.state;
         const own = [this.box.publicKey, this.env.TEAM_WALLET, this.dev?.publicKey].filter(Boolean) as string[];
-        Object.assign(this.state, newState(now), { log, pub, excluded: own });
-        this.state.pending = undefined;
+        for (const k of Object.keys(this.state)) delete (this.state as unknown as Record<string, unknown>)[k];
+        Object.assign(this.state, newState(now), {
+          log,
+          journal,
+          excluded: own,
+          pub: pub && {
+            ...pub,
+            boxLamports: "0",
+            vaultLamports: "0",
+            burned: undefined,
+            frenzy: 0,
+            odds: undefined,
+            mcap: undefined,
+          },
+        });
         this.log(`mint changed from ${old}, state reset`);
       }
       this.state.mintSeen = this.env.MINT;
       this.state.launchedAt = now; // grace period for the Final Box counts from launch
       this.log(`mint set: ${this.env.MINT}`);
+    }
+    if (this.state.phase === "done") return;
+    // a burn that failed earlier: whatever $PULLIT the box holds is burned now
+    if (this.state.burnPending && !this.dry) {
+      try {
+        const r = await burnAll(this.rpc, this.box, this.env.MINT);
+        this.state.burnPending = false;
+        if (r) this.log(`burned leftover $PULLIT: ${r.amount} (${r.sig})`);
+      } catch (e) {
+        this.log(`leftover burn failed again: ${(e as Error).message}`);
+      }
     }
     if (this.state.phase === "drawing") return this.finishBox();
     if (now - this.state.lastClaimAt >= (this.dry ? LOOP.dry.claimEveryMin : LOOP.claimEveryMin) * 60_000)
@@ -855,17 +1284,53 @@ export class Bot {
       if (s.eligible > 0 && (!lastInfo || now - Date.parse(lastInfo.at) > 30 * 60_000))
         await this.line(
           "info",
-          `${s.holdersTotal.toLocaleString("en-US")} holders, ${s.eligible.toLocaleString("en-US")} of them are in the draw (you need $20 held for 15 minutes)`,
+          `${s.holdersTotal.toLocaleString("en-US")} holders, ${s.eligible.toLocaleString("en-US")} of them are in the draw (you need $${this.entry()} held for 7 minutes for this box)`,
           [s.eligible.toLocaleString("en-US")],
-          say.info(s.holdersTotal.toLocaleString("en-US"), s.eligible.toLocaleString("en-US")),
+          say.info(s.holdersTotal.toLocaleString("en-US"), s.eligible.toLocaleString("en-US"), this.entry()),
         );
     }
-    const final = !this.dry && shouldRunFinalBox(this.state.feeLedger, this.state.launchedAt, now);
+    // the final box only when claims work and fees really dried up, never because a claim was failing
+    const claimsWork = !!this.dev && now - (this.state.lastClaimOkAt ?? 0) < 30 * 60_000;
+    const final = !this.dry && claimsWork && shouldRunFinalBox(this.state.feeLedger, this.state.launchedAt, now);
     await this.openBox(final);
     if ((this.state.phase as State["phase"]) === "drawing") return this.drawSoon();
     if (this.state.phase === "filling") {
+      await this.watch(now);
       await this.shitpost(now);
       await this.chatter(now);
     }
+  }
+
+  /**
+   * Every 10 minutes while the box fills, the agent re-scans the market and updates its shortlist,
+   * so the box is packed from what is running right now. The log says what changed, never which coins.
+   */
+  async watch(now = Date.now()) {
+    const every = (this.dry ? LOOP.scanEveryMin.dry : LOOP.scanEveryMin.live) * 60_000;
+    if (this.state.watch && now - this.state.watch.at < every) return;
+    const universe = await fetchUniverse(this.env.JUP_API_KEY);
+    const r = scan(universe);
+    const top = 5;
+    const fresh = r.fresh.slice(0, top).map((c) => c.mint);
+    const meta = r.established.slice(0, top).map((c) => c.mint);
+    const prev = this.state.watch;
+    this.state.watch = { at: now, fresh, meta };
+    if (!prev) return;
+    const was = new Set([...prev.fresh, ...prev.meta]);
+    const is = new Set([...fresh, ...meta]);
+    const added = [...is].filter((m) => !was.has(m)).length;
+    const dropped = [...was].filter((m) => !is.has(m)).length;
+    const lead = r.fresh[0];
+    const leadChanged = prev.fresh[0] !== fresh[0];
+    const secret = [...r.fresh.slice(0, top), ...r.established.slice(0, top)].flatMap((c) => [c.symbol, c.mint]);
+    await this.line(
+      "scan",
+      `you re-scanned ${universe.length.toLocaleString("en-US")} coins for box #${this.state.nextBoxId}. your shortlist changed: ${added} new runners in, ${dropped} dropped out (dumped or failed the filters).${leadChanged && lead ? ` new favourite for the fresh slot: ${criteria(lead, "fresh")}.` : ""} tell the chat the box gets packed from whatever is running when it fills. never name a coin`,
+      [],
+      say.watch(added, dropped),
+      undefined,
+      undefined,
+      secret,
+    );
   }
 }

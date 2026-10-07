@@ -5,7 +5,7 @@
 //   npm run bot
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync, renameSync } from "node:fs";
-import { Bot, newState, type Env, type State } from "../src/loop.ts";
+import { Bot, newState, type Env, type State } from "../../src/loop.ts";
 
 const env = process.env as unknown as Env;
 for (const k of ["MINT", "HELIUS_API_KEY", "JUP_API_KEY", "BOX_SECRET", "TEAM_WALLET"] as const)
@@ -20,6 +20,7 @@ const save = () => {
 };
 
 const bot = new Bot(env, state);
+bot.checkpoint = async () => save(); // a payment is on disk before the next one starts
 await bot.init();
 bot.log(`bot up. mint ${env.MINT}, ${bot.dry ? "DRY RUN (no money, no posts)" : "LIVE"}, state ${path}`);
 
@@ -32,6 +33,11 @@ async function loop() {
   } catch (e) {
     bot.log(`tick error: ${(e as Error).message}`);
   } finally {
+    // like the worker: ticket lists of opened boxes go to their own files, the state stays small
+    for (const b of state.outbox ?? []) writeFileSync(`out/box-${b.boxId}.json`, JSON.stringify(b.rows));
+    if (state.lastSnap) writeFileSync("out/tickets.json", JSON.stringify(state.lastSnap));
+    delete state.outbox;
+    delete state.lastSnap;
     save();
     busy = false;
   }

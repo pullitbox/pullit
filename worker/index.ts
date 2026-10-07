@@ -7,6 +7,7 @@ import { Bot, newState, type Env as BotEnv, type State } from "../src/loop.ts";
 import { HTML } from "./site.ts";
 import { keypairFromSecret, Rpc } from "../src/solana.ts";
 import { fetchToken } from "../src/jupiter.ts";
+import { HOLDERS } from "../src/holders.ts";
 import { findXAccount } from "../src/zernio.ts";
 import type { ExecutionContext, KVNamespace, ScheduledEvent } from "./cloudflare.ts";
 
@@ -48,21 +49,28 @@ async function selftest(env: Env) {
 interface Env extends BotEnv {
   STATE: KVNamespace;
   PREVIEW_KEY?: string;
+  REPO_URL?: string; // e.g. https://github.com/pullitbox/pullit, set once the repo is public
   PUBLIC?: string;
 }
 
 type Snap = NonNullable<State["lastSnap"]>;
 
-const LOCK_MS = 4 * 60_000;
+// longer than the slowest possible tick (AI lines, packing, waiting for the draw block)
+const LOCK_MS = 15 * 60_000;
 
 async function run(env: Env) {
   const lock = await env.STATE.get("lock");
-  if (lock && Date.now() - Number(lock) < LOCK_MS) return; // previous tick still running
-  await env.STATE.put("lock", String(Date.now()));
+  if (lock && Date.now() - Number(lock.split(":")[0]) < LOCK_MS) return; // previous tick still running
+  const token = `${Date.now()}:${crypto.randomUUID()}`;
+  await env.STATE.put("lock", token);
   const state = ((await env.STATE.get("state", "json")) as State | null) ?? newState();
   const bot = new Bot(env, state);
   // the sealed box is saved (and visible on the site) before the draw block exists
   bot.checkpoint = () => env.STATE.put("state", JSON.stringify(state));
+  // before any payment: stop if another tick has taken the lock
+  bot.guard = async () => {
+    if ((await env.STATE.get("lock")) !== token) throw new Error("lost the lock, another tick is running");
+  };
   try {
     await bot.init();
     await bot.tick();
@@ -77,18 +85,15 @@ async function run(env: Env) {
     for (const b of state.outbox ?? []) await env.STATE.put(`box:${b.boxId}`, JSON.stringify(b.rows));
     delete state.outbox;
     await env.STATE.put("state", JSON.stringify(state));
-    await env.STATE.delete("lock");
+    if ((await env.STATE.get("lock")) === token) await env.STATE.delete("lock");
   }
 }
 
-function publicState(s: State | null) {
+function publicState(s: State | null, repo?: string, dryRun = false) {
   if (!s) return { phase: "starting" };
   // a sealed box shows only its seal: the coins and the salt stay secret until it opens
   const sealed = (b: NonNullable<State["pending"]>) => {
-    const { rows, plan, salt, ...rest } = b;
-    void rows;
-    void plan;
-    void salt;
+    const { rows, plan, salt, paid, ...rest } = b;
     return rest;
   };
   return {
@@ -101,7 +106,12 @@ function publicState(s: State | null) {
     history: s.history.slice(-30).reverse(),
     boxesOpened: s.history.length,
     givenLamports: s.history.reduce((a, b) => a + BigInt(b.prize?.lamports ?? "0"), 0n).toString(),
-    dry: s.history.some((b) => b.prize?.sig === "dry-run") || undefined,
+    burned: s.burned,
+    journal: (s.journal ?? [])
+      .slice(-30)
+      .reverse()
+      .map(({ commit, ...j }) => ({ ...j, link: repo && commit ? `${repo}/commit/${commit}` : undefined })),
+    dry: dryRun || s.history.some((b) => b.prize?.sig === "dry-run") || undefined,
   };
 }
 
@@ -117,27 +127,50 @@ const json = (data: unknown, status = 200) =>
 
 const ADDR = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 
-/** Where a wallet stands: in the draw (with tickets), waiting out the 15 min, or not in. */
+/** Where a wallet stands: in the draw (with tickets), waiting out the minimum hold, or not in. And what a buy would change. */
 async function walletStatus(env: Env, addr: string) {
   const state = (await env.STATE.get("state", "json")) as State | null;
   const snap = (await env.STATE.get("tickets", "json")) as Snap | null;
+  const total = snap?.totalTickets ?? 0;
+  const share = (t: number, extra = 0) =>
+    total + extra > 0 ? Math.round(((t + extra) / (total + extra)) * 10000) / 100 : 0;
+  // what $50 more would do: the bag counts at today's price, with the buy boost and the wallet's multiplier
+  const entry = state?.pub?.entryUsd ?? HOLDERS.minHoldUsd;
+  const whatIf = (tickets: number, mult: number) => {
+    const price = snap?.priceUsd;
+    if (!price) return undefined;
+    const add = Math.max(50, entry);
+    const extra = (add / price) * mult * (1 + HOLDERS.buyBoostPct / 100);
+    return { addUsd: add, sharePct: share(tickets, extra) };
+  };
   const row = snap?.rows.find((r) => r[0] === addr);
   if (row) {
-    const [, tickets, heldMinutes, multiplier] = row;
+    const [, tickets, heldMinutes, multiplier, boosted] = row;
     return {
       status: "in",
       tickets,
       multiplier,
+      maxMultiplier: HOLDERS.maxMultiplier,
+      hoursToMax: Math.max(0, Math.ceil(HOLDERS.rampHours - heldMinutes / 60)),
+      boosted: !!boosted,
       heldMinutes,
-      sharePct: snap!.totalTickets ? Math.round((tickets / snap!.totalTickets) * 10000) / 100 : 0,
+      sharePct: share(tickets),
+      ifBuy: whatIf(tickets, multiplier),
       at: snap!.at,
     };
   }
   const since = state?.holderState?.[addr];
+  // held long enough but the bag is smaller than this box's entry
+  if (since && (Date.now() - since) / 60_000 >= HOLDERS.minHoldMinutes)
+    return { status: "out", short: true, ifBuy: whatIf(0, 1), minUsd: entry, at: snap?.at };
   if (since)
-    return { status: "waiting", minutesLeft: Math.max(1, Math.ceil(15 - (Date.now() - since) / 60_000)), at: snap?.at };
+    return {
+      status: "waiting",
+      minutesLeft: Math.max(1, Math.ceil(HOLDERS.minHoldMinutes - (Date.now() - since) / 60_000)),
+      at: snap?.at,
+    };
   if (state?.excluded?.includes(addr)) return { status: "excluded", at: snap?.at };
-  return { status: "out", at: snap?.at };
+  return { status: "out", ifBuy: whatIf(0, 1), minUsd: entry, at: snap?.at };
 }
 
 /** One opened box with everything needed to recompute the draw. */
@@ -160,7 +193,10 @@ export default {
     if (env.PUBLIC !== "1" && !preview) return new Response("not found", { status: 404 });
     if (url.pathname === "/api/selftest")
       return preview ? json(await selftest(env)) : new Response("not found", { status: 404 });
-    if (url.pathname === "/api/state") return json(publicState((await env.STATE.get("state", "json")) as State | null));
+    if (url.pathname === "/api/state")
+      return json(
+        publicState((await env.STATE.get("state", "json")) as State | null, env.REPO_URL, env.DRY_RUN === "1"),
+      );
     if (url.pathname === "/api/wallet") {
       const a = url.searchParams.get("a") ?? "";
       return ADDR.test(a) ? json(await walletStatus(env, a)) : json({ error: "not a solana address" }, 400);

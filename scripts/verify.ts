@@ -60,7 +60,7 @@ try {
 const w = await pickWinner(b.rows, d.blockhash, b.boxId);
 check(w?.seed === d.seed, `seed sha256(blockhash:${b.boxId}) = ${w?.seed.slice(0, 16)}…`);
 check(w?.owner === d.winner, `winner ${w?.owner}`);
-const tier = rollTier(w?.seed ?? "");
+const tier = rollTier(w?.seed ?? "", b.odds, !!b.milestone);
 check(tier === d.tier, `tier ${tier}`);
 
 console.log(

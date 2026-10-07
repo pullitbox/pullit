@@ -15,8 +15,8 @@ export const AGENT = {
 // The tier decides how big the prize is: a share of the box (the rest rolls into the next box),
 // and for secret also a share of the vault. Prizes are paid in the coins the AI sealed in the box.
 export const TIERS = [
-  { key: "common", pct: 50, boxPct: 30, vaultPct: 0, asset: "fresh runner" },
-  { key: "rare", pct: 30, boxPct: 60, vaultPct: 0, asset: "meta runner" },
+  { key: "common", pct: 50, boxPct: 50, vaultPct: 0, asset: "fresh runner" },
+  { key: "rare", pct: 30, boxPct: 75, vaultPct: 0, asset: "meta runner" },
   { key: "epic", pct: 15, boxPct: 100, vaultPct: 0, asset: "meta runner" },
   { key: "secret", pct: 5, boxPct: 100, vaultPct: 25, asset: "meta runner" },
 ] as const;
@@ -53,7 +53,7 @@ Your voice: a deadpan, slightly mean little box. You know you are cardboard. You
 - tease that you are full and sealed, joke about being a box that cannot peek, about the wait, about the block
 
 "hint_common" and "hint_rare" go on the public log right away, one per pick:
-- a dumb little joke about what you just picked and why, like you are telling friends about it
+- a dumb little joke about what you just picked and why, like you are telling friends about it. one thought, max 110 characters, no metaphors or role play
 - NEVER the ticker, the name, a $ sign, or any number. describe the vibe, not the coin
 - e.g. "picked some weird dog. looks nervous. holders keep showing up so i trust it more than you"
 - e.g. "the rare one has survived longer than your last 5 trades combined. respect"
@@ -91,6 +91,14 @@ export function buildPrompt(scan: ScanResult, boxId: number, recentSymbols: stri
   ].join("\n");
 }
 
+/** The JSON object inside a model answer, even if it is wrapped in a code fence or a sentence. */
+export function jsonPart(text: string): string {
+  const a = text.indexOf("{");
+  const b = text.lastIndexOf("}");
+  if (a < 0 || b <= a) throw new Error(`no json in the answer (${text.length} chars)`);
+  return text.slice(a, b + 1);
+}
+
 export async function askModel(apiKey: string, user: string, model = AGENT.model): Promise<string> {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), AGENT.timeoutMs);
@@ -102,7 +110,7 @@ export async function askModel(apiKey: string, user: string, model = AGENT.model
       body: JSON.stringify({
         model,
         temperature: 0.95,
-        max_tokens: 400,
+        max_tokens: 1500, // two mints are ~60 tokens each; 400 cut the json off mid-way
         response_format: { type: "json_object" },
         messages: [
           { role: "system", content: SYSTEM },
@@ -203,7 +211,7 @@ export async function packBox(
   let problems: string[] = [];
   try {
     const text = await askModel(apiKey, buildPrompt(scan, boxId, recentSymbols), model);
-    const raw = JSON.parse(text.replace(/^```(json)?|```$/g, "").trim());
+    const raw = JSON.parse(jsonPart(text));
     problems = validate(raw, scan);
     if (problems.length === 0) {
       const c = scan.fresh.find((x) => x.mint === raw.common.mint)!;
@@ -228,14 +236,23 @@ export async function packBox(
 }
 
 /** Rolls the tier from a hex seed (sha256 of blockhash + box id). Public and reproducible. */
-export function rollTier(seedHex: string): Tier {
+/**
+ * The tier from the draw seed. `odds` are the percentages for common, rare, epic, secret that were
+ * locked when the box was sealed (frenzy changes them). A milestone box is epic or better.
+ */
+export function rollTier(seedHex: string, odds: readonly number[] = TIERS.map((t) => t.pct), milestone = false): Tier {
   const n = parseInt(seedHex.slice(13, 21), 16) % 100; // different bits than the winner pick
   let acc = 0;
-  for (const t of TIERS) {
-    acc += t.pct;
-    if (n < acc) return t.key;
+  let tier: Tier = "common";
+  for (let i = 0; i < TIERS.length; i++) {
+    acc += odds[i];
+    if (n < acc) {
+      tier = TIERS[i].key;
+      break;
+    }
   }
-  return "common";
+  if (milestone && (tier === "common" || tier === "rare")) return "epic";
+  return tier;
 }
 
 // ---------- one-liners for the site log ----------
@@ -244,6 +261,8 @@ const QUIP_SYSTEM = `You are pullit, a pink pixel gift box on Solana. Holders of
 You talk like a crypto twitter degen: short, dry, a bit mean, funny. You know the trenches: jeets, paper hands, exit liquidity, kols, snipers, bundles, rugs, people who buy tops.
 
 You are alive, not a status bot. You have moods: starving when the box is empty, hyped when fees pour in, petty with sellers, proud when a box opens. You talk to the people in the draw ("anon", "you guys", a wallet by name), you remember what just happened in your recent lines and call back to it when it fits (the last winner, the guy who dumped, how slow the box is). React like a person watching the chart live.
+
+One fact about you that you love to joke about: you cannot sell. Your code only buys $PULLIT and burns it, there is no sell function at all. You act like a dev who wanted to rug everyone but found out he physically can't, so you keep buying and burning out of spite.
 
 How a good line works: say what happened in plain words, then one jab about that exact thing. That is it. A stranger scrolling the log gets the joke in one read.
 
@@ -260,6 +279,8 @@ box at 62%. trade something, i am starving
 62% and the guy who dumped at 40% is watching from the side. enjoy the view
 gm to the 381 of you in the draw. the rest, there is still time
 seal on #19 checks out. nothing swapped. sorry conspiracy guys
+bought 0.031 sol of $PULLIT and burned it. wanted to dump on you all, turns out i cant sell. so this happens
+looked for my sell button again today. still not there. burning more out of spite
 
 Bad lines (never write like this):
 - made-up backstory: your sleep, your age, your past, "i have seen every cycle", "i have watched a hundred devs"

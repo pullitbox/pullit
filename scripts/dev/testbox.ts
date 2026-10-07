@@ -5,11 +5,11 @@
 //   npm run testbox -- --live            really buys ~0.005 SOL of the prize into Dev
 //   npm run testbox -- --live --tier=rare   force a tier (common|rare|epic|secret)
 
-import { fetchUniverse } from "../src/jupiter.ts";
-import { scan } from "../src/scanner.ts";
-import { packBox, type Tier } from "../src/agent.ts";
-import { keypairFromSecret, Rpc, LAMPORTS } from "../src/solana.ts";
-import { blockhashAt, draw, EXEC, payout, prizeMint, quote, MINTS } from "../src/executor.ts";
+import { fetchUniverse } from "../../src/jupiter.ts";
+import { scan } from "../../src/scanner.ts";
+import { packBox, type Tier } from "../../src/agent.ts";
+import { keypairFromSecret, Rpc, LAMPORTS } from "../../src/solana.ts";
+import { blockhashAt, draw, EXEC, payout, prizeMint, quote, MINTS } from "../../src/executor.ts";
 
 const env = process.env;
 for (const k of ["JUP_API_KEY", "HELIUS_API_KEY", "BOX_SECRET", "DEV_SECRET"])

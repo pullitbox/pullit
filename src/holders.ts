@@ -3,8 +3,8 @@
 // Network code is only in fetchHolders(); everything else is pure.
 
 export const HOLDERS = {
-  minHoldUsd: 20, // below this a wallet is not in the draw
-  minHoldMinutes: 15, // anti-snipe: must hold this long before a draw counts you
+  minHoldUsd: 20, // the smallest bag that keeps a hold timer running; bigger boxes ask for more (entryUsd)
+  minHoldMinutes: 7, // anti-snipe: must hold this long before a draw counts you
   // hold-time multiplier ramps from 1x to maxMultiplier over rampHours
   rampHours: 24,
   maxMultiplier: 3,
@@ -12,7 +12,24 @@ export const HOLDERS = {
   bagCapPctOfSupply: 1,
   // ...and no wallet may hold more than this share of all tickets
   maxTicketSharePct: 10,
+  // a wallet that bought in the last 15 minutes gets this many % more tickets
+  buyBoostPct: 25,
+  buyBoostMinutes: 15,
+  // any sell puts the hold multiplier back to 1x (you stay in the draw)
+  sellResetsHold: true,
 };
+
+/** The bag a wallet needs to be in the draw for a box of this size (SOL). Bigger box, bigger entry. */
+export function entryUsd(boxSol: number): number {
+  if (boxSol >= 5) return 250;
+  if (boxSol >= 2.5) return 100;
+  if (boxSol > 1.5) return 75;
+  if (boxSol > 0.5) return 50;
+  return HOLDERS.minHoldUsd;
+}
+
+/** Between snapshots: owner -> [amount at the last snapshot, time of the last buy (ms)]. */
+export type BagMemo = Record<string, [number, number]>;
 
 export interface HolderBalance {
   owner: string;
@@ -28,6 +45,7 @@ export interface TicketRow {
   usd: number;
   heldMinutes: number;
   multiplier: number;
+  boosted: boolean; // bought in the last hour
   tickets: number;
   sharePct: number;
 }
@@ -40,6 +58,8 @@ export interface TicketSnapshot {
   totalTickets: number;
   rows: TicketRow[]; // sorted by tickets desc
   state: HolderState; // updated state to persist
+  memo: BagMemo; // updated amounts and last buys to persist
+  sold: string[]; // eligible wallets whose hold multiplier was reset by a sell
 }
 
 // ---------- network ----------
@@ -109,31 +129,63 @@ function capShares(rows: { owner: string; raw: number }[], maxShare: number): Ma
 export function computeTickets(
   balances: HolderBalance[],
   prev: HolderState,
-  opts: { priceUsd: number; totalSupply: number; exclude: string[]; now?: number; minHoldMinutes?: number },
+  opts: {
+    priceUsd: number;
+    totalSupply: number;
+    exclude: string[];
+    now?: number;
+    minHoldMinutes?: number;
+    minUsd?: number; // entry for the box being filled (entryUsd); the hold timer only needs HOLDERS.minHoldUsd
+    memo?: BagMemo; // without it, buys and sells are not tracked
+  },
 ): TicketSnapshot {
   const now = opts.now ?? Date.now();
   const exclude = new Set(opts.exclude);
   const bagCap = opts.totalSupply * (HOLDERS.bagCapPctOfSupply / 100);
+  const minHold = opts.minHoldMinutes ?? HOLDERS.minHoldMinutes;
   const state: HolderState = {};
-  const pre: { owner: string; amount: number; usd: number; heldMinutes: number; multiplier: number; raw: number }[] =
-    [];
+  const memo: BagMemo = {};
+  const sold: string[] = [];
+  const pre: {
+    owner: string;
+    amount: number;
+    usd: number;
+    heldMinutes: number;
+    multiplier: number;
+    boosted: boolean;
+    raw: number;
+  }[] = [];
 
   for (const b of balances) {
     if (exclude.has(b.owner)) continue;
     const usd = b.amount * opts.priceUsd;
     if (usd < HOLDERS.minHoldUsd) continue; // dropping below the minimum resets your timer
-    const since = prev[b.owner] ?? now;
+    let since = prev[b.owner] ?? now;
+    const last = opts.memo?.[b.owner];
+    let lastBuy = last?.[1] ?? 0;
+    if (opts.memo) {
+      // half a percent of slack, so dust moves do not count as a buy or a sell
+      if (!last || b.amount > last[0] * 1.005) lastBuy = now;
+      else if (b.amount < last[0] * 0.995 && HOLDERS.sellResetsHold && now - since >= minHold * 60_000) {
+        since = now - minHold * 60_000; // still in the draw, back to 1x
+        sold.push(b.owner);
+      }
+      memo[b.owner] = [b.amount, lastBuy];
+    }
     state[b.owner] = since;
     const heldMinutes = (now - since) / 60_000;
-    if (heldMinutes < (opts.minHoldMinutes ?? HOLDERS.minHoldMinutes)) continue;
+    if (heldMinutes < minHold) continue;
+    if (usd < (opts.minUsd ?? HOLDERS.minHoldUsd)) continue; // timer keeps running, but this box needs a bigger bag
     const multiplier = holdMultiplier(heldMinutes);
+    const boosted = now - lastBuy < HOLDERS.buyBoostMinutes * 60_000;
     pre.push({
       owner: b.owner,
       amount: b.amount,
       usd,
       heldMinutes,
       multiplier,
-      raw: Math.min(b.amount, bagCap) * multiplier,
+      boosted,
+      raw: Math.min(b.amount, bagCap) * multiplier * (boosted ? 1 + HOLDERS.buyBoostPct / 100 : 1),
     });
   }
 
@@ -148,6 +200,7 @@ export function computeTickets(
         usd: Math.round(p.usd * 100) / 100,
         heldMinutes: Math.round(p.heldMinutes),
         multiplier: Math.round(p.multiplier * 100) / 100,
+        boosted: p.boosted,
         tickets,
         sharePct: totalTickets ? Math.round((tickets / totalTickets) * 10000) / 100 : 0,
       };
@@ -162,6 +215,8 @@ export function computeTickets(
     totalTickets,
     rows,
     state,
+    memo,
+    sold,
   };
 }
 

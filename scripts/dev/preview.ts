@@ -3,9 +3,9 @@
 // Nothing here touches the chain: the state is generated, the draw math is the real one.
 
 import { createServer } from "node:http";
-import worker from "../worker/index.ts";
-import { newState, type State } from "../src/loop.ts";
-import { draw, prizeSplit, sealOf } from "../src/executor.ts";
+import worker from "../../worker/index.ts";
+import { newState, type State } from "../../src/loop.ts";
+import { draw, prizeSplit, sealOf } from "../../src/executor.ts";
 
 const kv = new Map<string, string>();
 const KV = {
@@ -84,6 +84,7 @@ for (let id = 1; id <= 6; id++) {
 }
 s.nextBoxId = 7;
 s.vaultLamports = "1240000000";
+s.burned = { lamports: "186000000", tokens: "0" };
 const F = (min: number, tag: string, m: string) => ({ at: new Date(Date.now() - min * 60_000).toISOString(), tag, m });
 s.feed = [
   F(58, "fee", "fees came in. 0.044 for me, 0.005 for the vault. tastes like your bad entries"),
@@ -100,6 +101,8 @@ s.feed = [
   },
   F(51, "box", "box #6 unsealed. seal matches. told you. im cardboard, not a dev"),
   F(51, "box", "0.137 sol stays in me for box #7. leftovers. like your bags"),
+  F(45, "boost", "frenzy 2/3. $64K in an hour. epic 21%, secret 9%. keep it going"),
+  { ...F(50, "burn", "bought 0.031 sol of $PULLIT and burned it. supply goes one way"), tx: "4" + hash(80) + hash(81) },
   F(40, "x", "breaking: local box 68% full, refuses to elaborate / holders still asking wen"),
   F(30, "hold", "Bq3x…P0aa has held me for 24h. 3x tickets. marry me"),
   F(8, "fee", "0.039 sol into the box. whoever keeps flipping 0.1 sol all day, i see you, i love you"),
@@ -115,6 +118,11 @@ s.pub = {
   boxLamports: "204000000",
   thresholdLamports: "300000000",
   holders: 412,
+  frenzy: 2,
+  odds: [40, 30, 21, 9],
+  mcap: 84_000,
+  nextMilestone: 100_000,
+  burned: { lamports: "186000000", tokens: "0" },
   eligible: 188,
 };
 if (mode === "packed") {
@@ -136,6 +144,50 @@ if (mode === "empty") {
   s.pub.boxLamports = "21000000";
   s.pub.thresholdLamports = "150000000";
 }
+const J = (d: number, kind: "ship" | "rule" | "fix" | "burn", text: string, link?: string) => ({
+  at: new Date(Date.now() - d * 86_400_000).toISOString(),
+  kind,
+  text,
+  link,
+});
+s.journal = [
+  J(
+    0,
+    "rule",
+    "bigger box, bigger entry. $20 up to 0.5 sol, $50 up to 1.5, $75 up to 2.5, $100 up to 5, $250 above. small bags keep their hold time",
+    "https://github.com/pullitbox/pullit/commit/9363679",
+  ),
+  J(
+    0,
+    "ship",
+    "i re-scan the market every 10 minutes now. the box packs whatever runs when it fills, not what ran an hour ago",
+    "https://github.com/pullitbox/pullit/commit/9363679",
+  ),
+  J(
+    1,
+    "burn",
+    "milestone boxes now burn 10% of the vault on top of the usual 10% of the box. first one at 50K cap",
+    "https://github.com/pullitbox/pullit/commit/9363679",
+  ),
+  J(
+    1,
+    "fix",
+    "the log stopped scrolling away while you read it. sorry to everyone who missed a roast",
+    "https://github.com/pullitbox/pullit/commit/9363679",
+  ),
+  J(
+    2,
+    "rule",
+    "bought in the last 15 minutes: +25% tickets. sold anything: back to 1x. you stay in, you just lose your streak",
+    "https://github.com/pullitbox/pullit/commit/9363679",
+  ),
+  J(
+    3,
+    "ship",
+    "removed my own sell button. there was never one, now there is a test that fails if anyone adds it",
+    "https://github.com/pullitbox/pullit/commit/9363679",
+  ),
+].reverse();
 kv.set("state", JSON.stringify(s));
 kv.set(
   "tickets",

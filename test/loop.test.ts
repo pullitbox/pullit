@@ -115,3 +115,112 @@ test("the log never says the same thing twice", async () => {
     for (let j = i + 1; j < lines.length; j++) assert.ok(!similar(lines[i], lines[j]), lines[i] + " / " + lines[j]);
   assert.ok(lines.length >= 3 && lines.length <= 7);
 });
+
+test("a dry box opens with locked odds, a milestone vault cut, a box burn and a vault burn", async () => {
+  const b = new Bot(
+    { HELIUS_API_KEY: "x", JUP_API_KEY: "x", BOX_SECRET: "x", TEAM_WALLET: "T", DRY_RUN: "1" },
+    newState(),
+  );
+  const slot = 1000;
+  b.rpc = {
+    call: async (m: string) => (m === "getSlot" ? slot + 5 : { blockhash: "BLOCKHASH111" }),
+  } as unknown as typeof b.rpc;
+  b.state.phase = "drawing";
+  b.state.vaultLamports = "1000000000";
+  b.state.dryBalance = "3000000000";
+  b.state.pending = {
+    boxId: 1,
+    plan: {
+      boxId: 1,
+      common: { mint: "C", symbol: "CCC", why: "" },
+      rare: { mint: "R", symbol: "RRR", why: "" },
+      post: "",
+      reveal: "",
+      hints: { common: "", rare: "" },
+      source: "fallback",
+    },
+    odds: [35, 30, 24, 11],
+    frenzy: 3,
+    milestone: 100_000,
+    burnLamports: "100000000",
+    budgetLamports: "1000000000",
+    seal: "s",
+    salt: "x",
+    targetSlot: slot,
+    eligible: 1,
+    rows: [{ owner: "W".repeat(44), tickets: 10 }],
+    posts: [],
+    at: new Date().toISOString(),
+  };
+  await b.finishBox();
+  const r = b.state.history[0];
+  assert.ok(r.draw && ["epic", "secret"].includes(r.draw.tier)); // milestone box
+  const fromVault = BigInt(r.prize!.fromVault);
+  assert.equal(fromVault, r.draw!.tier === "secret" ? 450_000_000n : 200_000_000n);
+  // prize = the whole box minus the burn, plus the vault cut
+  assert.equal(r.prize!.lamports, (900_000_000n + fromVault).toString());
+  // milestone: 10% of what is left in the vault is burned too, on top of 10% of the box
+  const vaultBurn = ((1_000_000_000n - fromVault) * 10n) / 100n;
+  assert.equal(r.burn!.lamports, (100_000_000n + vaultBurn).toString());
+  assert.equal(r.burn!.fromVault, vaultBurn.toString());
+  assert.equal(b.state.burned!.lamports, (100_000_000n + vaultBurn).toString());
+  assert.equal(b.state.vaultLamports, (1_000_000_000n - fromVault - vaultBurn).toString());
+  assert.ok(b.state.feed.some((f) => f.tag === "burn"));
+  assert.equal(r.paid, undefined);
+});
+
+test("a retry reuses the saved draw and does not take the dry balance twice", async () => {
+  const b = new Bot(
+    { HELIUS_API_KEY: "x", JUP_API_KEY: "x", BOX_SECRET: "x", TEAM_WALLET: "T", DRY_RUN: "1" },
+    newState(),
+  );
+  let blocks = 0;
+  b.rpc = {
+    call: async (m: string) => {
+      if (m === "getBlock") blocks++;
+      return m === "getSlot" ? 1005 : { blockhash: "BLOCKHASH111" };
+    },
+  } as unknown as typeof b.rpc;
+  let saves = 0;
+  b.checkpoint = async () => {
+    saves++;
+    if (saves === 2) throw new Error("kv down"); // dies right after the payment is recorded
+  };
+  b.state.phase = "drawing";
+  b.state.dryBalance = "1000000000";
+  b.state.pending = {
+    boxId: 1,
+    plan: {
+      boxId: 1,
+      common: { mint: "C", symbol: "CCC", why: "" },
+      rare: { mint: "R", symbol: "RRR", why: "" },
+      post: "",
+      reveal: "",
+      hints: { common: "", rare: "" },
+      source: "fallback",
+    },
+    burnLamports: "0",
+    budgetLamports: "500000000",
+    seal: "s",
+    salt: "x",
+    targetSlot: 1000,
+    eligible: 1,
+    rows: [{ owner: "W".repeat(44), tickets: 10 }],
+    posts: [],
+    at: new Date().toISOString(),
+  };
+  await assert.rejects(b.finishBox());
+  const after = b.state.dryBalance;
+  await b.finishBox();
+  assert.equal(blocks, 1); // the block was read once
+  assert.equal(b.state.dryBalance, after); // and paid once
+  assert.equal(b.state.history.length, 1);
+});
+
+test("commits are sorted into journal kinds", async () => {
+  const { journalKind } = await import("../src/loop.ts");
+  assert.equal(journalKind("fix log scroll"), "fix");
+  assert.equal(journalKind("milestone vault burn"), "burn");
+  assert.equal(journalKind("entry by box size"), "rule");
+  assert.equal(journalKind("live market rescan"), "ship");
+});

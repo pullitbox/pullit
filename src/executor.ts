@@ -1,7 +1,20 @@
 // Executor: draws the winner and the tier from a future blockhash, then pays the prize
 // straight into the winner's wallet (Jupiter swap with `receiver`, or a plain SOL transfer).
 
-import { fromB64, buildTransferTx, signSerializedTx, toB64, type Keypair, type Rpc } from "./solana.ts";
+import {
+  fromB64,
+  buildTransferTx,
+  buildTx,
+  burnIx,
+  signSerializedTx,
+  toB64,
+  txSignature,
+  type Keypair,
+  type Rpc,
+} from "./solana.ts";
+
+/** Called with a transaction's signature right before it is sent, so the caller can save it first. */
+export type OnSigned = (sig: string) => Promise<void> | void;
 import { pickWinner, type TicketRow } from "./holders.ts";
 import { rollTier, TIERS, type BoxPlan, type Tier } from "./agent.ts";
 
@@ -10,6 +23,7 @@ export const MINTS = {
 };
 
 export const EXEC = {
+  gasPerBoxLamports: 5_000_000n, // 0.005 SOL of every box stays for tx fees and token account rent
   drawDelaySlots: 50, // ~20 seconds: the draw uses a block that does not exist yet when we announce it
   keepInBoxLamports: 15_000_000n, // 0.015 SOL stays for fees and token accounts
   slippageBps: 300,
@@ -39,8 +53,9 @@ export async function blockhashAt(
             },
           ]);
           if (b?.blockhash) return { slot: s, blockhash: b.blockhash };
-        } catch {
-          /* skipped slot, try next */
+        } catch (e) {
+          // only a slot that really has no block moves the draw forward; any other error is retried
+          if (!/skipped|missing in long-term storage|-3200[79]/i.test((e as Error).message)) throw e;
         }
       }
     }
@@ -63,10 +78,12 @@ export async function draw(
   boxId: number,
   slot: number,
   blockhash: string,
+  odds?: readonly number[],
+  milestone = false,
 ): Promise<Draw> {
   const w = await pickWinner(rows, blockhash, boxId);
   if (!w) throw new Error("nobody eligible for this box");
-  return { boxId, slot, blockhash, seed: w.seed, winner: w.owner, tier: rollTier(w.seed) };
+  return { boxId, slot, blockhash, seed: w.seed, winner: w.owner, tier: rollTier(w.seed, odds, milestone) };
 }
 
 // ---------- payout ----------
@@ -76,16 +93,21 @@ export function prizeMint(tier: Tier, plan: BoxPlan): string {
   return tier === "common" ? plan.common.mint : plan.rare.mint;
 }
 
-/** How much of the box and of the vault a tier takes. The final box takes everything. */
+/**
+ * How much of the box and of the vault a tier takes. The final box takes everything.
+ * A milestone box also takes `milestoneVaultPct` of the vault on top.
+ */
 export function prizeSplit(
   tier: Tier,
   bank: bigint,
   vault: bigint,
   final = false,
+  milestoneVaultPct = 0,
 ): { fromBank: bigint; fromVault: bigint } {
   if (final) return { fromBank: bank, fromVault: vault };
   const t = TIERS.find((x) => x.key === tier)!;
-  return { fromBank: (bank * BigInt(t.boxPct)) / 100n, fromVault: (vault * BigInt(t.vaultPct)) / 100n };
+  const vaultPct = Math.min(100, t.vaultPct + milestoneVaultPct);
+  return { fromBank: (bank * BigInt(t.boxPct)) / 100n, fromVault: (vault * BigInt(vaultPct)) / 100n };
 }
 
 async function sha256Hex(s: string): Promise<string> {
@@ -117,7 +139,10 @@ interface ExecResp {
   totalOutputAmount?: string;
 }
 
-/** Quote only (no signing). Used for dry runs. */
+/**
+ * Quote only (no signing). Used for dry runs.
+ * The input is always SOL and there is no parameter to change it: this bot can buy tokens, it cannot sell any.
+ */
 export async function quote(
   jupKey: string,
   outputMint: string,
@@ -146,9 +171,11 @@ export async function buyInto(
   outputMint: string,
   lamports: bigint,
   receiver: string,
+  onSigned?: OnSigned,
 ): Promise<{ sig: string; outAmount: string; router?: string }> {
   const order = await quote(jupKey, outputMint, lamports, box.publicKey, receiver);
   const signed = await signSerializedTx(fromB64(order.transaction!), box);
+  await onSigned?.(txSignature(signed));
   const res = await fetch("https://api.jup.ag/swap/v2/execute", {
     method: "POST",
     headers: { "content-type": "application/json", "x-api-key": jupKey },
@@ -160,9 +187,17 @@ export async function buyInto(
   return { sig: ex.signature, outAmount: ex.totalOutputAmount ?? order.outAmount ?? "?", router: order.router };
 }
 
-export async function sendSol(rpc: Rpc, box: Keypair, to: string, lamports: bigint): Promise<string> {
+export async function sendSol(
+  rpc: Rpc,
+  box: Keypair,
+  to: string,
+  lamports: bigint,
+  onSigned?: OnSigned,
+): Promise<string> {
   const { blockhash } = await rpc.latestBlockhash();
-  return rpc.sendAndConfirm(await buildTransferTx(box, [{ to, lamports }], blockhash));
+  const tx = await buildTransferTx(box, [{ to, lamports }], blockhash);
+  await onSigned?.(txSignature(tx));
+  return rpc.sendAndConfirm(tx);
 }
 
 /** How much of the box balance goes into the prize. */
@@ -178,10 +213,25 @@ export async function payout(
   d: Draw,
   plan: BoxPlan,
   lamports: bigint,
+  onSigned?: OnSigned,
+  inSol = false, // fallback when the sealed coin cannot be bought any more
 ): Promise<{ sig: string; mint: string; amount: string }> {
-  const mint = prizeMint(d.tier, plan);
+  const mint = inSol ? MINTS.SOL : prizeMint(d.tier, plan);
   if (mint === MINTS.SOL)
-    return { sig: await sendSol(rpc, box, d.winner, lamports), mint, amount: lamports.toString() };
-  const r = await buyInto(jupKey, box, mint, lamports, d.winner);
+    return { sig: await sendSol(rpc, box, d.winner, lamports, onSigned), mint, amount: lamports.toString() };
+  const r = await buyInto(jupKey, box, mint, lamports, d.winner, onSigned);
   return { sig: r.sig, mint, amount: r.outAmount };
+}
+
+/** Burns the box's whole balance of `mint`. Returns null if there is nothing to burn. */
+export async function burnAll(rpc: Rpc, box: Keypair, mint: string): Promise<{ sig: string; amount: string } | null> {
+  let acc = null;
+  for (let i = 0; i < 8 && !acc?.amount; i++) {
+    acc = await rpc.tokenAccount(box.publicKey, mint);
+    if (!acc?.amount) await new Promise((r) => setTimeout(r, 1500)); // a fresh buy can take a moment to show
+  }
+  if (!acc?.amount) return null;
+  const { blockhash } = await rpc.latestBlockhash();
+  const tx = await buildTx(box, [burnIx(acc.program, acc.address, mint, box.publicKey, acc.amount)], blockhash);
+  return { sig: await rpc.sendAndConfirm(tx), amount: acc.amount.toString() };
 }

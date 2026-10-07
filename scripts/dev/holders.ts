@@ -3,8 +3,8 @@
 // Run it a few times: out/holder-state-<mint>.json remembers hold timers between runs.
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { computeTickets, fetchHolders, pickWinner, type HolderState } from "../src/holders.ts";
-import { fetchToken } from "../src/jupiter.ts";
+import { computeTickets, fetchHolders, pickWinner, type HolderState } from "../../src/holders.ts";
+import { fetchToken } from "../../src/jupiter.ts";
 
 const { HELIUS_API_KEY, JUP_API_KEY, MINT } = process.env;
 if (!HELIUS_API_KEY || !JUP_API_KEY || !MINT) {
@@ -35,7 +35,7 @@ writeFileSync(`out/tickets-${MINT}.json`, JSON.stringify(snap, null, 2));
 
 console.log(`${token.symbol}: ${snap.holdersTotal} holders fetched in ${fetchMs} ms, price $${token.usdPrice}`);
 console.log(`Excluded as pool: ${biggest}`);
-console.log(`Eligible now (>= $20, held >= 15 min): ${snap.eligible}`);
+console.log(`Eligible now (>= $20, held >= 7 min): ${snap.eligible}`);
 if (snap.eligible === 0) {
   console.log("First run only starts the timers. Run again in 15+ minutes to see tickets.");
 } else {

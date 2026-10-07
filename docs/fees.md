@@ -20,6 +20,19 @@ The vault grows every box. Something opens it.
 
 The first box is 0.15 SOL. After that, every time a box opens, the bot looks at the fees of the last hour and picks the biggest size that would fill in about 25 minutes at that pace: 0.3, 0.5, 0.75, 1, 1.5, 2, 2.75, 3.5 or 4 SOL. Busy market, big box. Quiet market, small box.
 
+## Prizes, buyback and burn
+
+When a box opens:
+
+1. 10% of the box buys $PULLIT on the market and burns it (SPL `Burn`, the supply goes down). Each burn has its own transaction on the site log.
+2. 0.005 SOL stays for transaction fees and token account rent, so they never eat into the vault.
+3. The tier decides the prize: common 50% of what is left, rare 75%, epic 100%, secret 100% plus 25% of the vault. A milestone box also takes 20% of the vault, and then 10% of what is left in the vault is added to the burn.
+4. The prize is swapped into the sealed coin and goes straight to the winner's wallet.
+
+Every payment is saved the moment it is signed, before it is sent, and again when it lands. If the bot restarts in the middle of a payout it first asks the chain whether that transaction landed, so it never pays twice. The draw itself is saved once computed, so a retry pays the same winner. If the sealed coin can no longer be bought after 5 tries, the prize is paid in SOL. If the buyback fails, that SOL stays in the box and rolls over; if only the burn fails, it is retried every minute until the bought $PULLIT is gone.
+
+The bot can only buy. Every swap in the code starts from SOL, there is no parameter to swap anything else, and `test/executor.test.ts` fails if a second kind of swap ever appears.
+
 ## Rollover
 
 Not every pull takes the whole box. Whatever is left stays in the box wallet and counts towards the next box, so the next one fills faster.

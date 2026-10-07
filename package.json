@@ -1,31 +1,45 @@
 {
   "name": "pullit",
+  "version": "0.9.0",
+  "description": "A blind box on Solana that fills itself from trading fees. An AI packs it, a future block opens it, the bot can only buy and burn.",
   "private": true,
   "type": "module",
+  "license": "MIT",
+  "homepage": "https://pullit.fun",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/pullitbox/pullit"
+  },
+  "keywords": [
+    "solana",
+    "pumpfun",
+    "ai-agent",
+    "provably-fair",
+    "cloudflare-workers"
+  ],
   "engines": {
     "node": ">=22.6"
   },
   "scripts": {
-    "bot": "node --experimental-strip-types --no-warnings --env-file-if-exists=.env scripts/run.ts",
+    "bot": "node --experimental-strip-types --no-warnings --env-file-if-exists=.env scripts/dev/run.ts",
     "check": "npm run lint && npm test",
-    "deploy": "npm run site && npx wrangler deploy",
+    "deploy": "npm run site && npx wrangler deploy --var BUILD_COMMITS:$(node --experimental-strip-types --no-warnings scripts/commits.ts)",
     "format": "prettier --write .",
-    "holders": "node --experimental-strip-types --no-warnings --env-file-if-exists=.env scripts/holders.ts",
+    "holders": "node --experimental-strip-types --no-warnings --env-file-if-exists=.env scripts/dev/holders.ts",
     "lint": "prettier --check . && tsc -p .",
     "logs": "npx wrangler tail --format pretty",
-    "pack": "node --experimental-strip-types --no-warnings --env-file-if-exists=.env scripts/pack.ts",
-    "preview": "node --experimental-strip-types --no-warnings scripts/preview.ts",
-    "quips": "node --experimental-strip-types --no-warnings --env-file-if-exists=.env scripts/quips.ts",
-    "scan": "node --experimental-strip-types --no-warnings --env-file-if-exists=.env scripts/scan.ts",
-    "secrets": "node --experimental-strip-types --no-warnings --env-file-if-exists=.env scripts/secrets.ts",
+    "pack": "node --experimental-strip-types --no-warnings --env-file-if-exists=.env scripts/dev/pack.ts",
+    "preview": "node --experimental-strip-types --no-warnings scripts/dev/preview.ts",
+    "quips": "node --experimental-strip-types --no-warnings --env-file-if-exists=.env scripts/dev/quips.ts",
+    "scan": "node --experimental-strip-types --no-warnings --env-file-if-exists=.env scripts/dev/scan.ts",
+    "secrets": "node --experimental-strip-types --no-warnings --env-file-if-exists=.env scripts/dev/secrets.ts",
     "site": "node --experimental-strip-types --no-warnings scripts/build-site.ts",
     "test": "node --experimental-strip-types --no-warnings --test test/*.test.ts",
-    "testbox": "node --experimental-strip-types --no-warnings --env-file-if-exists=.env scripts/testbox.ts",
+    "testbox": "node --experimental-strip-types --no-warnings --env-file-if-exists=.env scripts/dev/testbox.ts",
     "typecheck": "tsc -p .",
     "verify": "node --experimental-strip-types --no-warnings scripts/verify.ts",
-    "zcheck": "node --experimental-strip-types --no-warnings --env-file-if-exists=.env scripts/zcheck.ts"
+    "zcheck": "node --experimental-strip-types --no-warnings --env-file-if-exists=.env scripts/dev/zcheck.ts"
   },
-  "license": "MIT",
   "devDependencies": {
     "@types/node": "^22.10.0",
     "prettier": "^3.3.0",
