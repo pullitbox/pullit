@@ -241,7 +241,9 @@ export class Rpc {
   async send(tx: Uint8Array): Promise<string> {
     return this.call<string>("sendTransaction", [
       toB64(tx),
-      { encoding: "base64", skipPreflight: false, maxRetries: 3 },
+      // the blockhash comes from a "confirmed" read; the preflight must use the same level, or a fresh
+      // blockhash is "not found" by a simulation that only looks at finalized blocks
+      { encoding: "base64", skipPreflight: false, preflightCommitment: "confirmed", maxRetries: 3 },
     ]);
   }
 

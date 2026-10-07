@@ -37,7 +37,7 @@ export const LOOP = {
   dry: { solPerMin: 0.05, claimEveryMin: 1, holdersEveryMin: 1, minHoldMinutes: 1 },
   // dry run: fake volume swings between quiet and busy every 40 minutes, so both moods show up
   quietMin: { live: 6, dry: 2 }, // minutes of silence before the box says something on its own
-  xEveryMin: { live: [7, 10], dry: [7, 10] }, // a standalone shitpost on x every so often (dry: printed, not posted)
+  xEveryMin: { live: [480, 720], dry: [8, 12] }, // a standalone shitpost on x every so often (dry: printed, not posted)
   scanEveryMin: { live: 10, dry: 3 }, // the agent re-reads the market while the box fills
   priceMovePct: { live: 10, dry: 6 }, // $PULLIT move between snapshots worth a comment
   fillCallouts: [25, 50, 75, 90], // box fill % the agent calls out
@@ -120,6 +120,7 @@ export interface State {
   burned?: { lamports: string; tokens: string }; // totals of all buybacks and burns
   burnPending?: boolean; // the box holds bought $PULLIT that still has to be burned
   nextTeaseAt?: number; // before launch: when the next teaser goes out on x
+  xPostedAt?: number[]; // times of the x posts of the last 24 hours, for the daily cap
   teaseUsed?: number[]; // hand-written teasers already posted this round
   journal?: JournalEntry[]; // what changed in the project, in the box's words
   watch?: { at: number; fresh: string[]; meta: string[] }; // the agent's current shortlist (mints), never public
@@ -199,7 +200,8 @@ export interface Env {
   DRY_RUN?: string; // "1": no claims, no payouts, no posts (prints instead), simulated fees
   DRY_SOL_PER_MIN?: string; // dry run: average fake fees per minute (default 0.05)
   X_PRELAUNCH?: string; // "1": before launch the box posts teasers on x by itself (test boxes are never posted)
-  X_PRELAUNCH_EVERY_MIN?: string; // minutes between teasers, default 150
+  X_PRELAUNCH_EVERY_MIN?: string; // minutes between teasers, default 480
+  X_MAX_PER_DAY?: string; // most posts on x in any 24 hours, default 3
   BUILD_COMMITS?: string; // set by `npm run deploy`: base64 JSON of recent commits, for the journal
 }
 
@@ -338,8 +340,19 @@ export class Bot {
     };
   }
 
-  async post(text: string, replies: string[] = [], evenInDryRun = false) {
+  /**
+   * Posts on x, at most X_MAX_PER_DAY (default 3) in any 24 hours. `important` posts (big wins,
+   * milestones) may use the last slot of the day; shitposts and teasers leave it free.
+   */
+  async post(text: string, replies: string[] = [], evenInDryRun = false, important = false) {
     if (!text.trim()) return;
+    const now = Date.now();
+    const cap = Number(this.env.X_MAX_PER_DAY) || 3;
+    const today = (this.state.xPostedAt ?? []).filter((t) => now - t < 86_400_000);
+    if (today.length >= cap || (!important && today.length >= cap - 1)) {
+      this.log(`[x cap ${cap}/day, skipped] ${text}`);
+      return;
+    }
     if ((this.dry && !evenInDryRun) || !this.env.ZERNIO_API_KEY) {
       this.log(`[post] ${[text, ...replies].join(" // ")}`);
       return;
@@ -347,6 +360,7 @@ export class Bot {
     try {
       this.xAccountId ??= (await findXAccount(this.env.ZERNIO_API_KEY))._id;
       await zernioPost(this.env.ZERNIO_API_KEY, this.xAccountId, text, replies);
+      this.state.xPostedAt = [...today, now];
       this.log(`posted: ${text}`);
     } catch (e) {
       this.log(`post failed: ${(e as Error).message}`);
@@ -484,7 +498,7 @@ export class Bot {
         [cap],
         `$PULLIT at ${cap}. next box is a milestone box. epic or better, plus a chunk of the vault`,
       );
-      if (text) await this.post(text);
+      if (text) await this.post(text, [], false, true); // a milestone is worth a post
     }
     if (this.state.pub) {
       this.state.pub.frenzy = level;
@@ -923,7 +937,7 @@ export class Bot {
       [targetSlot.toLocaleString("en-US")],
       say.locked(targetSlot.toLocaleString("en-US")),
     );
-    await this.post(packedPost);
+    // sealed boxes are not posted on x: the daily posts are kept for wins that matter
   }
 
   /** Throws if this tick no longer owns the lock (another tick took over). Checked before anything is paid. */
@@ -1091,7 +1105,9 @@ export class Bot {
       )) || winPlain; // a win always gets its post, even if every joke was used
     const proof = `${p.plan.reveal ? p.plan.reveal.slice(0, 160) + "\n\n" : ""}tx: https://solscan.io/tx/${prize.sig}${p.burn && p.burn.burnSig !== "dry-run" ? `\nburn: https://solscan.io/tx/${p.burn.burnSig}` : ""}\ncheck the seal and the draw: https://pullit.fun`;
     const resultPost = winText;
-    await this.post(winText, [proof]);
+    // on x only the wins worth a post: epic, secret, milestone and the final box (x posts are capped per day)
+    if (d.tier === "epic" || d.tier === "secret" || p.milestone || p.final)
+      await this.post(winText, [proof], false, true);
     await this.line(
       "win",
       `{w} won ${d.tier === "epic" ? "an" : "a"} ${d.tier} pull${ms}: ${both}${extra}`,
@@ -1208,7 +1224,7 @@ export class Bot {
    */
   async tease(now = Date.now()) {
     if (this.env.X_PRELAUNCH !== "1" || !this.env.ZERNIO_API_KEY) return;
-    const every = (Number(this.env.X_PRELAUNCH_EVERY_MIN) || 150) * 60_000;
+    const every = (Number(this.env.X_PRELAUNCH_EVERY_MIN) || 480) * 60_000;
     if (this.state.nextTeaseAt && now < this.state.nextTeaseAt) return;
     this.state.nextTeaseAt = now + every * (0.8 + Math.random() * 0.4);
     // half the time a post from the hand-written bank, half the time a new one in the same style

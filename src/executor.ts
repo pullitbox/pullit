@@ -155,12 +155,22 @@ export async function quote(
     outputMint,
     amount: lamports.toString(),
     taker,
-    receiver,
     slippageBps: String(EXEC.slippageBps),
   });
+  // jupiter rejects a receiver equal to the taker (the buyback buys into the box itself)
+  if (receiver !== taker) qs.set("receiver", receiver);
   const res = await fetch(`https://api.jup.ag/swap/v2/order?${qs}`, { headers: { "x-api-key": jupKey } });
-  const json = (await res.json()) as OrderResp;
-  if (!res.ok || !json.transaction) throw new Error(`Jupiter order failed: ${json.errorMessage ?? res.status}`);
+  const body = await res.text();
+  let json: OrderResp & { error?: string; errorCode?: number } = {};
+  try {
+    json = JSON.parse(body);
+  } catch {
+    /* not json, the raw body goes into the error below */
+  }
+  if (!res.ok || !json.transaction)
+    throw new Error(
+      `Jupiter order failed (${res.status}): ${json.errorMessage ?? json.error ?? body.slice(0, 300)}${json.errorCode ? ` [code ${json.errorCode}]` : ""}`,
+    );
   return json;
 }
 
