@@ -14,11 +14,27 @@ test("first snapshot only remembers bags", async () => {
 
 test("a big buy and a full exit get noticed, pools do not", async () => {
   const b = bot();
-  const W = "W".repeat(44), D = "D".repeat(44), P = "P".repeat(44);
+  const W = "W".repeat(44),
+    D = "D".repeat(44),
+    P = "P".repeat(44);
   b.state.excluded = [P];
   const now = Date.now();
-  await b.react([{ owner: D, amount: 5e6 }, { owner: P, amount: 2e8 }], SUPPLY, { [D]: now });
-  await b.react([{ owner: W, amount: 2e7 }, { owner: P, amount: 1e8 }], SUPPLY, { [W]: now });
+  await b.react(
+    [
+      { owner: D, amount: 5e6 },
+      { owner: P, amount: 2e8 },
+    ],
+    SUPPLY,
+    { [D]: now },
+  );
+  await b.react(
+    [
+      { owner: W, amount: 2e7 },
+      { owner: P, amount: 1e8 },
+    ],
+    SUPPLY,
+    { [W]: now },
+  );
   const text = b.state.feed.map((f) => f.m).join("\n");
   assert.match(text, /WWWW…WWWW/);
   assert.match(text, /DDDD…DDDD/);
@@ -91,9 +107,11 @@ test("chatter waits for silence", async () => {
 
 test("the log never says the same thing twice", async () => {
   const b = bot();
-  for (let i = 0; i < 40; i++) await b.line("info", "x", [], (await import("../src/voice.ts")).say.info(String(400 + i), String(100 + i)));
+  for (let i = 0; i < 40; i++)
+    await b.line("info", "x", [], (await import("../src/voice.ts")).say.info(String(400 + i), String(100 + i)));
   const lines = b.state.feed.map((f) => f.m);
   const { similar } = await import("../src/agent.ts");
-  for (let i = 0; i < lines.length; i++) for (let j = i + 1; j < lines.length; j++) assert.ok(!similar(lines[i], lines[j]), lines[i] + " / " + lines[j]);
+  for (let i = 0; i < lines.length; i++)
+    for (let j = i + 1; j < lines.length; j++) assert.ok(!similar(lines[i], lines[j]), lines[i] + " / " + lines[j]);
   assert.ok(lines.length >= 3 && lines.length <= 7);
 });

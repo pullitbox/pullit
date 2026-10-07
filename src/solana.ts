@@ -8,8 +8,14 @@ export function b58encode(bytes: Uint8Array): string {
   let n = 0n;
   for (const b of bytes) n = n * 256n + BigInt(b);
   let out = "";
-  while (n > 0n) { out = B58[Number(n % 58n)] + out; n /= 58n; }
-  for (const b of bytes) { if (b === 0) out = "1" + out; else break; }
+  while (n > 0n) {
+    out = B58[Number(n % 58n)] + out;
+    n /= 58n;
+  }
+  for (const b of bytes) {
+    if (b === 0) out = "1" + out;
+    else break;
+  }
   return out;
 }
 
@@ -21,8 +27,14 @@ export function b58decode(s: string): Uint8Array {
     n = n * 58n + BigInt(i);
   }
   const bytes: number[] = [];
-  while (n > 0n) { bytes.unshift(Number(n % 256n)); n /= 256n; }
-  for (const c of s) { if (c === "1") bytes.unshift(0); else break; }
+  while (n > 0n) {
+    bytes.unshift(Number(n % 256n));
+    n /= 256n;
+  }
+  for (const c of s) {
+    if (c === "1") bytes.unshift(0);
+    else break;
+  }
   return new Uint8Array(bytes);
 }
 
@@ -31,7 +43,11 @@ const fromB64 = (s: string) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
 
 // ---------- keys ----------
 
-export interface Keypair { publicKey: string; pub: Uint8Array; key: CryptoKey }
+export interface Keypair {
+  publicKey: string;
+  pub: Uint8Array;
+  key: CryptoKey;
+}
 
 /** Accepts a base58 64-byte secret (Phantom export) or a JSON byte array (solana-keygen file). */
 export async function keypairFromSecret(secret: string): Promise<Keypair> {
@@ -40,14 +56,30 @@ export async function keypairFromSecret(secret: string): Promise<Keypair> {
   const seed = raw.slice(0, 32);
   const pub = raw.slice(32);
   const pkcs8 = new Uint8Array([
-    0x30, 0x2e, 0x02, 0x01, 0x00, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x04, 0x22, 0x04, 0x20, ...seed,
+    0x30,
+    0x2e,
+    0x02,
+    0x01,
+    0x00,
+    0x30,
+    0x05,
+    0x06,
+    0x03,
+    0x2b,
+    0x65,
+    0x70,
+    0x04,
+    0x22,
+    0x04,
+    0x20,
+    ...seed,
   ]);
   const key = await crypto.subtle.importKey("pkcs8", pkcs8, { name: "Ed25519" }, false, ["sign"]);
   return { publicKey: b58encode(pub), pub, key };
 }
 
 async function sign(kp: Keypair, msg: Uint8Array): Promise<Uint8Array> {
-  return new Uint8Array(await crypto.subtle.sign({ name: "Ed25519" }, kp.key, msg));
+  return new Uint8Array(await crypto.subtle.sign({ name: "Ed25519" }, kp.key, msg as Uint8Array<ArrayBuffer>));
 }
 
 // ---------- transaction bytes ----------
@@ -55,14 +87,20 @@ async function sign(kp: Keypair, msg: Uint8Array): Promise<Uint8Array> {
 function compactU16(n: number): number[] {
   const out: number[] = [];
   for (;;) {
-    let b = n & 0x7f; n >>= 7;
-    if (n === 0) { out.push(b); return out; }
+    let b = n & 0x7f;
+    n >>= 7;
+    if (n === 0) {
+      out.push(b);
+      return out;
+    }
     out.push(b | 0x80);
   }
 }
 
 function readCompactU16(buf: Uint8Array, off: number): [number, number] {
-  let val = 0, shift = 0, i = off;
+  let val = 0,
+    shift = 0,
+    i = off;
   for (;;) {
     const b = buf[i++];
     val |= (b & 0x7f) << shift;
@@ -87,7 +125,10 @@ export async function signSerializedTx(txBytes: Uint8Array, kp: Keypair): Promis
   let slot = -1;
   for (let i = 0; i < Math.min(numKeys, numRequired); i++) {
     const k = msg.slice(keysStart + i * 32, keysStart + (i + 1) * 32);
-    if (k.every((b, j) => b === kp.pub[j])) { slot = i; break; }
+    if (k.every((b, j) => b === kp.pub[j])) {
+      slot = i;
+      break;
+    }
   }
   if (slot < 0) throw new Error("our key is not a required signer of this transaction");
   const sig = await sign(kp, msg);
@@ -124,7 +165,9 @@ export async function buildTransferTx(
 
 export class Rpc {
   private url: string;
-  constructor(url: string) { this.url = url; }
+  constructor(url: string) {
+    this.url = url;
+  }
 
   async call<T>(method: string, params: unknown[] = []): Promise<T> {
     const res = await fetch(this.url, {
@@ -143,14 +186,17 @@ export class Rpc {
   }
 
   async latestBlockhash(): Promise<{ blockhash: string; slot: number }> {
-    const r = await this.call<{ context: { slot: number }; value: { blockhash: string } }>(
-      "getLatestBlockhash", [{ commitment: "confirmed" }],
-    );
+    const r = await this.call<{ context: { slot: number }; value: { blockhash: string } }>("getLatestBlockhash", [
+      { commitment: "confirmed" },
+    ]);
     return { blockhash: r.value.blockhash, slot: r.context.slot };
   }
 
   async send(tx: Uint8Array): Promise<string> {
-    return this.call<string>("sendTransaction", [toB64(tx), { encoding: "base64", skipPreflight: false, maxRetries: 3 }]);
+    return this.call<string>("sendTransaction", [
+      toB64(tx),
+      { encoding: "base64", skipPreflight: false, maxRetries: 3 },
+    ]);
   }
 
   /** Waits until confirmed; throws if the transaction failed. */
@@ -158,7 +204,8 @@ export class Rpc {
     const until = Date.now() + timeoutMs;
     while (Date.now() < until) {
       const r = await this.call<{ value: ({ err: unknown; confirmationStatus?: string } | null)[] }>(
-        "getSignatureStatuses", [[sig], { searchTransactionHistory: false }],
+        "getSignatureStatuses",
+        [[sig], { searchTransactionHistory: false }],
       );
       const s = r.value[0];
       if (s?.err) throw new Error(`tx ${sig} failed: ${JSON.stringify(s.err)}`);

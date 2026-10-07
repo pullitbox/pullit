@@ -89,8 +89,11 @@ export async function fetchUniverse(apiKey: string): Promise<JupToken[]> {
   // one request at a time with a small gap, the free tier rate-limits bursts
   const results: PromiseSettledResult<JupToken[]>[] = [];
   for (const p of paths) {
-    try { results.push({ status: "fulfilled", value: await get<JupToken[]>(p, apiKey) }); }
-    catch (reason) { results.push({ status: "rejected", reason }); }
+    try {
+      results.push({ status: "fulfilled", value: await get<JupToken[]>(p, apiKey) });
+    } catch (reason) {
+      results.push({ status: "rejected", reason });
+    }
     await sleep(350);
   }
   const byId = new Map<string, JupToken>();

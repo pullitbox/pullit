@@ -27,7 +27,7 @@ The salt is 16 random bytes. The seal is published right away, the coins and the
 
 ## 3. The block
 
-At packing time the bot reads the current slot and commits to `slot + 150` (about a minute ahead). That block does not exist yet, so nobody can know its hash. When it is confirmed, the bot uses its blockhash. If the slot was skipped, it takes the next slot that has a block.
+At packing time the bot reads the current slot and commits to `slot + 50` (about 20 seconds ahead). That block does not exist yet, so nobody can know its hash. When it is confirmed, the bot uses its blockhash. If the slot was skipped, it takes the next slot that has a block.
 
 ## 4. Winner and tier
 

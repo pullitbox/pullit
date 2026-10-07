@@ -14,10 +14,19 @@ async function call<T>(apiKey: string, method: string, path: string, body?: unkn
   return JSON.parse(text) as T;
 }
 
-export interface ZernioAccount { _id: string; platform: string; username?: string; name?: string }
+export interface ZernioAccount {
+  _id: string;
+  platform: string;
+  username?: string;
+  name?: string;
+}
 
 export async function listAccounts(apiKey: string): Promise<ZernioAccount[]> {
-  const r = await call<ZernioAccount[] | { accounts?: ZernioAccount[]; data?: ZernioAccount[] }>(apiKey, "GET", "/accounts");
+  const r = await call<ZernioAccount[] | { accounts?: ZernioAccount[]; data?: ZernioAccount[] }>(
+    apiKey,
+    "GET",
+    "/accounts",
+  );
   return Array.isArray(r) ? r : (r.accounts ?? r.data ?? []);
 }
 
@@ -28,11 +37,17 @@ export async function findXAccount(apiKey: string): Promise<ZernioAccount> {
 }
 
 /** Posts to X. `replies` become a thread under the post (links are only allowed there, the main post stays clean for reach). */
-export async function zernioPost(apiKey: string, accountId: string, text: string, replies: string[] = []): Promise<string> {
+export async function zernioPost(
+  apiKey: string,
+  accountId: string,
+  text: string,
+  replies: string[] = [],
+): Promise<string> {
   if (/https?:\/\//i.test(text)) throw new Error("post contains a link; links cost more on X, put it in a reply");
   for (const t of [text, ...replies]) if (t.length > 280) throw new Error(`post too long: ${t.length}`);
   const platform: Record<string, unknown> = { platform: "twitter", accountId };
-  if (replies.length) platform.platformSpecificData = { threadItems: [text, ...replies].map((content) => ({ content })) };
+  if (replies.length)
+    platform.platformSpecificData = { threadItems: [text, ...replies].map((content) => ({ content })) };
   const r = await call<{ _id?: string; post?: { _id: string }; status?: string }>(apiKey, "POST", "/posts", {
     content: text,
     publishNow: true,

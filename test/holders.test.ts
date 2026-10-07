@@ -23,7 +23,10 @@ test("excludes pools, dust and fresh wallets; keeps timers", () => {
     { old: minAgo(60), fresh: minAgo(5) },
     { priceUsd: 0.0001, totalSupply: SUPPLY, exclude: ["POOL"], now: NOW },
   );
-  assert.deepEqual(snap.rows.map((r) => r.owner), ["old"]);
+  assert.deepEqual(
+    snap.rows.map((r) => r.owner),
+    ["old"],
+  );
   assert.ok(snap.state.fresh, "fresh wallet timer is remembered");
   assert.equal(snap.state.dust, undefined);
   assert.equal(snap.state.POOL, undefined);
@@ -42,7 +45,10 @@ test("whale is capped by bag cap and ticket share cap", () => {
 });
 
 test("winner pick is deterministic and weighted", async () => {
-  const rows = [{ owner: "a", tickets: 1 }, { owner: "b", tickets: 99 }];
+  const rows = [
+    { owner: "a", tickets: 1 },
+    { owner: "b", tickets: 99 },
+  ];
   const w1 = await pickWinner(rows, "BLOCKHASHxyz", 7);
   const w2 = await pickWinner(rows, "BLOCKHASHxyz", 7);
   assert.deepEqual(w1, w2);

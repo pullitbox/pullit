@@ -10,7 +10,7 @@ export const MINTS = {
 };
 
 export const EXEC = {
-  drawDelaySlots: 150, // ~1 minute: the draw uses a block that does not exist yet when we announce it
+  drawDelaySlots: 50, // ~20 seconds: the draw uses a block that does not exist yet when we announce it
   keepInBoxLamports: 15_000_000n, // 0.015 SOL stays for fees and token accounts
   slippageBps: 300,
 };
@@ -18,18 +18,30 @@ export const EXEC = {
 // ---------- randomness ----------
 
 /** Waits until `slot` is confirmed and returns its blockhash (skipped slots roll forward). */
-export async function blockhashAt(rpc: Rpc, slot: number, timeoutMs = 180_000): Promise<{ slot: number; blockhash: string }> {
+export async function blockhashAt(
+  rpc: Rpc,
+  slot: number,
+  timeoutMs = 180_000,
+): Promise<{ slot: number; blockhash: string }> {
   const until = Date.now() + timeoutMs;
   while (Date.now() < until) {
     const tip = await rpc.call<number>("getSlot", [{ commitment: "confirmed" }]);
     if (tip >= slot + 2) {
       for (let s = slot; s <= tip; s++) {
         try {
-          const b = await rpc.call<{ blockhash: string } | null>("getBlock", [s, {
-            commitment: "confirmed", transactionDetails: "none", rewards: false, maxSupportedTransactionVersion: 0,
-          }]);
+          const b = await rpc.call<{ blockhash: string } | null>("getBlock", [
+            s,
+            {
+              commitment: "confirmed",
+              transactionDetails: "none",
+              rewards: false,
+              maxSupportedTransactionVersion: 0,
+            },
+          ]);
           if (b?.blockhash) return { slot: s, blockhash: b.blockhash };
-        } catch { /* skipped slot, try next */ }
+        } catch {
+          /* skipped slot, try next */
+        }
       }
     }
     await new Promise((r) => setTimeout(r, 2000));
@@ -46,7 +58,12 @@ export interface Draw {
   tier: Tier;
 }
 
-export async function draw(rows: Pick<TicketRow, "owner" | "tickets">[], boxId: number, slot: number, blockhash: string): Promise<Draw> {
+export async function draw(
+  rows: Pick<TicketRow, "owner" | "tickets">[],
+  boxId: number,
+  slot: number,
+  blockhash: string,
+): Promise<Draw> {
   const w = await pickWinner(rows, blockhash, boxId);
   if (!w) throw new Error("nobody eligible for this box");
   return { boxId, slot, blockhash, seed: w.seed, winner: w.owner, tier: rollTier(w.seed) };
@@ -60,7 +77,12 @@ export function prizeMint(tier: Tier, plan: BoxPlan): string {
 }
 
 /** How much of the box and of the vault a tier takes. The final box takes everything. */
-export function prizeSplit(tier: Tier, bank: bigint, vault: bigint, final = false): { fromBank: bigint; fromVault: bigint } {
+export function prizeSplit(
+  tier: Tier,
+  bank: bigint,
+  vault: bigint,
+  final = false,
+): { fromBank: bigint; fromVault: bigint } {
   if (final) return { fromBank: bank, fromVault: vault };
   const t = TIERS.find((x) => x.key === tier)!;
   return { fromBank: (bank * BigInt(t.boxPct)) / 100n, fromVault: (vault * BigInt(t.vaultPct)) / 100n };
@@ -80,13 +102,35 @@ export function newSalt(): string {
   return [...crypto.getRandomValues(new Uint8Array(16))].map((x) => x.toString(16).padStart(2, "0")).join("");
 }
 
-interface OrderResp { transaction?: string; requestId?: string; outAmount?: string; errorMessage?: string; router?: string }
-interface ExecResp { status?: string; signature?: string; code?: number; error?: string; totalOutputAmount?: string }
+interface OrderResp {
+  transaction?: string;
+  requestId?: string;
+  outAmount?: string;
+  errorMessage?: string;
+  router?: string;
+}
+interface ExecResp {
+  status?: string;
+  signature?: string;
+  code?: number;
+  error?: string;
+  totalOutputAmount?: string;
+}
 
 /** Quote only (no signing). Used for dry runs. */
-export async function quote(jupKey: string, outputMint: string, lamports: bigint, taker: string, receiver: string): Promise<OrderResp> {
+export async function quote(
+  jupKey: string,
+  outputMint: string,
+  lamports: bigint,
+  taker: string,
+  receiver: string,
+): Promise<OrderResp> {
   const qs = new URLSearchParams({
-    inputMint: MINTS.SOL, outputMint, amount: lamports.toString(), taker, receiver,
+    inputMint: MINTS.SOL,
+    outputMint,
+    amount: lamports.toString(),
+    taker,
+    receiver,
     slippageBps: String(EXEC.slippageBps),
   });
   const res = await fetch(`https://api.jup.ag/swap/v2/order?${qs}`, { headers: { "x-api-key": jupKey } });
@@ -96,7 +140,13 @@ export async function quote(jupKey: string, outputMint: string, lamports: bigint
 }
 
 /** Buys `outputMint` with `lamports` of SOL from the box and delivers it to `receiver`. */
-export async function buyInto(jupKey: string, box: Keypair, outputMint: string, lamports: bigint, receiver: string): Promise<{ sig: string; outAmount: string; router?: string }> {
+export async function buyInto(
+  jupKey: string,
+  box: Keypair,
+  outputMint: string,
+  lamports: bigint,
+  receiver: string,
+): Promise<{ sig: string; outAmount: string; router?: string }> {
   const order = await quote(jupKey, outputMint, lamports, box.publicKey, receiver);
   const signed = await signSerializedTx(fromB64(order.transaction!), box);
   const res = await fetch("https://api.jup.ag/swap/v2/execute", {
@@ -105,7 +155,8 @@ export async function buyInto(jupKey: string, box: Keypair, outputMint: string, 
     body: JSON.stringify({ signedTransaction: toB64(signed), requestId: order.requestId }),
   });
   const ex = (await res.json()) as ExecResp;
-  if (ex.status !== "Success" || !ex.signature) throw new Error(`Jupiter execute failed: ${ex.error ?? JSON.stringify(ex).slice(0, 200)}`);
+  if (ex.status !== "Success" || !ex.signature)
+    throw new Error(`Jupiter execute failed: ${ex.error ?? JSON.stringify(ex).slice(0, 200)}`);
   return { sig: ex.signature, outAmount: ex.totalOutputAmount ?? order.outAmount ?? "?", router: order.router };
 }
 
@@ -121,10 +172,16 @@ export async function prizeBudget(rpc: Rpc, box: Keypair): Promise<bigint> {
 }
 
 export async function payout(
-  rpc: Rpc, jupKey: string, box: Keypair, d: Draw, plan: BoxPlan, lamports: bigint,
+  rpc: Rpc,
+  jupKey: string,
+  box: Keypair,
+  d: Draw,
+  plan: BoxPlan,
+  lamports: bigint,
 ): Promise<{ sig: string; mint: string; amount: string }> {
   const mint = prizeMint(d.tier, plan);
-  if (mint === MINTS.SOL) return { sig: await sendSol(rpc, box, d.winner, lamports), mint, amount: lamports.toString() };
+  if (mint === MINTS.SOL)
+    return { sig: await sendSol(rpc, box, d.winner, lamports), mint, amount: lamports.toString() };
   const r = await buyInto(jupKey, box, mint, lamports, d.winner);
   return { sig: r.sig, mint, amount: r.outAmount };
 }

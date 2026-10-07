@@ -1,35 +1,55 @@
 // Cloudflare Worker: runs the bot once a minute (cron) and serves the site + /api/state.
 // Secrets (wrangler secret put): HELIUS_API_KEY, JUP_API_KEY, OPENROUTER_API_KEY,
-// ZERNIO_API_KEY, DEV_SECRET, BOX_SECRET.
-// Vars (wrangler.jsonc): TEAM_WALLET, MINT, PUBLIC ("1" = site open to everyone), DRY_RUN, PREVIEW_KEY.
+// ZERNIO_API_KEY, DEV_SECRET, BOX_SECRET, PREVIEW_KEY.
+// Vars (wrangler.jsonc): TEAM_WALLET, MINT, PUBLIC ("1" = site open to everyone), DRY_RUN.
 
 import { Bot, newState, type Env as BotEnv, type State } from "../src/loop.ts";
 import { HTML } from "./site.ts";
 import { keypairFromSecret, Rpc } from "../src/solana.ts";
 import { fetchToken } from "../src/jupiter.ts";
 import { findXAccount } from "../src/zernio.ts";
+import type { ExecutionContext, KVNamespace, ScheduledEvent } from "./cloudflare.ts";
 
 /** Checks every dependency from inside Cloudflare without moving money or posting. */
 async function selftest(env: Env) {
   const r: Record<string, string> = {};
   const step = async (name: string, f: () => Promise<string>) => {
-    try { r[name] = "ok " + (await f()); } catch (e) { r[name] = "FAIL " + (e as Error).message; }
+    try {
+      r[name] = "ok " + (await f());
+    } catch (e) {
+      r[name] = "FAIL " + (e as Error).message;
+    }
   };
   await step("box_key_ed25519", async () => (await keypairFromSecret(env.BOX_SECRET)).publicKey.slice(0, 4));
-  await step("dev_key_ed25519", async () => (env.DEV_SECRET ? (await keypairFromSecret(env.DEV_SECRET)).publicKey.slice(0, 4) : "missing"));
+  await step("dev_key_ed25519", async () =>
+    env.DEV_SECRET ? (await keypairFromSecret(env.DEV_SECRET)).publicKey.slice(0, 4) : "missing",
+  );
   await step("helius_rpc", async () => {
     const kp = await keypairFromSecret(env.BOX_SECRET);
     const rpc = new Rpc(`https://mainnet.helius-rpc.com/?api-key=${env.HELIUS_API_KEY}`);
     return `box ${(Number(await rpc.balance(kp.publicKey)) / 1e9).toFixed(4)} SOL`;
   });
-  await step("jupiter", async () => `SOL $${(await fetchToken(env.JUP_API_KEY, "So11111111111111111111111111111111111111112"))?.usdPrice?.toFixed(2)}`);
+  await step(
+    "jupiter",
+    async () =>
+      `SOL $${(await fetchToken(env.JUP_API_KEY, "So11111111111111111111111111111111111111112"))?.usdPrice?.toFixed(2)}`,
+  );
   await step("openrouter", async () => (env.OPENROUTER_API_KEY ? "key set" : "missing"));
-  await step("zernio", async () => (env.ZERNIO_API_KEY ? "@" + ((await findXAccount(env.ZERNIO_API_KEY)).username ?? "connected") : "missing"));
-  await step("kv", async () => { await env.STATE.put("selftest", String(Date.now())); return "write ok"; });
+  await step("zernio", async () =>
+    env.ZERNIO_API_KEY ? "@" + ((await findXAccount(env.ZERNIO_API_KEY)).username ?? "connected") : "missing",
+  );
+  await step("kv", async () => {
+    await env.STATE.put("selftest", String(Date.now()));
+    return "write ok";
+  });
   return r;
 }
 
-interface Env extends BotEnv { STATE: KVNamespace; PREVIEW_KEY?: string; PUBLIC?: string }
+interface Env extends BotEnv {
+  STATE: KVNamespace;
+  PREVIEW_KEY?: string;
+  PUBLIC?: string;
+}
 
 type Snap = NonNullable<State["lastSnap"]>;
 
@@ -41,6 +61,8 @@ async function run(env: Env) {
   await env.STATE.put("lock", String(Date.now()));
   const state = ((await env.STATE.get("state", "json")) as State | null) ?? newState();
   const bot = new Bot(env, state);
+  // the sealed box is saved (and visible on the site) before the draw block exists
+  bot.checkpoint = () => env.STATE.put("state", JSON.stringify(state));
   try {
     await bot.init();
     await bot.tick();
@@ -48,7 +70,10 @@ async function run(env: Env) {
     bot.log(`tick error: ${(e as Error).message}`);
   } finally {
     // big blobs live in their own keys so the state stays small
-    if (state.lastSnap) { await env.STATE.put("tickets", JSON.stringify(state.lastSnap)); delete state.lastSnap; }
+    if (state.lastSnap) {
+      await env.STATE.put("tickets", JSON.stringify(state.lastSnap));
+      delete state.lastSnap;
+    }
     for (const b of state.outbox ?? []) await env.STATE.put(`box:${b.boxId}`, JSON.stringify(b.rows));
     delete state.outbox;
     await env.STATE.put("state", JSON.stringify(state));
@@ -61,7 +86,9 @@ function publicState(s: State | null) {
   // a sealed box shows only its seal: the coins and the salt stay secret until it opens
   const sealed = (b: NonNullable<State["pending"]>) => {
     const { rows, plan, salt, ...rest } = b;
-    void rows; void plan; void salt;
+    void rows;
+    void plan;
+    void salt;
     return rest;
   };
   return {
@@ -81,7 +108,11 @@ function publicState(s: State | null) {
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), {
     status,
-    headers: { "content-type": "application/json", "cache-control": "public, max-age=3", "access-control-allow-origin": "*" },
+    headers: {
+      "content-type": "application/json",
+      "cache-control": "public, max-age=3",
+      "access-control-allow-origin": "*",
+    },
   });
 
 const ADDR = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
@@ -93,10 +124,18 @@ async function walletStatus(env: Env, addr: string) {
   const row = snap?.rows.find((r) => r[0] === addr);
   if (row) {
     const [, tickets, heldMinutes, multiplier] = row;
-    return { status: "in", tickets, multiplier, heldMinutes, sharePct: snap!.totalTickets ? Math.round((tickets / snap!.totalTickets) * 10000) / 100 : 0, at: snap!.at };
+    return {
+      status: "in",
+      tickets,
+      multiplier,
+      heldMinutes,
+      sharePct: snap!.totalTickets ? Math.round((tickets / snap!.totalTickets) * 10000) / 100 : 0,
+      at: snap!.at,
+    };
   }
   const since = state?.holderState?.[addr];
-  if (since) return { status: "waiting", minutesLeft: Math.max(1, Math.ceil(15 - (Date.now() - since) / 60_000)), at: snap?.at };
+  if (since)
+    return { status: "waiting", minutesLeft: Math.max(1, Math.ceil(15 - (Date.now() - since) / 60_000)), at: snap?.at };
   if (state?.excluded?.includes(addr)) return { status: "excluded", at: snap?.at };
   return { status: "out", at: snap?.at };
 }
@@ -119,8 +158,9 @@ export default {
     const preview = !!env.PREVIEW_KEY && url.searchParams.get("preview") === env.PREVIEW_KEY;
     // before launch the site is hidden from the public; open it with ?preview=PREVIEW_KEY
     if (env.PUBLIC !== "1" && !preview) return new Response("not found", { status: 404 });
-    if (url.pathname === "/api/selftest") return preview ? json(await selftest(env)) : new Response("not found", { status: 404 });
-    if (url.pathname === "/api/state") return json(publicState(await env.STATE.get("state", "json")));
+    if (url.pathname === "/api/selftest")
+      return preview ? json(await selftest(env)) : new Response("not found", { status: 404 });
+    if (url.pathname === "/api/state") return json(publicState((await env.STATE.get("state", "json")) as State | null));
     if (url.pathname === "/api/wallet") {
       const a = url.searchParams.get("a") ?? "";
       return ADDR.test(a) ? json(await walletStatus(env, a)) : json({ error: "not a solana address" }, 400);
@@ -130,7 +170,9 @@ export default {
       return d ? json(d) : json({ error: "no such box" }, 404);
     }
     if (url.pathname === "/" || url.pathname === "/index.html")
-      return new Response(HTML, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "public, max-age=60" } });
+      return new Response(HTML, {
+        headers: { "content-type": "text/html; charset=utf-8", "cache-control": "public, max-age=60" },
+      });
     return new Response("not found", { status: 404 });
   },
 };

@@ -17,7 +17,7 @@ Nobody knows the result in advance. Not the holders, not the AI, not us.
 1. **Fees fill the box.** Every 10 minutes the bot claims the creator fees of $PULLIT. 80% goes to the box wallet, 20% to the team wallet (agent costs, servers, building). A small part of the box share is set aside in the vault.
 2. **The AI packs it.** When the box is full, the agent scans the market, throws out anything that looks unsafe, and picks two coins: a fresh runner and a runner of the meta. It writes a joke about its picks on the site log, never the names.
 3. **The box is sealed.** The bot publishes a seal: `sha256(common mint | rare mint | salt)`. The contents cannot change after that without the seal breaking.
-4. **A future block decides.** The bot commits to a slot about a minute ahead. When that block exists, its hash picks the winner (weighted by tickets) and the tier.
+4. **A future block decides.** The bot commits to a slot about 20 seconds ahead. When that block exists, its hash picks the winner (weighted by tickets) and the tier.
 5. **The prize goes straight to the winner.** The bot swaps SOL from the box into the prize coin with Jupiter and delivers it to the winner's wallet in the same transaction. The seal and the draw are published so anyone can check them.
 
 Whatever a pull leaves in the box rolls into the next one.
@@ -34,11 +34,13 @@ Whatever a pull leaves in the box rolls into the next one.
 The bot holds the keys of the dev wallet (to claim fees) and the box wallet (to pay prizes). The code that runs is the code in this repo, deployed to a Cloudflare Worker.
 
 It can:
+
 - claim creator fees and split them 80/20 between the box and the team wallet
 - swap box SOL into the prize coin and send it to the winner
 - post on x
 
 It cannot:
+
 - sell or move $PULLIT. the code only reads $PULLIT balances, it never trades or transfers it
 - send box funds anywhere except a draw winner
 - pick a coin that the scanner did not list as safe. every AI answer goes through a validator in code, and a bad answer falls back to the top scored coins

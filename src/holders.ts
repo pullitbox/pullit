@@ -44,13 +44,12 @@ export interface TicketSnapshot {
 
 // ---------- network ----------
 
-interface DasTokenAccount { owner: string; amount: number | string }
+interface DasTokenAccount {
+  owner: string;
+  amount: number | string;
+}
 
-export async function fetchHolders(
-  heliusKey: string,
-  mint: string,
-  decimals = 6,
-): Promise<HolderBalance[]> {
+export async function fetchHolders(heliusKey: string, mint: string, decimals = 6): Promise<HolderBalance[]> {
   const url = `https://mainnet.helius-rpc.com/?api-key=${heliusKey}`;
   const byOwner = new Map<string, number>();
   let cursor: string | undefined;
@@ -97,7 +96,11 @@ function capShares(rows: { owner: string; raw: number }[], maxShare: number): Ma
     const total = [...out.values()].reduce((a, b) => a + b, 0);
     const cap = total * maxShare;
     let changed = false;
-    for (const [k, v] of out) if (v > cap + 1e-9) { out.set(k, cap); changed = true; }
+    for (const [k, v] of out)
+      if (v > cap + 1e-9) {
+        out.set(k, cap);
+        changed = true;
+      }
     if (!changed) break;
   }
   return out;
@@ -112,7 +115,8 @@ export function computeTickets(
   const exclude = new Set(opts.exclude);
   const bagCap = opts.totalSupply * (HOLDERS.bagCapPctOfSupply / 100);
   const state: HolderState = {};
-  const pre: { owner: string; amount: number; usd: number; heldMinutes: number; multiplier: number; raw: number }[] = [];
+  const pre: { owner: string; amount: number; usd: number; heldMinutes: number; multiplier: number; raw: number }[] =
+    [];
 
   for (const b of balances) {
     if (exclude.has(b.owner)) continue;
@@ -123,7 +127,14 @@ export function computeTickets(
     const heldMinutes = (now - since) / 60_000;
     if (heldMinutes < (opts.minHoldMinutes ?? HOLDERS.minHoldMinutes)) continue;
     const multiplier = holdMultiplier(heldMinutes);
-    pre.push({ owner: b.owner, amount: b.amount, usd, heldMinutes, multiplier, raw: Math.min(b.amount, bagCap) * multiplier });
+    pre.push({
+      owner: b.owner,
+      amount: b.amount,
+      usd,
+      heldMinutes,
+      multiplier,
+      raw: Math.min(b.amount, bagCap) * multiplier,
+    });
   }
 
   const capped = capShares(pre, HOLDERS.maxTicketSharePct / 100);

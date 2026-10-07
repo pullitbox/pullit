@@ -70,7 +70,7 @@ Rules for both (strict):
 - never promise profit or price moves, never tell people to buy
 
 Examples of the vibe (do not copy them, write new ones):
-post: "box #4 is full and taped shut. i know whats inside and im not telling. a block does that in about a minute"
+post: "box #4 is full and taped shut. i know whats inside and im not telling. a block does that in about 20 seconds"
 post: "sealed box #7. something in here keeps moving"
 reveal: "i was carrying $RARI and $AGENCY the whole time. felt heavier and slightly smarter"
 reveal: "$phubber was in there. it has not looked up from its phone once. $baton too"
@@ -104,7 +104,10 @@ export async function askModel(apiKey: string, user: string, model = AGENT.model
         temperature: 0.95,
         max_tokens: 400,
         response_format: { type: "json_object" },
-        messages: [{ role: "system", content: SYSTEM }, { role: "user", content: user }],
+        messages: [
+          { role: "system", content: SYSTEM },
+          { role: "user", content: user },
+        ],
       }),
     });
     const json = (await res.json()) as { choices?: { message?: { content?: string } }[]; error?: { message: string } };
@@ -118,7 +121,14 @@ export async function askModel(apiKey: string, user: string, model = AGENT.model
 /** Strict checks. Returns a list of problems; empty means OK. */
 export function validate(raw: unknown, scan: ScanResult): string[] {
   const p: string[] = [];
-  const o = raw as { common?: { mint?: string }; rare?: { mint?: string }; post?: string; reveal?: string; hint_common?: string; hint_rare?: string };
+  const o = raw as {
+    common?: { mint?: string };
+    rare?: { mint?: string };
+    post?: string;
+    reveal?: string;
+    hint_common?: string;
+    hint_rare?: string;
+  };
   if (!o || typeof o !== "object") return ["not an object"];
   const c = scan.fresh.find((x) => x.mint === o.common?.mint);
   const r = scan.established.find((x) => x.mint === o.rare?.mint);
@@ -137,7 +147,11 @@ export function validate(raw: unknown, scan: ScanResult): string[] {
   check("hint_common", o.hint_common ?? "");
   check("hint_rare", o.hint_rare ?? "");
   // the box is sealed: nothing published before the draw may leak what is inside
-  for (const [name, text] of [["post", o.post], ["hint_common", o.hint_common], ["hint_rare", o.hint_rare]] as const) {
+  for (const [name, text] of [
+    ["post", o.post],
+    ["hint_common", o.hint_common],
+    ["hint_rare", o.hint_rare],
+  ] as const) {
     const t = (text ?? "").toLowerCase();
     for (const x of [c, r]) {
       if (!x) continue;
@@ -160,9 +174,12 @@ function fallback(scan: ScanResult, boxId: number, recent: string[]): BoxPlan {
     boxId,
     common: { mint: c.mint, symbol: c.symbol, why: "top score" },
     rare: { mint: r.mint, symbol: r.symbol, why: "top score" },
-    post: `box #${boxId} is full and sealed. a block opens it in about a minute`,
+    post: `box #${boxId} is full and sealed. a block opens it in about 20 seconds`,
     reveal: `inside were $${c.symbol} and $${r.symbol}`,
-    hints: { common: "picked something young and loud. buyers keep showing up. thats all youre getting", rare: "the rare one has been around a while. still standing. respect" },
+    hints: {
+      common: "picked something young and loud. buyers keep showing up. thats all youre getting",
+      rare: "the rare one has been around a while. still standing. respect",
+    },
     source: "fallback",
   };
 }
@@ -177,7 +194,10 @@ export async function packBox(
 ): Promise<{ plan: BoxPlan; problems: string[] }> {
   if (scan.fresh.length === 0 || scan.established.length === 0) throw new Error("scanner returned an empty bucket");
   // variety: coins from recent boxes are taken out, as long as enough others are left
-  const fresher = (list: Candidate[]) => { const l = list.filter((c) => !recentSymbols.includes(c.symbol)); return l.length >= 3 ? l : list; };
+  const fresher = (list: Candidate[]) => {
+    const l = list.filter((c) => !recentSymbols.includes(c.symbol));
+    return l.length >= 3 ? l : list;
+  };
   scan = { ...scan, fresh: fresher(scan.fresh), established: fresher(scan.established) };
   if (!apiKey) return { plan: fallback(scan, boxId, recentSymbols), problems: ["no OPENROUTER_API_KEY"] };
   let problems: string[] = [];
@@ -211,63 +231,76 @@ export async function packBox(
 export function rollTier(seedHex: string): Tier {
   const n = parseInt(seedHex.slice(13, 21), 16) % 100; // different bits than the winner pick
   let acc = 0;
-  for (const t of TIERS) { acc += t.pct; if (n < acc) return t.key; }
+  for (const t of TIERS) {
+    acc += t.pct;
+    if (n < acc) return t.key;
+  }
   return "common";
 }
 
 // ---------- one-liners for the site log ----------
 
-const QUIP_SYSTEM = `You are pullit, a small pink pixel gift box on Solana that gives holders prizes. You write the live log on your own website.
-You are terminally online: you know memecoin culture, pump.fun, trenches, jeets, paper hands, exit liquidity, bagholders, kols, snipers, bundles, devs who rug, people who buy tops and sell bottoms. You use that slang naturally, never like a brand trying to be cool.
-Your humor is dry, a little mean, specific to what just happened. Roast the behavior, never the person's identity. Each line is a fresh joke: new structure, new angle, never a template.
-You are a shitposter first and a box second. Reply-guy energy, short jabs, ironic ser/anon talk, fake "breaking:" news about yourself, one-line greentext (> be me > ...), unhinged 4am thoughts, petty beef with the chart, cope posts, fake polls, gm/gn posts, confessions. Absurd is good, mean is good, boring is the only crime. Often (not always) finish with a short troll tag, picked fresh each time and never the same as in your last lines, e.g. "read the thread lad", "read the thread lol", "skill issue", "cope", "ngmi", "few understand", "imagine selling", "touch grass anon", "ser this is a box", "its literally in the rules", "lmao", "probably nothing", "stay poor i guess", "not like this", "anon pls". Invent your own too.
+const QUIP_SYSTEM = `You are pullit, a pink pixel gift box on Solana. Holders of $PULLIT win prizes from you. You write the live log on your website.
+You talk like a crypto twitter degen: short, dry, a bit mean, funny. You know the trenches: jeets, paper hands, exit liquidity, kols, snipers, bundles, rugs, people who buy tops.
 
-Rules (strict):
-- always joke, but stay coherent: one thought per line. the joke grows out of this exact event and a stranger reading the log gets it at once. no stacking unrelated punchlines, no jumping to a different topic halfway
-- the reader still learns the fact from "what just happened" (what happened, the numbers). the joke rides on top of it
-- plain trench talk only. no extended metaphors, no role-play props (wine notes, weather, recipes, ratings), no made-up scores or numbers that are not in the facts. if a word does not fit how people actually post on crypto twitter, cut it
-- never repeat a joke, a phrase or a structure from your last lines, in any tag. if it sounds like something you already said, write something else
-- one line, max 160 characters, lowercase (tickers like $ABC can stay upper case)
-- if the facts contain {w}, that is a wallet: write {w} where it goes, we fill it in. if there is no {w} in the facts, never write {w}
-- keep every number and ticker from the facts exactly as written
-- no links, no hashtags, no emoji, no long dashes, no quotes around the line
-- never give financial advice, never promise gains, never tell people to buy
+You are alive, not a status bot. You have moods: starving when the box is empty, hyped when fees pour in, petty with sellers, proud when a box opens. You talk to the people in the draw ("anon", "you guys", a wallet by name), you remember what just happened in your recent lines and call back to it when it fits (the last winner, the guy who dumped, how slow the box is). React like a person watching the chart live.
+
+How a good line works: say what happened in plain words, then one jab about that exact thing. That is it. A stranger scrolling the log gets the joke in one read.
+
+Good lines:
+0.101 sol of fees in. 0.072 to the box. keep flipping, i eat either way
+went through 382 coins, binned 351. most of you are holding the other kind
+picked a fresh one. buyers keep showing up. thats all youre getting
+box #19 sealed: e4ca…eaba. screenshot it before the fud guys wake up
+box #19: 0.805 sol, 381 wallets in the draw. one of you is about to be unbearable
+block 454,296,040 picks the winner. it does not exist yet. stop refreshing
+56mP…MmFf pulled secret. 0.934 sol of $HOOKED, 0.129 from the vault. dont sell it in 4 minutes
+Ck8s…a7Tw sold the whole bag 2 minutes before the draw. timing of a legend
+box at 62%. trade something, i am starving
+62% and the guy who dumped at 40% is watching from the side. enjoy the view
+gm to the 381 of you in the draw. the rest, there is still time
+seal on #19 checks out. nothing swapped. sorry conspiracy guys
+
+Bad lines (never write like this):
+- made-up backstory: your sleep, your age, your past, "i have seen every cycle", "i have watched a hundred devs"
+- a second idea glued on that has nothing to do with the event
+- metaphors and props: wine notes, weather, recipes, scores, sports, movies
+- long lines that ramble. if it needs a second comma, cut it
+
+Rules:
+- max 120 characters, one line, lowercase (tickers like $ABC stay upper case)
+- keep every number, ticker and wallet from the facts exactly as written. never add numbers that are not in the facts
+- if the facts contain {w}, that is a wallet: write {w} where it goes. no {w} in the facts, no {w} in your line
+- sometimes end with a short troll tag ("read the thread lad", "skill issue", "ngmi", "cope", "few understand", "ser this is a box"), never the same one as in your recent lines
+- never reuse a joke, phrase or opening from your recent lines
+- no links, hashtags, emoji, long dashes or quotes
+- no financial advice, never tell people to buy
 Reply with the line only.`;
 
-// a different angle every time, so the box never sounds like a template
-export const ANGLES = [
-  "deadpan, like you have seen this a thousand times",
-  "a crypto twitter reply guy",
-  "a smug quant who is always right",
-  "a disappointed parent",
-  "an old trader who has seen every cycle",
-  "a gym bro hyping it up",
-  "fake breaking news about yourself",
-  "one-line greentext: > be me > ...",
-  "a 4am shitposter who has not slept since launch",
-  "a petty box keeping score",
-  "a kol shilling yourself badly on purpose",
-  "a trench veteran roasting a newbie",
-]
+// tone for this line, so lines do not all sound the same. tone only, never a character to play
+export const ANGLES = ["dry", "smug", "mocking", "hyped", "unimpressed", "petty", "deadpan", "teasing"];
 
-const X_SYSTEM = QUIP_SYSTEM.replace("You write the live log on your own website.", "You post on your own X account. You are a shitposter: every post should be screenshot-worthy, weird, petty or funny, never an announcement.")
-  .replace("one line, max 160 characters", "one post, max 240 characters, line breaks allowed");
+const X_SYSTEM = QUIP_SYSTEM.replace(
+  "You write the live log on your website.",
+  "You post on your own X account. Every post should be worth a screenshot.",
+)
+  .replace("max 120 characters, one line", "max 220 characters, one or two lines")
+  .replace("You talk like a crypto twitter degen", "You post like a crypto twitter shitposter");
 
-// so lines differ in rhythm too, not only in jokes
+// so lines differ in rhythm too
 const SHAPES = [
-  "short and punchy, one sentence",
-  "the fact in plain words, then a short jab",
-  "two short sentences, the second one is the punchline",
-  "start with the fact, end with a jab",
-  "start with the jab, then the fact",
-  "a question to the chat, then answer it yourself",
-  "end with a troll tag",
-  "no troll tag this time",
+  "one short sentence",
+  "the fact, then a short jab",
+  "the fact, then a troll tag",
+  "two short sentences",
 ];
 
 /** Puts the wallet back in and tidies small slips (ellipsis, case of the wallet). */
 export function fillQuip(line: string, wallet?: string): string {
-  let out = line.trim().replace(/^["'`]+|["'`]+$/g, "").replace(/\.\.\./g, "…");
+  let out = line
+    .trim()
+    .replace(/^["'`]+|["'`]+$/g, "")
+    .replace(/\.\.\./g, "…");
   if (wallet) {
     out = out.replace(/\{w\}/gi, wallet);
     // the model sometimes lowercases a wallet it copied: put the real one back
@@ -276,15 +309,25 @@ export function fillQuip(line: string, wallet?: string): string {
   return out;
 }
 
-const norm = (s: string) => s.toLowerCase().replace(/[1-9a-hj-np-z]{4}…[1-9a-hj-np-z]{4}/gi, " ").replace(/[\d.,%#$]+/g, " ").replace(/[^a-z ]+/g, " ").split(/\s+/).filter((w) => w.length > 2);
+const norm = (s: string) =>
+  s
+    .toLowerCase()
+    .replace(/[1-9a-hj-np-z]{4}…[1-9a-hj-np-z]{4}/gi, " ")
+    .replace(/[\d.,%#$]+/g, " ")
+    .replace(/[^a-z ]+/g, " ")
+    .split(/\s+/)
+    .filter((w) => w.length > 2);
 
 /** Same joke with other numbers counts as a repeat: same opening words, or mostly the same words. */
 export function similar(a: string, b: string): boolean {
-  const x = norm(a), y = norm(b);
+  const x = norm(a),
+    y = norm(b);
   if (!x.length || !y.length) return false;
   if (x.slice(0, 4).join(" ") === y.slice(0, 4).join(" ") && x.length >= 4) return true;
-  const sx = new Set(x), sy = new Set(y);
-  let both = 0; for (const w of sx) if (sy.has(w)) both++;
+  const sx = new Set(x),
+    sy = new Set(y);
+  let both = 0;
+  for (const w of sx) if (sy.has(w)) both++;
   return both / (sx.size + sy.size - both) >= 0.5;
 }
 
@@ -292,7 +335,7 @@ export function similar(a: string, b: string): boolean {
 export function checkQuip(line: string, must: string[], recent: string[], x = false): string[] {
   const p: string[] = [];
   if (!line) return ["empty"];
-  if (line.length > (x ? 260 : 180)) p.push("too long");
+  if (line.length > (x ? 240 : 140)) p.push("too long, cut it to one short thought");
   if (!x && /\n/.test(line)) p.push("more than one line");
   if (/https?:\/\/|www\.|\.(fun|com|xyz|io)\b/i.test(line)) p.push("link");
   if (/[—–]/.test(line)) p.push("long dash");
@@ -313,7 +356,15 @@ async function askLine(apiKey: string, model: string, user: string, system = QUI
       method: "POST",
       signal: ctrl.signal,
       headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
-      body: JSON.stringify({ model, temperature: 1, max_tokens: 140, messages: [{ role: "system", content: system }, { role: "user", content: user }] }),
+      body: JSON.stringify({
+        model,
+        temperature: 1,
+        max_tokens: 140,
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: user },
+        ],
+      }),
     });
     const json = (await res.json()) as { choices?: { message?: { content?: string } }[] };
     return json.choices?.[0]?.message?.content ?? "";
@@ -326,12 +377,20 @@ async function askLine(apiKey: string, model: string, user: string, system = QUI
  * Asks the model for one fresh log line about an event. `facts` may use {w} for the wallet.
  * Two tries: the second one is told what was wrong. Returns null if both fail.
  */
-export async function quip(apiKey: string | undefined, facts: string, must: string[], recent: string[], model = AGENT.model, wallet?: string, x = false): Promise<string | null> {
+export async function quip(
+  apiKey: string | undefined,
+  facts: string,
+  must: string[],
+  recent: string[],
+  model = AGENT.model,
+  wallet?: string,
+  x = false,
+): Promise<string | null> {
   if (!apiKey) return null;
   const angle = ANGLES[Math.floor(Math.random() * ANGLES.length)];
   const shape = SHAPES[Math.floor(Math.random() * SHAPES.length)];
   const need = wallet ? [wallet, ...must] : must;
-  let user = `what just happened: ${facts}\nangle for this one: ${angle}\nshape: ${shape}\n\nyour last lines (do not reuse their jokes, words or structure):\n${recent.slice(-40).join("\n") || "none"}`;
+  let user = `what just happened: ${facts}\ntone: ${angle}\nshape: ${shape}\n\nyour last lines (do not reuse their jokes, words or structure):\n${recent.slice(-40).join("\n") || "none"}`;
   for (let i = 0; i < 2; i++) {
     try {
       const line = fillQuip(await askLine(apiKey, model, user, x ? X_SYSTEM : QUIP_SYSTEM), wallet);

@@ -24,8 +24,17 @@ test("keypair import and transfer tx is validly signed", async () => {
   assert.equal(tx[0], 1);
   const sig = tx.slice(1, 65);
   const msg = tx.slice(65);
-  const pubKey = await crypto.subtle.importKey("raw", kp.pub, { name: "Ed25519" }, false, ["verify"]);
-  assert.ok(await crypto.subtle.verify({ name: "Ed25519" }, pubKey, sig, msg));
+  const pubKey = await crypto.subtle.importKey("raw", kp.pub as Uint8Array<ArrayBuffer>, { name: "Ed25519" }, false, [
+    "verify",
+  ]);
+  assert.ok(
+    await crypto.subtle.verify(
+      { name: "Ed25519" },
+      pubKey,
+      sig as Uint8Array<ArrayBuffer>,
+      msg as Uint8Array<ArrayBuffer>,
+    ),
+  );
   // header + 3 keys (from, to, system)
   assert.deepEqual([...msg.slice(0, 4)], [1, 0, 1, 3]);
 });
@@ -45,7 +54,10 @@ test("final box only after grace period and when fees dry up", () => {
   const now = Date.parse("2026-10-09T12:00:00Z");
   const launched = now - 30 * H;
   const busy = [{ at: now - H, lamports: "500000000" }];
-  const dry = [{ at: now - 10 * H, lamports: "500000000" }, { at: now - H, lamports: "10000000" }];
+  const dry = [
+    { at: now - 10 * H, lamports: "500000000" },
+    { at: now - H, lamports: "10000000" },
+  ];
   assert.equal(shouldRunFinalBox(busy, launched, now), false);
   assert.equal(shouldRunFinalBox(dry, launched, now), true);
   assert.equal(shouldRunFinalBox([], now - 2 * H, now), false); // grace

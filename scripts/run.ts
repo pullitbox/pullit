@@ -12,9 +12,12 @@ for (const k of ["MINT", "HELIUS_API_KEY", "JUP_API_KEY", "BOX_SECRET", "TEAM_WA
   if (!env[k]) throw new Error(`${k} missing`);
 
 mkdirSync("out", { recursive: true });
-const path = env.DRY_RUN === "1" ? `out/state-dry-${env.MINT.slice(0, 6)}.json` : "out/state.json";
+const path = env.DRY_RUN === "1" ? `out/state-dry-${(env.MINT ?? "").slice(0, 6)}.json` : "out/state.json";
 const state: State = existsSync(path) ? JSON.parse(readFileSync(path, "utf8")) : newState();
-const save = () => { writeFileSync(path + ".tmp", JSON.stringify(state, null, 2)); renameSync(path + ".tmp", path); };
+const save = () => {
+  writeFileSync(path + ".tmp", JSON.stringify(state, null, 2));
+  renameSync(path + ".tmp", path);
+};
 
 const bot = new Bot(env, state);
 await bot.init();
@@ -24,8 +27,14 @@ let busy = false;
 async function loop() {
   if (busy) return;
   busy = true;
-  try { await bot.tick(); } catch (e) { bot.log(`tick error: ${(e as Error).message}`); }
-  finally { save(); busy = false; }
+  try {
+    await bot.tick();
+  } catch (e) {
+    bot.log(`tick error: ${(e as Error).message}`);
+  } finally {
+    save();
+    busy = false;
+  }
 }
 await loop();
 setInterval(loop, 60_000);

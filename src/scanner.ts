@@ -164,11 +164,20 @@ export function scan(universe: JupToken[], now = Date.now()): ScanResult {
 
   for (const t of universe) {
     const age = ageHours(t, now);
-    if (age === null) { bump("no_age"); continue; }
+    if (age === null) {
+      bump("no_age");
+      continue;
+    }
     const unsafe = safetyReject(t);
-    if (unsafe) { bump(unsafe); continue; }
+    if (unsafe) {
+      bump(unsafe);
+      continue;
+    }
     const c = classify(t, age);
-    if ("reject" in c) { bump(c.reject); continue; }
+    if ("reject" in c) {
+      bump(c.reject);
+      continue;
+    }
     buckets[c.bucket].push(toCandidate(t, c.bucket, age));
   }
 

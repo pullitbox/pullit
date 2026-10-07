@@ -15,7 +15,12 @@ export const FEES = {
   finalGraceHours: 12, // never trigger within the first 12h after launch
 };
 
-export interface FeeLedgerEntry { at: number; lamports: string; claimSig?: string; splitSig?: string }
+export interface FeeLedgerEntry {
+  at: number;
+  lamports: string;
+  claimSig?: string;
+  splitSig?: string;
+}
 
 /** Ask PumpPortal for an unsigned claim tx (claims all pump creator fees of this wallet). */
 export async function claimPumpCreatorFees(rpc: Rpc, dev: Keypair): Promise<string | null> {
@@ -40,7 +45,12 @@ export async function claimPumpCreatorFees(rpc: Rpc, dev: Keypair): Promise<stri
   return rpc.sendAndConfirm(signed);
 }
 
-export interface SplitResult { totalLamports: bigint; boxLamports: bigint; teamLamports: bigint; sig: string }
+export interface SplitResult {
+  totalLamports: bigint;
+  boxLamports: bigint;
+  teamLamports: bigint;
+  sig: string;
+}
 
 /** Moves everything above the gas reserve out of the dev wallet: box share + team share. */
 export async function splitFees(
@@ -55,10 +65,14 @@ export async function splitFees(
   const box = (available * BigInt(FEES.boxSharePct)) / 100n;
   const team = available - box;
   const { blockhash } = await rpc.latestBlockhash();
-  const tx = await buildTransferTx(dev, [
-    { to: boxWallet, lamports: box },
-    { to: teamWallet, lamports: team },
-  ], blockhash);
+  const tx = await buildTransferTx(
+    dev,
+    [
+      { to: boxWallet, lamports: box },
+      { to: teamWallet, lamports: team },
+    ],
+    blockhash,
+  );
   const sig = await rpc.sendAndConfirm(tx);
   return { totalLamports: available, boxLamports: box, teamLamports: team, sig };
 }

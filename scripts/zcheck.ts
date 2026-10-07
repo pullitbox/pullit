@@ -8,7 +8,9 @@ const key = process.env.ZERNIO_API_KEY;
 if (!key) throw new Error("Set ZERNIO_API_KEY in .env");
 
 const accounts = await listAccounts(key);
-console.log(`Key works. Connected accounts: ${accounts.map((a) => `${a.platform}:${a.username ?? a.name ?? a._id}`).join(", ") || "none"}`);
+console.log(
+  `Key works. Connected accounts: ${accounts.map((a) => `${a.platform}:${a.username ?? a.name ?? a._id}`).join(", ") || "none"}`,
+);
 const x = await findXAccount(key);
 console.log(`X account id for the bot: ${x._id}`);
 

@@ -6,7 +6,8 @@ import type { BoxPlan } from "../src/agent.ts";
 const plan = { common: { mint: "C1", symbol: "C" }, rare: { mint: "R1", symbol: "R" } } as BoxPlan;
 
 test("tiers take their share of the box, secret also a quarter of the vault", () => {
-  const bank = 1_000_000_000n, vault = 400_000_000n;
+  const bank = 1_000_000_000n,
+    vault = 400_000_000n;
   assert.deepEqual(prizeSplit("common", bank, vault), { fromBank: 300_000_000n, fromVault: 0n });
   assert.deepEqual(prizeSplit("rare", bank, vault), { fromBank: 600_000_000n, fromVault: 0n });
   assert.deepEqual(prizeSplit("epic", bank, vault), { fromBank: bank, fromVault: 0n });

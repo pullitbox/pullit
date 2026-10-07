@@ -12,7 +12,13 @@ if (!JUP_API_KEY) throw new Error("JUP_API_KEY missing");
 const result = scan(await fetchUniverse(JUP_API_KEY));
 console.log(`candidates: ${result.fresh.length} fresh, ${result.established.length} established`);
 const t0 = Date.now();
-const { plan, problems } = await packBox(OPENROUTER_API_KEY, result, Number(process.env.BOX ?? 1), [], OPENROUTER_MODEL);
+const { plan, problems } = await packBox(
+  OPENROUTER_API_KEY,
+  result,
+  Number(process.env.BOX ?? 1),
+  [],
+  OPENROUTER_MODEL,
+);
 console.log(`\nsource: ${plan.source} (${Date.now() - t0} ms)`);
 if (problems.length) console.log("problems:", problems);
 console.log(`common: $${plan.common.symbol} (${plan.common.why})`);

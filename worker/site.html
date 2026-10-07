@@ -162,8 +162,8 @@ nav{display:flex;gap:8px;align-items:center;font-size:12px}
 .opened .run a .cap{width:16px;height:16px;border-width:2px}
 .opened .run .d{color:var(--dim)}
 .opened .run .it{display:inline-flex;align-items:center;gap:8px}
-.opened .run a.tx{color:var(--pink);font-size:11px}.opened .run .tx.test{color:var(--dim);font-size:11px}
-.log .m .tx.test{color:var(--dim);margin-left:6px;white-space:nowrap}
+.opened .run a.tx{color:var(--pink);font-size:11px}.opened .run .tx.dry{color:var(--dim);font-size:11px}
+.log .m .tx.dry{color:var(--dim);margin-left:6px;white-space:nowrap}
 .opened .stats{flex:0 0 auto;padding:10px 12px;font-size:11px;color:var(--muted);border-left:2px solid var(--line);display:flex;align-items:center;gap:4px}
 .opened .stats b{color:var(--text);font-weight:400}
 @keyframes marq{to{transform:translateX(-50%)}}
@@ -530,7 +530,7 @@ function render() {
       const li = el('li', {},
         el('span', { className: 't', textContent: hhmm(f.at) }),
         el('span', { className: 'tag', textContent: f.tag, style: `color:${TAG[f.tag] || '#9a8f99'};border-color:${TAG[f.tag] || '#9a8f99'}` }), m);
-      const tx = () => { if (f.tag === 'win' && (!f.tx || f.tx === 'dry-run')) m.append(el('span', { className: 'tx test', textContent: 'tx (test)' })); else if (f.tx) m.append(el('a', { className: 'tx', href: 'https://solscan.io/tx/' + f.tx, target: '_blank', rel: 'noopener', textContent: 'tx ↗' })); };
+      const tx = () => { if (f.tag === 'win' && (!f.tx || f.tx === 'dry-run')) m.append(el('span', { className: 'tx dry', textContent: 'tx (test)' })); else if (f.tx) m.append(el('a', { className: 'tx', href: 'https://solscan.io/tx/' + f.tx, target: '_blank', rel: 'noopener', textContent: 'tx ↗' })); };
       if (!typed) tx();
       return { li, m, text: f.m, typed, tx };
     };
@@ -560,7 +560,7 @@ function render() {
     render.hkey = hkey;
     const txOf = (b) => b.prize?.sig && b.prize.sig !== 'dry-run'
       ? el('a', { className: 'tx', href: 'https://solscan.io/tx/' + b.prize.sig, target: '_blank', rel: 'noopener', textContent: 'tx ↗' })
-      : el('span', { className: 'tx test', textContent: 'tx (test)' });
+      : el('span', { className: 'tx dry', textContent: 'tx (test)' });
     const items = () => h.slice(0, 20).map((b) => el('span', { className: 'it' }, el('a', { href: '#box-' + b.boxId },
       cap(b.draw.tier), el('span', { className: 'd', textContent: '#' + b.boxId }), short(b.draw.winner),
       el('span', { className: 't-' + b.draw.tier, textContent: `${fmt(sol(b.prize?.lamports), 2)} sol of $${b.prize?.symbol || '?'}` }),

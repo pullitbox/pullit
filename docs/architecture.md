@@ -42,16 +42,16 @@ The seal is published before the block exists. The salt and the full ticket list
 
 ## Code
 
-| file | what it does |
-|---|---|
-| `worker/index.ts` | cron, public api, site |
-| `src/loop.ts` | the state machine: fill, pack, draw, pay, roll over |
-| `src/fees.ts` | claim creator fees, 80/20 split, final box rule |
-| `src/scanner.ts` | market scanner and safety filters |
-| `src/agent.ts` | AI picks, the validator around them, tier odds, log lines |
-| `src/holders.ts` | holder snapshots, tickets, weighted pick |
-| `src/executor.ts` | blockhash randomness, prize sizes, seal, Jupiter swap, payout |
-| `scripts/verify.ts` | recompute any opened box from public data |
+| file                | what it does                                                  |
+| ------------------- | ------------------------------------------------------------- |
+| `worker/index.ts`   | cron, public api, site                                        |
+| `src/loop.ts`       | the state machine: fill, pack, draw, pay, roll over           |
+| `src/fees.ts`       | claim creator fees, 80/20 split, final box rule               |
+| `src/scanner.ts`    | market scanner and safety filters                             |
+| `src/agent.ts`      | AI picks, the validator around them, tier odds, log lines     |
+| `src/holders.ts`    | holder snapshots, tickets, weighted pick                      |
+| `src/executor.ts`   | blockhash randomness, prize sizes, seal, Jupiter swap, payout |
+| `scripts/verify.ts` | recompute any opened box from public data                     |
 
 ## What lives where
 
