@@ -1265,6 +1265,14 @@ export class Bot {
     } catch {
       return;
     }
+    // a commit that was rewritten (amended) is gone from git: its old entry goes too.
+    // only checked inside the 48h window the deploy sends, and only when that window is complete
+    if (commits.length < 15) {
+      const live = new Set(commits.map(([hash]) => hash));
+      this.state.journal = (this.state.journal ?? []).filter(
+        (j) => !j.commit || live.has(j.commit) || now - Date.parse(j.at) >= 48 * 3_600_000,
+      );
+    }
     const done = new Set((this.state.journal ?? []).map((j) => j.commit));
     const todo = commits
       .filter(([hash, at]) => !done.has(hash) && now - at < 48 * 3_600_000)

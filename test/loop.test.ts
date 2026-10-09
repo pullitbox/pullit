@@ -224,3 +224,27 @@ test("commits are sorted into journal kinds", async () => {
   assert.equal(journalKind("entry by box size"), "rule");
   assert.equal(journalKind("live market rescan"), "ship");
 });
+
+test("journal drops entries of commits that were rewritten", async () => {
+  const { Bot, newState } = await import("../src/loop.ts");
+  const now = Date.parse("2026-10-10T12:00:00Z");
+  const commits = [["new1234", now - 3_600_000, "bigger coin pool"]];
+  const env = {
+    HELIUS_API_KEY: "x",
+    JUP_API_KEY: "x",
+    BOX_SECRET: "x",
+    TEAM_WALLET: "x",
+    BUILD_COMMITS: btoa(JSON.stringify(commits)),
+  };
+  const state = newState(now);
+  state.journal = [
+    { at: new Date(now - 7_200_000).toISOString(), kind: "rule", text: "old leaky entry", commit: "old9999" },
+    { at: new Date(now - 5 * 86_400_000).toISOString(), kind: "ship", text: "week old entry", commit: "week111" },
+  ];
+  await new Bot(env, state).journal(now);
+  assert.deepEqual(
+    state.journal.map((j) => j.commit),
+    ["week111", "new1234"],
+  );
+  assert.equal(state.journal[1].text, "bigger coin pool");
+});
