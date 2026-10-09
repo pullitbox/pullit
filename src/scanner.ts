@@ -2,7 +2,7 @@
 // (established runners, fresh runners), applies hard safety filters,
 // and ranks what is left. Pure functions, no network calls here.
 
-import { SCANNER } from "./config.ts";
+import { HOT, SCANNER } from "./config.ts";
 import type { JupToken } from "./jupiter.ts";
 
 export type Bucket = "established" | "fresh";
@@ -36,6 +36,7 @@ export interface ScanResult {
   universe: number;
   established: Candidate[];
   fresh: Candidate[];
+  hot?: Candidate[]; // hand-picked coins of the week; when present the rare slot comes from here
   rejected: Record<string, number>; // reason -> count, for tuning
 }
 
@@ -155,6 +156,21 @@ function score(list: Candidate[]): Candidate[] {
   return list
     .map((c) => ({ ...c, score: Math.round((total.get(c.mint) ?? 0) * 1000) / 10 }))
     .sort((a, b) => b.score - a.score);
+}
+
+/**
+ * The hot coins that are fit for a prize right now. They are hand-picked bridged or verified coins,
+ * so mint authority is not checked (bridges keep one); liquidity, fake volume and Jupiter's sus flag are.
+ */
+export function hotCandidates(tokens: (JupToken | null)[], now = Date.now()): Candidate[] {
+  const out: Candidate[] = [];
+  for (const h of HOT.coins) {
+    const t = tokens.find((x) => x?.id === h.mint);
+    if (!t || t.audit?.isSus) continue;
+    if (n(t.liquidity) < HOT.minLiquidity || n(t.organicScore) < HOT.minOrganicScore) continue;
+    out.push(toCandidate({ ...t, symbol: h.symbol }, "established", ageHours(t, now) ?? 24 * 365));
+  }
+  return score(out);
 }
 
 export function scan(universe: JupToken[], now = Date.now()): ScanResult {

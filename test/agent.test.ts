@@ -163,3 +163,22 @@ test("fresher skips recent boxes and shrinks the window when thin", () => {
   assert.equal(keep(fresher(list, ["A", "B", "C", "D", "E", "X"])), "ABCD");
   assert.equal(fresher(list, []).length, 5);
 });
+
+test("big coins of the week join the rare pool, mixed in, not forced", async () => {
+  const { rarePool } = await import("../src/agent.ts");
+  const withHot: ScanResult = { ...scan, hot: [cand("ZEC", "H1", "established"), cand("AGENCY", "E1", "established")] };
+  assert.deepEqual(
+    rarePool(withHot).map((c) => c.mint),
+    ["E1", "H1"],
+  ); // no duplicates
+  const base = {
+    post: "box #3 sealed. no peeking",
+    reveal: "it was $RARI and $ZEC",
+    hint_common: "young and loud",
+    hint_rare: "a grown up coin",
+  };
+  assert.deepEqual(validate({ ...base, common: { mint: "F1" }, rare: { mint: "H1" } }, withHot), []);
+  assert.deepEqual(validate({ ...base, common: { mint: "F1" }, rare: { mint: "E1" } }, withHot), []);
+  const { plan } = await packBox(undefined, withHot, 3, []);
+  assert.ok(["H1", "E1"].includes(plan.rare.mint));
+});

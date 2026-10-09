@@ -5,7 +5,8 @@
 import { Rpc, keypairFromSecret, LAMPORTS, type Keypair } from "./solana.ts";
 import { fetchHolders, computeTickets, entryUsd, type BagMemo, type HolderState, type TicketRow } from "./holders.ts";
 import { fetchToken, fetchUniverse, type JupToken } from "./jupiter.ts";
-import { scan, type Candidate } from "./scanner.ts";
+import { hotCandidates, scan, type Candidate } from "./scanner.ts";
+import { HOT } from "./config.ts";
 import { say, remember } from "./voice.ts";
 import { TEASERS } from "./teasers.ts";
 import { packBox, quip, similar, fillQuip, type BoxPlan } from "./agent.ts";
@@ -848,6 +849,7 @@ export class Bot {
     }
     const universe = await fetchUniverse(this.env.JUP_API_KEY);
     const result = scan(universe);
+    result.hot = await this.hotCoins();
     const thrown = Object.values(result.rejected).reduce((a, b) => a + b, 0);
     await this.line(
       "scan",
@@ -905,7 +907,7 @@ export class Bot {
     const secret = [plan.common.symbol, plan.common.mint, plan.rare.symbol, plan.rare.mint];
     for (const [kind, c, h] of [
       ["fresh", result.fresh.find((x) => x.mint === plan.common.mint), plan.hints?.common],
-      ["meta", result.established.find((x) => x.mint === plan.rare.mint), plan.hints?.rare],
+      ["meta", [...result.established, ...(result.hot ?? [])].find((x) => x.mint === plan.rare.mint), plan.hints?.rare],
     ] as const) {
       const fresh =
         h &&
@@ -943,6 +945,21 @@ export class Bot {
       say.locked(targetSlot.toLocaleString("en-US")),
     );
     // sealed boxes are not posted on x: the daily posts are kept for wins that matter
+  }
+
+  /** The hot coins that pass the checks right now. A failed lookup just means no hot coin this box. */
+  async hotCoins(): Promise<Candidate[]> {
+    try {
+      const tokens = await Promise.all(
+        HOT.coins.map((h) => fetchToken(this.env.JUP_API_KEY, h.mint).catch(() => null)),
+      );
+      const hot = hotCandidates(tokens);
+      if (hot.length < HOT.coins.length) this.log(`hot coins ok: ${hot.map((c) => c.symbol).join(", ") || "none"}`);
+      return hot;
+    } catch (e) {
+      this.log(`hot coins lookup failed: ${(e as Error).message}`);
+      return [];
+    }
   }
 
   reserveLeft(): bigint {

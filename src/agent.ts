@@ -87,8 +87,14 @@ export function buildPrompt(scan: ScanResult, boxId: number, recentSymbols: stri
     ...scan.fresh.map(brief),
     "",
     "ESTABLISHED runners:",
-    ...scan.established.map(brief),
+    ...rarePool(scan).map(brief),
   ].join("\n");
+}
+
+/** Where the rare coin comes from: the meta runners plus the hand-picked big coins, mixed together. */
+export function rarePool(scan: ScanResult): Candidate[] {
+  const seen = new Set(scan.established.map((c) => c.mint));
+  return [...scan.established, ...(scan.hot ?? []).filter((c) => !seen.has(c.mint))];
 }
 
 /** The JSON object inside a model answer, even if it is wrapped in a code fence or a sentence. */
@@ -139,7 +145,7 @@ export function validate(raw: unknown, scan: ScanResult): string[] {
   };
   if (!o || typeof o !== "object") return ["not an object"];
   const c = scan.fresh.find((x) => x.mint === o.common?.mint);
-  const r = scan.established.find((x) => x.mint === o.rare?.mint);
+  const r = rarePool(scan).find((x) => x.mint === o.rare?.mint);
   if (!c) p.push("common mint not in fresh list");
   if (!r) p.push("rare mint not in established list");
   const check = (name: string, text: string) => {
@@ -180,7 +186,7 @@ function fallback(scan: ScanResult, boxId: number, recent: string[]): BoxPlan {
     return ok.length ? ok[Math.floor(Math.random() * ok.length)] : list[0];
   };
   const c = pick(scan.fresh);
-  const r = pick(scan.established);
+  const r = pick(rarePool(scan));
   return {
     boxId,
     common: { mint: c.mint, symbol: c.symbol, why: "top score" },
@@ -225,7 +231,13 @@ export async function packBox(
   model?: string,
 ): Promise<{ plan: BoxPlan; problems: string[] }> {
   if (scan.fresh.length === 0 || scan.established.length === 0) throw new Error("scanner returned an empty bucket");
-  scan = { ...scan, fresh: fresher(scan.fresh, recentSymbols), established: fresher(scan.established, recentSymbols) };
+  scan = {
+    ...scan,
+    fresh: fresher(scan.fresh, recentSymbols),
+    // the big hand-picked coins sit in the same list as the meta runners, shuffled in
+    established: fresher(rarePool(scan), recentSymbols),
+    hot: [],
+  };
   if (!apiKey) return { plan: fallback(scan, boxId, recentSymbols), problems: ["no OPENROUTER_API_KEY"] };
   let problems: string[] = [];
   try {
@@ -234,7 +246,7 @@ export async function packBox(
     problems = validate(raw, scan);
     if (problems.length === 0) {
       const c = scan.fresh.find((x) => x.mint === raw.common.mint)!;
-      const r = scan.established.find((x) => x.mint === raw.rare.mint)!;
+      const r = rarePool(scan).find((x) => x.mint === raw.rare.mint)!;
       return {
         plan: {
           boxId,

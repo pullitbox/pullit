@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.10.0
+
+- bigger pool: the agent sees the top 20 fresh and top 20 meta runners instead of 12, plus a few big liquid coins of the week
+
 ## 0.9.0 (test run)
 
 The whole loop runs on mainnet data with simulated fees. No money moves, nothing is posted from the test.

@@ -105,3 +105,18 @@ test("ranking prefers higher turnover and momentum", () => {
   );
   assert.equal(r.established[0].symbol, "HOT");
 });
+
+test("hot coins: only the listed mints with enough liquidity, authority not checked", async () => {
+  const { hotCandidates } = await import("../src/scanner.ts");
+  const { HOT } = await import("../src/config.ts");
+  const [zec, dark, wld] = HOT.coins;
+  const bridged = { ...tok({ id: zec.mint, symbol: "zec", age: 5000 }), mintAuthority: "bridge" };
+  const thin = { ...tok({ id: dark.mint, symbol: "DARK", age: 300 }), liquidity: 5_000 };
+  const other = tok({ id: "NOTHOT", symbol: "X", age: 100 });
+  const out = hotCandidates([bridged, thin, null, other], NOW);
+  assert.deepEqual(
+    out.map((c) => c.symbol),
+    ["ZEC"],
+  ); // symbol from our list, thin and missing ones dropped
+  void wld;
+});

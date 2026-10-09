@@ -61,7 +61,24 @@ export const SCANNER = {
   excludeMints: [] as string[],
 
   // How many candidates per bucket the agent gets to choose from
-  topN: { established: 12, fresh: 12 },
+  topN: { established: 20, fresh: 20 },
+};
+
+// Big liquid coins that are hot this week. They join the meta runners as extra options for the
+// rare slot, so the agent has more to pick from. Not forced, not announced. Mints checked on Jupiter
+// (verified) on 9 Oct 2026. Add or swap coins when the meta moves.
+export const HOT = {
+  minLiquidity: 100_000,
+  minOrganicScore: 40,
+  coins: [
+    {
+      symbol: "ZEC",
+      mint: "A7bdiYdS5GjqGFtxf17ppRHtDKPkkRqbKtR27dxvQXaS",
+      why: "zcash, privacy coin of the quantum scare",
+    },
+    { symbol: "DARK", mint: "7KEPApdbBMByrmqihz3bht2uMhFQcatjfSFQCKq66kH3", why: "darkswap, private swaps on solana" },
+    { symbol: "WLD", mint: "WLDTE73PPdfFFjhpBz8Yuhvx5N45gvgEgyMXqwa3rFn", why: "worldcoin, now on solana" },
+  ],
 };
 
 export const JUPITER = {

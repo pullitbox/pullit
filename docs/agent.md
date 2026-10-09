@@ -18,6 +18,10 @@ While a box fills, the agent re-scans the market every 10 minutes and keeps a sh
 
 Every candidate also has to pass: mint and freeze authority revoked, not flagged suspicious by Jupiter, dev holding under 10%, organic score 25+. Majors, stables and old dinosaurs are excluded by symbol. All numbers live in `src/config.ts`.
 
+## Extra coins
+
+`HOT` in `src/config.ts` is a short hand-picked list of big liquid coins that are hot right now. The ones with 100k+ liquidity and an organic score of 40+ join the meta runners as extra options for the rare slot. Mint authority is not checked for them, since bridged coins keep one.
+
 What is left is ranked by turnover, 6h momentum, holder growth, net buyers and organic score. Coins used in the last 8 boxes are taken out of the lists, so the boxes do not repeat.
 
 ## The AI
