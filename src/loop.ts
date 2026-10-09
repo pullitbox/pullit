@@ -8,7 +8,7 @@ import { fetchToken, fetchUniverse, type JupToken } from "./jupiter.ts";
 import { hotCandidates, scan, type Candidate } from "./scanner.ts";
 import { HOT } from "./config.ts";
 import { say, remember } from "./voice.ts";
-import { TEASERS } from "./teasers.ts";
+import { TEASERS, TEASE_TOPICS } from "./teasers.ts";
 import { packBox, quip, similar, fillQuip, type BoxPlan } from "./agent.ts";
 import { claimPumpCreatorFees, splitFees, shouldRunFinalBox, type FeeLedgerEntry } from "./fees.ts";
 import {
@@ -125,6 +125,7 @@ export interface State {
   nextTeaseAt?: number; // before launch: when the next teaser goes out on x
   xPostedAt?: number[]; // times of the x posts of the last 24 hours, for the daily cap
   teaseUsed?: number[]; // hand-written teasers already posted this round
+  teaseTopics?: string[]; // topics of the last pre-launch posts, oldest first
   journal?: JournalEntry[]; // what changed in the project, in the box's words
   watch?: { at: number; fresh: string[]; meta: string[] }; // the agent's current shortlist (mints), never public
   // handed to the host (worker) after a tick and removed from state, so state stays small
@@ -1306,21 +1307,44 @@ export class Bot {
     const every = (Number(this.env.X_PRELAUNCH_EVERY_MIN) || 480) * 60_000;
     if (this.state.nextTeaseAt && now < this.state.nextTeaseAt) return;
     this.state.nextTeaseAt = now + every * (0.8 + Math.random() * 0.4);
-    // half the time a post from the hand-written bank, half the time a new one in the same style
+    // a fresh topic every time; the hand-written bank is only the fallback when the model is down
+    const usedTopics = this.state.teaseTopics ?? [];
+    const open = TEASE_TOPICS.filter((t) => !usedTopics.includes(t.id));
+    const topic = (open.length ? open : TEASE_TOPICS)[Math.floor(Math.random() * (open.length || TEASE_TOPICS.length))];
+    this.state.teaseTopics = [...(open.length ? usedTopics : []), topic.id].slice(-TEASE_TOPICS.length);
+
     const used = this.state.teaseUsed ?? [];
     const fresh = TEASERS.map((_, i) => i).filter((i) => !used.includes(i));
     const pickOne = fresh[Math.floor(Math.random() * fresh.length)];
-    this.state.teaseUsed = fresh.length > 1 ? [...used, pickOne] : [];
-    let text = TEASERS[pickOne];
-    if (Math.random() < 0.5) {
-      const style = [...TEASERS].sort(() => Math.random() - 0.5).slice(0, 5);
-      text =
-        (await this.xLine(
-          `write one new teaser post before launch, in exactly this style (short lines, cryptic, a little funny, makes people curious):\n${style.join("\n---\n")}\n---\nwhat is true about you: a pink pixel gift box on solana, not live yet. trading fees fill you, an ai seals two coins inside, a future solana block picks the holder who opens you. you can only buy your own token and burn it, never sell. a vault grows inside you, something opens it. never give a date, a coin address or a link, never say you are live, never explain everything`,
-          [],
-          text,
-        )) || text;
+    const fallback = TEASERS[pickOne];
+
+    let facts = "";
+    if (topic.facts) {
+      try {
+        const universe = await fetchUniverse(this.env.JUP_API_KEY);
+        const r = scan(universe, now);
+        const thrown = Object.values(r.rejected).reduce((a, b) => a + b, 0);
+        const hour = Number(
+          new Date(now).toLocaleString("en-US", { timeZone: "America/New_York", hour: "numeric", hour12: false }),
+        );
+        facts = `\nlive facts you may use (exact numbers only): scanned ${universe.length} coins just now, threw out ${thrown}, ${r.fresh.length} fresh runners and ${r.established.length} meta runners passed. it is ${hour}:00 in new york.`;
+      } catch {
+        /* no facts this time */
+      }
     }
+    const style = [...TEASERS].sort(() => Math.random() - 0.5).slice(0, 4);
+    const text =
+      (await this.xLine(
+        `write one new post for x before launch. topic: ${topic.angle}.${facts}
+voice examples (match the rhythm, not the content):
+${style.join("\n---\n")}
+---
+rules: one idea only. do NOT talk about the sell button, the dev pressing it, rugging, the block or the box being sealed unless the topic is exactly that. no date, no coin address, no link, never say you are live, never explain the whole mechanic.
+who you are, only for context: a pink pixel gift box on solana, not live yet. trading fees will fill you, an ai packs two coins inside, a future solana block picks the holder who opens you, you can only buy and burn your own token.`,
+        [],
+        "",
+      )) || fallback;
+    if (text === fallback) this.state.teaseUsed = fresh.length > 1 ? [...used, pickOne] : [];
     if (text) await this.post(text, [], true);
   }
 

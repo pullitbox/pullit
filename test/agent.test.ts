@@ -182,3 +182,10 @@ test("big coins of the week join the rare pool, mixed in, not forced", async () 
   const { plan } = await packBox(undefined, withHot, 3, []);
   assert.ok(["H1", "E1"].includes(plan.rare.mint));
 });
+
+test("x prompt does not push the no-sell joke, teaser topics are unique", async () => {
+  const { TEASE_TOPICS } = await import("../src/teasers.ts");
+  const ids = TEASE_TOPICS.map((t) => t.id);
+  assert.equal(new Set(ids).size, ids.length);
+  assert.ok(ids.length >= 10);
+});
