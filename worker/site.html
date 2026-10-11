@@ -55,9 +55,6 @@ nav .dk{display:none}
 .hero.won{background:var(--c,var(--pink))}
 .hero.won img{animation:hop 1s steps(6) infinite}
 
-.steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:22px}
-.steps div{border:2px solid var(--line);background:var(--panel);padding:10px 6px;text-align:center;font-size:12px;line-height:1.3}
-.steps b{display:block;font-family:'Silkscreen',monospace;font-weight:400;font-size:18px;color:var(--pink);margin-bottom:4px}
 .ctas{margin-top:18px;display:flex;flex-direction:column;gap:10px}
 .btn{display:block;text-align:center;background:var(--pink);color:var(--ink);font-size:17px;padding:14px;box-shadow:4px 4px 0 var(--shadow);border:0;cursor:pointer}
 .btn:hover{background:#ffa6cf}
@@ -92,7 +89,21 @@ h3.h button:hover{color:var(--pink)}
 footer .dk-u,.dk-u{display:none}
 footer{font-size:11px;color:var(--dim);margin-top:22px}
 
-@media (max-width:899px){.hero{display:flex;flex-direction:column}.hero>div{display:contents}.hero .k{order:-1}}
+@media (max-width:899px){.hero{display:flex;flex-direction:column}.hero>div{display:contents}.hero .k{order:-2}.hero .badge{order:-1}}
+.badge{display:inline-block;background:var(--ink);color:var(--gold);font-size:10px;padding:2px 7px;margin:2px auto 0}
+.odds{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:22px}
+.odds span{background:var(--panel);border:2px solid var(--line);border-bottom:3px solid currentColor;text-align:center;padding:4px 2px;font-family:'Silkscreen',monospace;font-size:10px;line-height:1.3}
+.odds span b{display:block;font-weight:400;font-size:15px;color:var(--text)}
+.odds.frenzy span{animation:blink 1.4s steps(2) infinite}
+.stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+.stats .vt{background:var(--bg);border:0;padding:10px 8px;text-align:left;cursor:pointer;color:var(--gold);min-width:0}
+.stats .vt .k{color:var(--gold);opacity:.8}
+.stats .vt:hover{background:#1a1408}
+.mini .log{max-height:none;overflow:visible;gap:6px}
+.mini .log li{grid-template-columns:40px 50px minmax(0,1fr)}
+.mini .log .m{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mini h3 button{background:none;border:0;color:var(--muted);font-size:11px;cursor:pointer;padding:0}
+.mini h3 button:hover{color:var(--pink)}
 /* desktop */
 @media (min-width:900px){
   .tick{font-size:14px;padding:8px 0}
@@ -106,10 +117,12 @@ footer{font-size:11px;color:var(--dim);margin-top:22px}
   .hero{padding:30px;text-align:left;display:grid;grid-template-columns:170px minmax(0,1fr);gap:26px;align-items:center;margin:0}
   .hero img{width:170px;margin:0}
   .big{font-size:56px}
-  .steps{margin-top:24px}.steps div{font-size:14px;padding:16px 8px}
+  .odds{margin-top:24px}
   .ctas{margin-top:22px;display:grid;grid-template-columns:1fr 1fr;gap:12px}
   .right{margin-top:0;padding-top:50px}
-  .stats div{padding:16px}
+  .stats div,.stats .vt{padding:14px 16px}
+  .badge{margin:0 0 4px}
+  .hero .k{display:inline-block;margin-right:8px}
   .stats .v{font-size:28px}
   .op{margin-right:0}.op h3{margin-right:0}
   .cards{flex-wrap:wrap;overflow:visible;padding:0}
@@ -173,7 +186,6 @@ dialog::backdrop{background:rgba(5,4,6,.8)}
 </head>
 <body>
 <div class="test px" id="testBar" hidden>test mode. simulated fees, no real prizes</div>
-<div class="tick" id="tick"><div class="run" id="tickRun"><span>nothing opened yet. the first box opens soon</span></div></div>
 <div class="wrap">
 <header>
   <a class="logo px" href="/">pullit</a>
@@ -191,14 +203,14 @@ dialog::backdrop{background:rgba(5,4,6,.8)}
     <section class="hero" id="hero" aria-live="polite">
       <img src="data:image/svg+xml,BOXSVG_URI" alt="pullit, a pink pixel box with a mint bow">
       <div>
-        <span class="k px" id="kick">box #1 is filling</span>
+        <span class="k px" id="kick">box #1 is filling</span><span class="badge px" id="badge" hidden></span>
         <span class="big px" id="big">0 sol</span>
         <span class="s" id="sline">a random holder gets it</span>
         <div class="bar"><i id="fill" style="width:0"></i></div>
         <div class="bl"><span id="bl1">opens when full</span><span id="bl2"></span></div>
       </div>
     </section>
-    <div class="steps"><div><b>1</b>buy <span id="entry">$20</span>+</div><div><b>2</b>hold 7 min</div><div><b>3</b>you're in the draw</div></div>
+    <div class="odds" id="oddsRow" title="what the next box can be"></div>
     <div class="ctas"><a class="btn px" id="buy" href="https://x.com/Pullitbox" target="_blank" rel="noopener">buy $pullit</a><button class="btn2" type="button" data-open="meSheet">am i in?</button></div>
   </div>
   <div class="right">
@@ -206,16 +218,22 @@ dialog::backdrop{background:rgba(5,4,6,.8)}
       <div><span class="k">in the draw</span><span class="v" id="eligible">-</span></div>
       <div><span class="k">given out</span><span class="v"><span id="given">0</span><span class="u dk-u"> sol</span></span></div>
       <div><span class="k">burned</span><span class="v"><span id="burned">0</span><span class="u dk-u"> sol</span></span></div>
+      <button class="vt" type="button" data-open="vaultSheet"><span class="k">vault ⓘ</span><span class="v"><span id="vaultTile">0</span><span class="u dk-u"> sol</span></span></button>
     </div>
     <div class="op">
       <h3 class="h">opened <button type="button" data-open="allSheet" id="allBtn" hidden>all →</button></h3>
       <div class="cards" id="cards"><span class="empty">nothing opened yet</span></div>
+    </div>
+    <div class="mini">
+      <h3 class="h">live <button type="button" data-open="logSheet">full log →</button></h3>
+      <ol class="log" id="miniLog"><li><span class="t"></span><span></span><span class="m">waiting for the box</span></li></ol>
     </div>
   </div>
 </main>
 <div class="foot"><button type="button" data-open="rules">rules</button><button type="button" data-open="logSheet">live log</button><a href="https://x.com/Pullitbox" target="_blank" rel="noopener">x</a></div>
 <footer><span id="holdersLine"></span><span id="resv" hidden> · reserve <b id="resvPct">100</b>% left</span><span id="journalWrap" hidden> · <a href="#" data-open="journal">journal</a></span></footer>
 </div>
+<div class="tick" id="tick"><div class="run" id="tickRun"><span>nothing opened yet. the first box opens soon</span></div></div>
 
 <dialog id="meSheet" class="small"><div class="sheet">
   <h2 class="px">am i in?<button class="x" type="button" data-close aria-label="close">x</button></h2>
@@ -295,6 +313,7 @@ const prizeText = (b) => `${fmt(sol(b.prize?.lamports), 2)} sol of $${b.prize?.s
 const setText = (id, t) => { const e = $(id); if (e.textContent !== t) e.textContent = t; };
 
 let S = null, mint = '';
+const say = () => {};
 
 $('ca').onclick = () => {
   if (!mint) return;
@@ -318,7 +337,7 @@ function render() {
   const hist = s.history || [];
   const last = hist[0];
   const entry = '$' + (p.entryUsd || 20);
-  setText('entry', entry); setText('entry2', entry);
+  setText('entry2', entry);
 
   // the card
   if (render.seen === undefined) render.seen = last ? last.boxId : 0;
@@ -334,12 +353,15 @@ function render() {
     setText('sline', `${short(won.draw.winner)} pulled ${won.draw.tier}: $${won.prize?.symbol || '?'}`);
     $('fill').style.width = '100%';
     setText('bl1', 'next box is filling'); setText('bl2', '');
+    say(won.posts?.[won.posts.length - 1] || `${short(won.draw.winner)} pulled ${won.draw.tier}. next box is filling`);
   } else if (!mint) {
     setText('kick', 'box #1'); setText('big', 'soon'); setText('sline', 'a random holder gets it');
     $('fill').style.width = '0'; setText('bl1', 'not live yet'); setText('bl2', '');
+    say('not live yet. soon');
   } else if (s.phase === 'done') {
     setText('kick', 'all done'); setText('big', 'empty'); setText('sline', 'the final box is open');
     $('fill').style.width = '100%'; setText('bl1', 'thanks for holding'); setText('bl2', '');
+    say('that was the final box. thanks for holding me');
   } else if (pk) {
     const left = Math.round(30 - (Date.now() - Date.parse(pk.at)) / 1000);
     setText('kick', `box #${id} is sealed`);
@@ -347,6 +369,7 @@ function render() {
     setText('sline', 'block ' + pk.targetSlot.toLocaleString('en-US') + ' picks the holder');
     $('fill').style.width = '100%';
     setText('bl1', left > 0 ? `opens in ~${left}s` : 'opening…'); setText('bl2', '');
+    say(pk.posts?.[0] || 'packed and sealed. even i cant peek');
   } else {
     setText('kick', `box #${id} is filling`);
     setText('big', fmt(have, 2) + ' sol');
@@ -354,7 +377,13 @@ function render() {
     $('fill').style.width = Math.round(pct * 100) + '%';
     setText('bl1', need ? `opens at ${fmt(need, 2)} sol` : 'opens when full');
     setText('bl2', Math.round(pct * 100) + '%');
+    const n = Math.round(pct * 100);
+    const fresh = last && Date.now() - Date.parse(last.at) < 10 * 60_000;
+    if (fresh) say(last.posts?.[last.posts.length - 1] || `${short(last.draw.winner)} pulled ${last.draw.tier}. next box is filling`);
+    else say(n < 30 ? 'im mostly air right now. trades fill me' : n < 80 ? `${n}% full. i can feel it` : `${n}%. almost. dont leave`);
   }
+  const badge = won || !mint || pk ? '' : p.milestoneBox ? `milestone box · ${capShort(p.milestoneBox)} cap` : p.frenzy ? `frenzy ${p.frenzy}/3 · better odds` : '';
+  $('badge').hidden = !badge; setText('badge', badge);
 
   // numbers
   setText('eligible', p.eligible != null ? Number(p.eligible).toLocaleString('en-US') : '-');
@@ -363,11 +392,14 @@ function render() {
   setText('holdersLine', p.holders != null ? `${Number(p.holders).toLocaleString('en-US')} holders · ${s.boxesOpened || 0} boxes opened` : '');
   setText('vault', fmt(sol(s.vaultLamports), 2) + ' sol');
   setText('vaultBig', fmt(sol(s.vaultLamports), 3) + ' sol');
+  setText('vaultTile', fmt(sol(s.vaultLamports), 2));
   const rv = p.reserve;
   $('resv').hidden = !rv;
   if (rv) $('resvPct').textContent = String(Math.round((Number(rv.left) / Number(rv.initial)) * 100));
   const odds = p.odds || TIERS.map((t) => t.pct);
-  if (odds.join() !== render.okey) { render.okey = odds.join(); $('oddsLine').replaceChildren(...TIERS.map((t, i) => el('b', { className: 't-' + t.key, textContent: `${t.key} ${odds[i]}` }))); }
+  if (odds.join() !== render.okey) { render.okey = odds.join(); $('oddsLine').replaceChildren(...TIERS.map((t, i) => el('b', { className: 't-' + t.key, textContent: `${t.key} ${odds[i]}` })));
+    $('oddsRow').replaceChildren(...TIERS.map((t, i) => el('span', { className: 't-' + t.key }, t.key, el('b', { textContent: odds[i] + '%' })))); }
+  $('oddsRow').classList.toggle('frenzy', !!p.frenzy);
 
   // ticker + cards + full list
   const hkey = hist.map((b) => b.boxId).join(',') + '|' + id + '|' + Math.round(have * 100);
@@ -424,6 +456,10 @@ function render() {
       return el('li', {}, el('span', { className: 't', textContent: hhmm(f.at) }), el('span', { className: 'tag', textContent: f.tag, style: `color:${TAG[f.tag] || '#9a8f99'};border-color:${TAG[f.tag] || '#9a8f99'}` }), m);
     }));
     if (atBottom) box.scrollTop = box.scrollHeight;
+    const mini = feed.slice(0, 3);
+    if (mini.length) $('miniLog').replaceChildren(...mini.map((f) => el('li', {}, el('span', { className: 't', textContent: hhmm(f.at) }),
+      el('span', { className: 'tag', textContent: f.tag, style: `color:${TAG[f.tag] || '#9a8f99'};border-color:${TAG[f.tag] || '#9a8f99'}` }),
+      el('span', { className: 'm ' + (MSG[f.tag] || ''), textContent: f.m, title: f.m }))));
   }
 
   const dl = $('wallets'); dl.replaceChildren();
