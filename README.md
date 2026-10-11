@@ -14,7 +14,7 @@
 # pullit
 
 Trading fees of $PULLIT fill a box. When it is full, an AI picks what goes inside and seals it.
-A Solana block that does not exist yet decides which holder opens it and what tier they pull.
+A Solana block about 20 seconds in the future decides which holder opens it and what tier they pull.
 Nobody knows the result in advance. Not the holders, not the AI, not us.
 
 The bot can only buy. It buys the prize for the winner and buys $PULLIT to burn it. It has no code to sell anything.
