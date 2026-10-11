@@ -12,7 +12,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen&family=Space+Mono:wght@400;700&display=swap">
 <style>
-:root{--bg:#0a090b;--panel:#141114;--line:#2a2329;--ink:#120a10;--pink:#ff8dc0;--shadow:#6a2a4c;--text:#f6eff9;--muted:#9a8f99;--dim:#5e555d;
+:root{--bg:#0a090b;--panel:#141114;--line:#2a2329;--ink:#120a10;--pink:#ff8dc0;--shadow:#6a2a4c;--text:#f6eff9;--muted:#9a8f99;--dim:#7f747e;
 --mint:#7be0c3;--gold:#ffc94d;--common:#c9c2d6;--rare:#8ec5ff;--epic:#cfa8ff;--secret:#ffc94d}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
@@ -33,7 +33,11 @@ button,input{font:inherit;color:inherit}
 .tick:hover .run{animation-play-state:paused}
 
 .wrap{width:100%;max-width:1180px;margin:0 auto;padding:0 16px 28px}
-header{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:14px 0}
+header{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 0}
+.cabuy{display:inline-flex;align-items:stretch}
+.cabuy .chip{border-right:0}
+.buyc{background:var(--pink);color:var(--ink);display:inline-flex;align-items:center;padding:0 12px;font-size:12px;box-shadow:3px 3px 0 var(--shadow)}
+.buyc:hover{background:#ffa6cf}
 .logo{font-size:20px}
 nav{display:flex;gap:8px;align-items:center}
 .chip{background:transparent;border:2px solid var(--line);color:var(--muted);padding:6px 10px;font-size:12px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;min-height:36px}
@@ -41,31 +45,27 @@ nav{display:flex;gap:8px;align-items:center}
 .chip b{color:var(--text);font-weight:400}
 nav .dk{display:none}
 
-.tagline{display:none}
-.hero{background:var(--pink);color:var(--ink);padding:18px 16px 16px;box-shadow:6px 6px 0 var(--shadow);text-align:center;margin-top:4px;transition:background .3s}
-.hero .k{font-size:12px;opacity:.7;display:block}
-.hero img{width:120px;margin:6px auto 2px;display:block;image-rendering:pixelated;animation:bob 2.6s steps(6) infinite}
+.tagline{font-size:13px;line-height:1.4;margin:0 0 10px;color:var(--muted)}
+.tagline span{color:var(--pink)}
+.hero{background:var(--pink);color:var(--ink);padding:14px 14px 12px;box-shadow:6px 6px 0 var(--shadow);text-align:center;margin-top:4px;transition:background .3s}
+.hero .k{font-family:'Space Mono',ui-monospace,monospace;font-size:13px;display:block}
+.hero img{width:92px;margin:4px auto 0;display:block;image-rendering:pixelated;animation:bob 2.6s steps(6) infinite}
 .hero.packed img{animation:shake .6s steps(4) infinite}
-.big{font-size:44px;line-height:1;margin:4px 0 2px;display:block;white-space:nowrap}
+.big{font-size:38px;line-height:1;margin:4px 0 2px;display:block;white-space:nowrap}
 .hero .s{font-size:13px;display:block}
-.bar{height:16px;border:2px solid var(--ink);position:relative;background:rgba(18,10,16,.15);margin:12px 0 6px}
+.bar{height:14px;border:2px solid var(--ink);position:relative;background:rgba(18,10,16,.15);margin:10px 0 5px}
 .bar i{position:absolute;left:0;top:0;bottom:0;background:var(--ink);transition:width .6s steps(6)}
 .hero.packed .bar i{animation:blink 1s steps(2) infinite}
 .bl{display:flex;justify-content:space-between;gap:8px;font-size:12px}
 .hero.won{background:var(--c,var(--pink))}
 .hero.won img{animation:hop 1s steps(6) infinite}
 
-.ctas{margin-top:18px;display:flex;flex-direction:column;gap:10px}
-.btn{display:block;text-align:center;background:var(--pink);color:var(--ink);font-size:17px;padding:14px;box-shadow:4px 4px 0 var(--shadow);border:0;cursor:pointer}
-.btn:hover{background:#ffa6cf}
-.btn:active{transform:translate(2px,2px);box-shadow:2px 2px 0 var(--shadow)}
-.btn2{display:block;text-align:center;border:2px solid var(--line);background:transparent;color:var(--text);font-size:13px;padding:12px;cursor:pointer}
-.btn2:hover{border-color:var(--pink)}
 
-.right{display:flex;flex-direction:column;gap:24px;margin-top:24px}
+.right{display:flex;flex-direction:column;gap:18px;margin-top:18px}
+.mini{margin-top:16px}
 .stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:2px;background:var(--line);border:2px solid var(--line)}
 .stats div{background:var(--bg);padding:10px 8px;min-width:0}
-.stats .k{font-family:'Silkscreen',monospace;font-size:10px;color:var(--muted);display:block}
+.stats .k{font-family:'Space Mono',ui-monospace,monospace;font-size:11px;color:var(--muted);display:block}
 .stats .v{font-family:'Silkscreen',monospace;font-size:22px;line-height:1.15;display:block;white-space:nowrap}
 .stats .u{font-size:.6em}
 h3.h{font-family:'Silkscreen',monospace;font-weight:400;font-size:13px;margin:0 0 10px;display:flex;justify-content:space-between;align-items:baseline}
@@ -77,12 +77,12 @@ h3.h button:hover{color:var(--pink)}
 .cards::-webkit-scrollbar{display:none}
 .card{flex:0 0 150px;border:2px solid var(--line);background:var(--panel);padding:10px;display:flex;flex-direction:column;gap:4px;font-size:11px;border-top:4px solid var(--c);scroll-snap-align:start;min-width:0}
 .card:hover{border-color:var(--c);border-top-width:4px}
-.card .n{font-family:'Silkscreen',monospace;font-size:11px;color:var(--muted)}
+.card .n{font-family:'Space Mono',ui-monospace,monospace;font-size:11px;color:var(--muted)}
 .card .w{font-family:'Silkscreen',monospace;font-size:20px;line-height:1.2}
 .card .coins{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .card .p{color:var(--pink);margin-top:2px}
-.card.next{opacity:.5;border-top-color:var(--line)}
-.foot{display:flex;gap:8px;margin-top:24px}
+.card.next{opacity:.7;border-top-color:var(--line)}
+.foot{display:flex;gap:8px;margin-top:18px}
 .foot a,.foot button{flex:1;text-align:center;border:2px solid var(--line);background:none;padding:9px 0;font-size:12px;color:var(--muted);cursor:pointer}
 .foot a:hover,.foot button:hover{border-color:var(--pink);color:var(--text)}
 .empty{color:var(--muted);font-size:12px}
@@ -90,10 +90,15 @@ footer .dk-u,.dk-u{display:none}
 footer{font-size:11px;color:var(--dim);margin-top:22px}
 
 @media (max-width:899px){.hero{display:flex;flex-direction:column}.hero>div{display:contents}.hero .k{order:-2}.hero .badge{order:-1}}
-.badge{display:inline-block;background:var(--ink);color:var(--gold);font-size:10px;padding:2px 7px;margin:2px auto 0}
-.odds{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:22px}
-.odds span{background:var(--panel);border:2px solid var(--line);border-bottom:3px solid currentColor;text-align:center;padding:4px 2px;font-family:'Silkscreen',monospace;font-size:10px;line-height:1.3}
-.odds span b{display:block;font-weight:400;font-size:15px;color:var(--text)}
+.badge{display:inline-block;background:var(--ink);color:var(--gold);font-family:'Space Mono',ui-monospace,monospace;font-size:11px;padding:2px 7px;margin:2px auto 0}
+.odds{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:14px}
+.odds span{background:var(--panel);border:2px solid var(--line);border-bottom:3px solid currentColor;text-align:center;padding:4px 2px;font-family:'Space Mono',ui-monospace,monospace;font-size:11px;line-height:1.3}
+.odds span b{display:block;font-weight:400;font-size:15px;color:var(--text);font-family:'Silkscreen',monospace}
+.oddsh{font-size:11px;color:var(--muted);margin-top:14px}
+.oddsh+.odds{margin-top:6px}
+.how{margin:12px 0 0;font-size:12px;color:var(--muted)}
+.how b{color:var(--text);font-weight:400}
+.how button{background:none;border:0;padding:0;color:var(--pink);cursor:pointer;font-size:12px;text-decoration:underline;text-underline-offset:3px}
 .odds.frenzy span{animation:blink 1.4s steps(2) infinite}
 .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
 .stats .vt{background:var(--bg);border:0;padding:10px 8px;text-align:left;cursor:pointer;color:var(--gold);min-width:0}
@@ -111,15 +116,14 @@ footer{font-size:11px;color:var(--dim);margin-top:22px}
   header{padding:20px 0}
   .logo{font-size:26px}
   nav .dk{display:inline-flex}
-  main{display:grid;grid-template-columns:1.1fr 1fr;gap:40px;align-items:start;margin-top:6px}
-  .tagline{display:block;font-family:'Silkscreen',monospace;font-size:30px;line-height:1.15;margin:0 0 14px}
-  .tagline span{color:var(--pink)}
-  .hero{padding:30px;text-align:left;display:grid;grid-template-columns:170px minmax(0,1fr);gap:26px;align-items:center;margin:0}
-  .hero img{width:170px;margin:0}
+  main{display:grid;grid-template-columns:1.1fr 1fr;gap:36px;align-items:start;margin-top:6px}
+  .tagline{font-family:'Silkscreen',monospace;font-size:30px;line-height:1.15;margin:0 0 14px;color:var(--text)}
+  .hero{padding:24px;text-align:left;display:grid;grid-template-columns:150px minmax(0,1fr);gap:24px;align-items:center;margin:0}
+  .hero img{width:150px;margin:0}
   .big{font-size:56px}
-  .odds{margin-top:24px}
-  .ctas{margin-top:22px;display:grid;grid-template-columns:1fr 1fr;gap:12px}
-  .right{margin-top:0;padding-top:50px}
+  .odds{margin-top:16px}
+  .mini{margin-top:20px}
+  .right{margin-top:0;padding-top:50px;gap:20px}
   .stats div,.stats .vt{padding:14px 16px}
   .badge{margin:0 0 4px}
   .hero .k{display:inline-block;margin-right:8px}
@@ -143,7 +147,7 @@ dialog::backdrop{background:rgba(5,4,6,.8)}
 .sheet dd{margin:0;word-break:break-all}
 .sheet dd a,.sheet .fine a{color:var(--pink)}
 .sheet .rg{gap:8px 14px;font-size:12px;line-height:1.45}
-.sheet .rg dt{font-family:'Silkscreen',monospace;font-size:10px;color:var(--pink);padding-top:2px;white-space:nowrap}
+.sheet .rg dt{font-family:'Space Mono',ui-monospace,monospace;font-size:11px;color:var(--pink);padding-top:2px;white-space:nowrap}
 .sheet .rg dd{word-break:normal}
 .sheet .odds{display:flex;flex-wrap:wrap;gap:6px}.sheet .odds b{font-weight:400;border:1px solid currentColor;padding:0 6px}
 .sheet .fine{margin:0;font-size:11px;color:var(--muted);line-height:1.45}
@@ -161,12 +165,12 @@ dialog::backdrop{background:rgba(5,4,6,.8)}
 .jr{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px;max-height:60vh;overflow:auto}
 .jr li{display:grid;grid-template-columns:52px 1fr;gap:4px 12px;font-size:12px;line-height:1.45}
 .jr .d{color:var(--dim);font-size:11px;padding-top:1px}
-.jr .k{font-family:'Silkscreen',monospace;font-size:9px;border:1px solid currentColor;padding:0 5px;margin-right:6px}
+.jr .k{font-family:'Space Mono',ui-monospace,monospace;font-size:10px;border:1px solid currentColor;padding:0 5px;margin-right:6px}
 .jr a{color:var(--pink);white-space:nowrap;margin-left:6px}
 .log{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;max-height:62vh;overflow:auto;font-size:12px}
 .log li{display:grid;grid-template-columns:40px 50px 1fr;gap:8px;line-height:1.45;align-items:baseline}
 .log .t{color:var(--dim)}
-.log .tag{font-family:'Silkscreen',monospace;font-size:10px;border:1px solid;text-align:center}
+.log .tag{font-family:'Space Mono',ui-monospace,monospace;font-size:10px;border:1px solid;text-align:center}
 .log .m{color:var(--muted)}
 .log .m.hi{color:var(--text)}.log .m.rd{color:#ff6b6b}.log .m.mt{color:var(--mint)}.log .m.pk{color:var(--pink)}.log .m.gd{color:var(--gold)}.log .m.or{color:#ff9a4d}
 .log a.tx{color:var(--pink);margin-left:6px;white-space:nowrap}
@@ -190,10 +194,10 @@ dialog::backdrop{background:rgba(5,4,6,.8)}
 <header>
   <a class="logo px" href="/">pullit</a>
   <nav>
-    <button class="chip" id="ca" type="button" title="copy contract address">ca <b id="caText">soon</b> ⧉</button>
+    <span class="cabuy"><button class="chip" id="ca" type="button" title="copy contract address">ca <b id="caText">soon</b> ⧉</button><a class="buyc px" id="buy" href="https://x.com/Pullitbox" target="_blank" rel="noopener">buy</a></span>
     <a class="chip dk" href="https://x.com/Pullitbox" target="_blank" rel="noopener">x</a>
     <button class="chip dk" type="button" data-open="rules">rules</button>
-    <button class="chip dk" type="button" data-open="logSheet">live log</button>
+    <button class="chip dk" type="button" data-open="meSheet">am i in?</button>
   </nav>
 </header>
 
@@ -205,13 +209,18 @@ dialog::backdrop{background:rgba(5,4,6,.8)}
       <div>
         <span class="k px" id="kick">box #1 is filling</span><span class="badge px" id="badge" hidden></span>
         <span class="big px" id="big">0 sol</span>
-        <span class="s" id="sline">a random holder gets it</span>
+        <span class="s" id="sline">a random holder gets it, in a coin the ai picks</span>
         <div class="bar"><i id="fill" style="width:0"></i></div>
         <div class="bl"><span id="bl1">opens when full</span><span id="bl2"></span></div>
       </div>
     </section>
-    <div class="odds" id="oddsRow" title="what the next box can be"></div>
-    <div class="ctas"><a class="btn px" id="buy" href="https://x.com/Pullitbox" target="_blank" rel="noopener">buy $pullit</a><button class="btn2" type="button" data-open="meSheet">am i in?</button></div>
+    <p class="how">hold <b id="entry">$20</b>+ for 7 min and you're in · <button type="button" data-open="meSheet">am i in?</button></p>
+    <div class="oddsh">next box odds</div>
+    <div class="odds" id="oddsRow"></div>
+    <div class="mini">
+      <h3 class="h">live <button type="button" data-open="logSheet">full log →</button></h3>
+      <ol class="log" id="miniLog"><li><span class="t"></span><span></span><span class="m">waiting for the box</span></li></ol>
+    </div>
   </div>
   <div class="right">
     <div class="stats">
@@ -224,13 +233,9 @@ dialog::backdrop{background:rgba(5,4,6,.8)}
       <h3 class="h">opened <button type="button" data-open="allSheet" id="allBtn" hidden>all →</button></h3>
       <div class="cards" id="cards"><span class="empty">nothing opened yet</span></div>
     </div>
-    <div class="mini">
-      <h3 class="h">live <button type="button" data-open="logSheet">full log →</button></h3>
-      <ol class="log" id="miniLog"><li><span class="t"></span><span></span><span class="m">waiting for the box</span></li></ol>
-    </div>
   </div>
 </main>
-<div class="foot"><button type="button" data-open="rules">rules</button><button type="button" data-open="logSheet">live log</button><a href="https://x.com/Pullitbox" target="_blank" rel="noopener">x</a></div>
+<div class="foot"><button type="button" data-open="rules">rules</button><button type="button" data-open="meSheet">am i in?</button><a href="https://x.com/Pullitbox" target="_blank" rel="noopener">x</a></div>
 <footer><span id="holdersLine"></span><span id="resv" hidden> · reserve <b id="resvPct">100</b>% left</span><span id="journalWrap" hidden> · <a href="#" data-open="journal">journal</a></span></footer>
 </div>
 <div class="tick" id="tick"><div class="run" id="tickRun"><span>nothing opened yet. the first box opens soon</span></div></div>
@@ -337,7 +342,7 @@ function render() {
   const hist = s.history || [];
   const last = hist[0];
   const entry = '$' + (p.entryUsd || 20);
-  setText('entry2', entry);
+  setText('entry', entry); setText('entry2', entry);
 
   // the card
   if (render.seen === undefined) render.seen = last ? last.boxId : 0;
@@ -355,7 +360,7 @@ function render() {
     setText('bl1', 'next box is filling'); setText('bl2', '');
     say(won.posts?.[won.posts.length - 1] || `${short(won.draw.winner)} pulled ${won.draw.tier}. next box is filling`);
   } else if (!mint) {
-    setText('kick', 'box #1'); setText('big', 'soon'); setText('sline', 'a random holder gets it');
+    setText('kick', 'box #1'); setText('big', 'soon'); setText('sline', 'a random holder gets it, in a coin the ai picks');
     $('fill').style.width = '0'; setText('bl1', 'not live yet'); setText('bl2', '');
     say('not live yet. soon');
   } else if (s.phase === 'done') {
@@ -373,7 +378,7 @@ function render() {
   } else {
     setText('kick', `box #${id} is filling`);
     setText('big', fmt(have, 2) + ' sol');
-    setText('sline', p.milestoneBox ? `milestone box: epic or better` : 'a random holder gets it');
+    setText('sline', p.milestoneBox ? `milestone box: epic or better` : 'a random holder gets it, in a coin the ai picks');
     $('fill').style.width = Math.round(pct * 100) + '%';
     setText('bl1', need ? `opens at ${fmt(need, 2)} sol` : 'opens when full');
     setText('bl2', Math.round(pct * 100) + '%');
@@ -456,7 +461,7 @@ function render() {
       return el('li', {}, el('span', { className: 't', textContent: hhmm(f.at) }), el('span', { className: 'tag', textContent: f.tag, style: `color:${TAG[f.tag] || '#9a8f99'};border-color:${TAG[f.tag] || '#9a8f99'}` }), m);
     }));
     if (atBottom) box.scrollTop = box.scrollHeight;
-    const mini = feed.slice(0, 3);
+    const mini = feed.slice(0, 4);
     if (mini.length) $('miniLog').replaceChildren(...mini.map((f) => el('li', {}, el('span', { className: 't', textContent: hhmm(f.at) }),
       el('span', { className: 'tag', textContent: f.tag, style: `color:${TAG[f.tag] || '#9a8f99'};border-color:${TAG[f.tag] || '#9a8f99'}` }),
       el('span', { className: 'm ' + (MSG[f.tag] || ''), textContent: f.m, title: f.m }))));
