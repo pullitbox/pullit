@@ -197,6 +197,37 @@ export async function buyInto(
   return { sig: ex.signature, outAmount: ex.totalOutputAmount ?? order.outAmount ?? "?", router: order.router };
 }
 
+/**
+ * Fallback buy through PumpPortal (bonding curve or PumpSwap), for when Jupiter has no route yet,
+ * e.g. right after launch. Tokens land in the box wallet; the amount is read later by the burn.
+ */
+export async function buyViaPumpPortal(
+  rpc: Rpc,
+  box: Keypair,
+  mint: string,
+  lamports: bigint,
+  onSigned?: OnSigned,
+): Promise<{ sig: string; outAmount: string }> {
+  const res = await fetch("https://pumpportal.fun/api/trade-local", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      publicKey: box.publicKey,
+      action: "buy",
+      mint,
+      amount: Number(lamports) / 1e9,
+      denominatedInSol: "true",
+      slippage: 15,
+      priorityFee: 0.00005,
+      pool: "auto",
+    }),
+  });
+  if (!res.ok) throw new Error(`PumpPortal buy ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  const signed = await signSerializedTx(new Uint8Array(await res.arrayBuffer()), box);
+  await onSigned?.(txSignature(signed));
+  return { sig: await rpc.sendAndConfirm(signed), outAmount: "?" };
+}
+
 export async function sendSol(
   rpc: Rpc,
   box: Keypair,

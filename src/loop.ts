@@ -21,6 +21,7 @@ import {
   sealOf,
   newSalt,
   buyInto,
+  buyViaPumpPortal,
   burnAll,
   MINTS,
   EXEC,
@@ -36,6 +37,7 @@ export const LOOP = {
   vaultPct: 10, // of everything that goes into the box, this share is set aside in the vault
   // dry run runs fast so a full cycle can be watched in minutes
   dry: { solPerMin: 0.05, claimEveryMin: 1, holdersEveryMin: 1, minHoldMinutes: 1 },
+  boxCapX: 3, // one box pays out at most 3x its size, the rest waits for the next boxes
   // dry run: fake volume swings between quiet and busy every 40 minutes, so both moods show up
   quietMin: { live: 6, dry: 2 }, // minutes of silence before the box says something on its own
   xEveryMin: { live: [480, 720], dry: [8, 12] }, // a standalone shitpost on x every so often (dry: printed, not posted)
@@ -203,6 +205,7 @@ export interface Env {
   BOX_SECRET: string;
   TEAM_WALLET: string;
   DRY_RUN?: string; // "1": no claims, no payouts, no posts (prints instead), simulated fees
+  MAX_BOX_SOL?: string; // optional hard cap for one box, in SOL
   DRY_SOL_PER_MIN?: string; // dry run: average fake fees per minute (default 0.05)
   X_PRELAUNCH?: string; // "1": before launch the box posts teasers on x by itself (test boxes are never posted)
   X_PRELAUNCH_EVERY_MIN?: string; // minutes between teasers, default 480
@@ -823,8 +826,14 @@ export class Bot {
       vault = available;
       this.state.vaultLamports = vault.toString();
     }
-    const budget = available - vault; // the box itself; the vault is set aside
     const threshold = boxSize(this.state.history.length, this.state.boxTarget);
+    // one open never takes more than a few box sizes: SOL that lands in the box wallet by mistake
+    // (or any other surprise) goes out slowly over many boxes, never in one pull
+    const capMax = this.env.MAX_BOX_SOL ? BigInt(Math.round(Number(this.env.MAX_BOX_SOL) * 1e9)) : 0n;
+    let cap = threshold * BigInt(LOOP.boxCapX);
+    if (capMax > 0n && capMax < cap) cap = capMax;
+    let budget = available - vault; // the box itself; the vault is set aside
+    if (!final && budget > cap) budget = cap;
     if (this.state.pub) {
       this.state.pub.boxLamports = budget.toString();
       this.state.pub.thresholdLamports = threshold.toString();
@@ -1110,10 +1119,18 @@ export class Bot {
       else if (!paid.burnBuy) {
         try {
           await this.guard?.();
-          const r = await buyInto(this.env.JUP_API_KEY, this.box, this.env.MINT!, burnTotal, this.box.publicKey);
+          let r: { sig: string; outAmount: string };
+          try {
+            r = await buyInto(this.env.JUP_API_KEY, this.box, this.env.MINT!, burnTotal, this.box.publicKey);
+          } catch (e) {
+            // no jupiter route yet (bonding curve, fresh pool): buy straight from pump
+            this.log(`buyback via jupiter failed, trying pumpportal: ${(e as Error).message}`);
+            r = await buyViaPumpPortal(this.rpc, this.box, this.env.MINT!, burnTotal);
+          }
           paid.burnBuy = { sig: r.sig, amount: r.outAmount };
           await save();
         } catch (e) {
+          // if a buy landed anyway, the next box burns those tokens with its own (burnAll takes everything above the reserve)
           this.log(`buyback failed, the SOL stays in the box: ${(e as Error).message}`);
         }
       }

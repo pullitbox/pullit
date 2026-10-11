@@ -89,8 +89,21 @@ async function run(env: Env) {
   }
 }
 
-function publicState(s: State | null, repo?: string, dryRun = false) {
+function publicState(s: State | null, repo?: string, dryRun = false, live = true) {
   if (!s) return { phase: "starting" };
+  // before launch (no MINT) the public sees an empty box, never the test runs. preview shows everything
+  if (!live)
+    return {
+      phase: "filling",
+      nextBoxId: 1,
+      pub: {},
+      pending: null,
+      vaultLamports: "0",
+      feed: [],
+      history: [],
+      boxesOpened: 0,
+      givenLamports: "0",
+    };
   // a sealed box shows only its seal: the coins and the salt stay secret until it opens
   const sealed = (b: NonNullable<State["pending"]>) => {
     const { rows, plan, salt, paid, ...rest } = b;
@@ -195,7 +208,12 @@ export default {
       return preview ? json(await selftest(env)) : new Response("not found", { status: 404 });
     if (url.pathname === "/api/state")
       return json(
-        publicState((await env.STATE.get("state", "json")) as State | null, env.REPO_URL, env.DRY_RUN === "1"),
+        publicState(
+          (await env.STATE.get("state", "json")) as State | null,
+          env.REPO_URL,
+          env.DRY_RUN === "1",
+          !!env.MINT || preview,
+        ),
       );
     if (url.pathname === "/api/wallet") {
       const a = url.searchParams.get("a") ?? "";
