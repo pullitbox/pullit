@@ -23,7 +23,7 @@ The bot can only buy. It buys the prize for the winner and buys $PULLIT to burn 
 
 ## How it works
 
-1. **Fees fill the box.** Every 15 seconds the bot claims the creator fees of $PULLIT. 80% goes to the box wallet, 20% stays in the dev wallet (agent costs, servers, building). A small part of the box share is set aside in the vault.
+1. **Fees fill the box.** Every 15 seconds the bot claims the creator fees of $PULLIT. Until $PULLIT bonds, 100% goes to the box wallet. After the bond, 80% goes to the box and 20% stays in the dev wallet (agent costs, servers, building). A small part of the box share is set aside in the vault.
 2. **The AI packs it.** When the box is full, the agent scans the market, throws out anything that looks unsafe, and picks two coins: a fresh runner and a runner of the meta. It writes a joke about its picks on the site log, never the names.
 3. **The box is sealed.** The bot publishes a seal: `sha256(common mint | rare mint | salt)`. The contents cannot change after that without the seal breaking.
 4. **A future block decides.** The bot commits to a slot about 20 seconds ahead. When that block exists, its hash picks the winner (weighted by tickets) and the tier.
@@ -50,6 +50,8 @@ Each opened box has its own page, `pullit.fun/box/<n>`. Shared on X or Telegram 
 - **Milestones.** The first box after the market cap crosses 50K, 100K, 250K, 500K, 1M, 2.5M, 5M or 10M is epic or better.
 - **Bond box.** When $PULLIT bonds and moves to PumpSwap, whoever pulls the next box gets epic or better.
 - **In the red.** A holder whose bag is worth less than the SOL they put in (buys minus sells, from their onchain history) gets 3x tickets until they are back up.
+- **The clock.** Every buy of $20+ resets a 10 minute timer. When it hits zero, the last buyer takes the clock pot (10% of every box), if they still hold at least 90% of what they bought.
+- **Lucky buys.** Every buy of $20+ is rolled against a block that did not exist when they bought: 1 in 15 wins 0.02 SOL from the lucky pot (5% of every box), paid 7 minutes later if they still hold.
 - **Vault.** Only a secret pull (1% per box) opens the vault, and it takes all of it.
 - **It can only buy.** Every box buys $PULLIT and burns it. The bot has no code that sells anything: every swap starts from SOL, and a test fails if that ever changes (`test/executor.test.ts`).
 
@@ -71,7 +73,7 @@ The bot holds the keys of the dev wallet (to claim fees) and the box wallet (to 
 
 It can:
 
-- claim creator fees and send 80% of them to the box. the other 20% stays in the dev wallet
+- claim creator fees and send them to the box: all of them until the bond, 80% after (the other 20% stays in the dev wallet)
 - swap box SOL into the prize coin and send it to the winner
 - buy $PULLIT with box SOL and burn it
 - post on x
@@ -102,7 +104,7 @@ npm install
 npm run check
 ```
 
-Formatting, strict types and 57 tests. One of them runs the real bot, not a dry run, against a simulated chain, Jupiter, PumpPortal and Helius, through hours of trading in fast forward. It checks every lamport: only claimed fees are split, exactly 80% reaches the box, SOL the dev adds itself is never touched, every box pays its winner once, buys back once and burns once, and a stale copy of the bot finds the payout on chain instead of paying again (`test/e2e.test.ts`).
+Formatting, strict types and 61 tests. One of them runs the real bot, not a dry run, against a simulated chain, Jupiter, PumpPortal and Helius, through hours of trading in fast forward. It checks every lamport: only claimed fees are split, every lamport of them reaches the box before the bond, SOL the dev adds itself is never touched, every box pays its winner once, buys back once and burns once, and a stale copy of the bot finds the payout on chain instead of paying again (`test/e2e.test.ts`).
 
 ## Docs
 

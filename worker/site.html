@@ -110,6 +110,12 @@ h3.h .hb{display:flex;gap:14px}
 .foot a,.foot button{flex:1;text-align:center;border:2px solid var(--line);background:none;padding:9px 0;font-size:12px;color:var(--muted);cursor:pointer}
 .foot a:hover,.foot button:hover{border-color:var(--pink);color:var(--text)}
 .empty{color:var(--muted);font-size:12px}
+.games{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0}
+.games>div{border:2px solid var(--line);background:var(--panel);padding:12px;display:flex;flex-direction:column;gap:6px;font-size:12px;line-height:1.45}
+.games .k{color:var(--muted);font-size:11px}
+.games b.px{font-size:28px;color:var(--gold);font-weight:400}
+.games .dim{color:var(--muted)}
+@media (max-width:700px){.games{grid-template-columns:1fr}}
 .xs{margin-top:22px}.hb a{color:inherit;text-decoration:none}
 .xf{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
 .xf li{border:2px solid var(--line);background:var(--panel);font-size:12px;line-height:1.5;white-space:pre-line}
@@ -267,6 +273,10 @@ html:has(dialog[open]),body:has(dialog[open]){overflow:hidden}
     </section>
     <p class="how">hold <b id="entry">$20</b>+ for 7 min and you're in · <button type="button" data-open="meSheet">check eligibility</button></p>
     <p class="meta"><span class="bn">burned <b id="mBurn">0 sol</b></span><span>in the draw <b id="mIn">0</b></span></p>
+    <section class="games" id="games" hidden>
+      <div><span class="k">the clock</span><b class="px" id="clkTime">--:--</b><span>every $20+ buy resets it to 10:00. the last buyer when it hits zero takes <b id="clkPot">0 sol</b></span><span class="dim" id="clkLast"></span></div>
+      <div><span class="k">lucky buys</span><b class="px" id="lkPot">0 sol</b><span>every $20+ buy: 1 in 15 wins 0.02 sol, paid if you still hold 7 min later</span></div>
+    </section>
     <div class="oddsh">next box odds</div>
     <div class="odds" id="oddsRow"></div>
     <div class="mini">
@@ -326,7 +336,9 @@ html:has(dialog[open]),body:has(dialog[open]){overflow:hidden}
     <dt>in the red</dt><dd>bag worth less than the sol you paid? 3x tickets until you are back up</dd>
     <dt>vault</dt><dd>10% of every box is set aside. <a href="#" data-open="vaultSheet">now <span id="vault">0 sol</span></a>. only a secret pull opens it</dd>
     <dt>burn</dt><dd>10% of every box buys $pullit and burns it</dd>
-    <dt>fees</dt><dd>80% to the box, 20% to the dev</dd>
+    <dt>fees</dt><dd>100% to the box until $pullit bonds. after that 80% to the box, 20% to the dev</dd>
+    <dt>the clock</dt><dd>every $20+ buy resets a 10 min timer. when it hits zero the last buyer takes the clock pot, if they still hold what they bought</dd>
+    <dt>lucky buys</dt><dd>every $20+ buy is rolled on a later block: 1 in 15 wins 0.02 sol, paid after 7 min if you still hold</dd>
   </dl>
   <p class="fine">pools and our wallets are never in. not financial advice.</p>
   <dl id="wallets"></dl>
@@ -500,6 +512,17 @@ function render() {
     }
   }
 
+  // the clock and lucky buys
+  const G = s.games;
+  $('games').hidden = !G;
+  if (G) {
+    render.clockEnds = G.endsAt;
+    setText('clkPot', fmt(sol(G.clockPot), 3) + ' sol');
+    setText('lkPot', fmt(sol(G.luckyPot), 3) + ' sol');
+    setText('clkLast', G.lastBuyer ? 'last buyer ' + short(G.lastBuyer) : 'waiting for the first buy');
+    clock();
+  }
+
   // the latest posts on x
   const X = s.x || [];
   const xkey = X.length ? X[0].at + X.length : '';
@@ -548,6 +571,8 @@ function render() {
 }
 
 async function load() { try { S = await api('/api/state'); render(); } catch { setText('bl1', 'cant reach the box. retrying'); } }
+function clock() { const e = render.clockEnds; if (!e) { setText('clkTime', '--:--'); return; } const r = Math.max(0, Math.round((e - Date.now()) / 1000)); setText('clkTime', r ? String(Math.floor(r / 60)).padStart(2, '0') + ':' + String(r % 60).padStart(2, '0') : '00:00'); }
+setInterval(clock, 1000);
 load(); setInterval(load, 5_000); setInterval(() => S && (S.pending || Won.until > Date.now() - 2000) && render(), 1000);
 
 $('check').onsubmit = async (e) => {

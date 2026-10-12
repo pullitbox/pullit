@@ -140,6 +140,13 @@ function publicState(s: State | null, repo?: string, dryRun = false, live = true
     givenLamports: s.history.reduce((a, b) => a + BigInt(b.prize?.lamports ?? "0"), 0n).toString(),
     burned: s.burned,
     x: (s.xFeed ?? []).slice(-8).reverse(),
+    games: s.games && {
+      clockPot: s.games.clockPot,
+      luckyPot: s.games.luckyPot,
+      endsAt: s.games.clock?.endsAt,
+      lastBuyer: s.games.clock?.last[0]?.buyer,
+      wins: s.games.wins.slice(-6).reverse(),
+    },
     journal: (s.journal ?? [])
       .slice(-30)
       .reverse()

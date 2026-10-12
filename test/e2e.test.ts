@@ -419,13 +419,13 @@ test("e2e: hours of trading in fast forward, every lamport where it belongs", { 
     const errors = state.log.filter((l) => /TICK ERROR|tick error|failed/i.test(l));
     assert.deepEqual(errors, [], "no errors in the bot log");
 
-    // fees: the box got exactly 80% of what was claimed and split, the dev kept the rest and its own SOL
+    // fees: before the bond the box gets every lamport that was claimed and split, the dev keeps only its own SOL
     const fromDevToBox = [...c.txs.values()]
       .filter((t) => t.kind.startsWith(`transfer ${dev.publicKey.slice(0, 4)}>${box.publicKey.slice(0, 4)}`))
       .reduce((a, t) => a + (t.deltas.get(box.publicKey) ?? 0n), 0n);
     const splitTotal = state.feeLedger.reduce((a, e) => a + BigInt(e.lamports), 0n);
     assert.ok(c.claimed > 5n * SOL, `fees were claimed (${c.claimed})`);
-    assert.equal(fromDevToBox, (splitTotal * 80n) / 100n, "box got 80% of the split fees");
+    assert.equal(fromDevToBox, splitTotal, "box got 100% of the split fees before the bond");
     assert.ok(
       splitTotal + BigInt(state.pendingFees ?? "0") === c.claimed,
       "every claimed lamport is split or still pending",

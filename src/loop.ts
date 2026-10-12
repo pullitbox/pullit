@@ -18,6 +18,7 @@ import { HOT } from "./config.ts";
 import { say, remember } from "./voice.ts";
 import { TEASERS, TEASE_TOPICS } from "./teasers.ts";
 import { packBox, quip, similar, fillQuip, type BoxPlan } from "./agent.ts";
+import { fetchNewBuys, luckyRoll, mustHold, GAMES, type Buy } from "./games.ts";
 import { buildSplit, claimedBy, claimPumpCreatorFees, shouldRunFinalBox, FEES, type FeeLedgerEntry } from "./fees.ts";
 import {
   blockhashAt,
@@ -31,6 +32,7 @@ import {
   buyInto,
   buyViaPumpPortal,
   burnAll,
+  sendSol,
   MINTS,
   EXEC,
   type Draw,
@@ -144,6 +146,33 @@ export interface State {
   // $PULLIT bought into the box at launch. the bot never sells it: 10% is burned at 50K, 125K, 200K and 350K cap
   reserve?: { initial: string; left: string; burns: { at: string; sig: string; amount: string; milestone: number }[] };
   nextTeaseAt?: number; // before launch: when the next teaser goes out on x
+  priceUsd?: number; // last $PULLIT price seen
+  games?: {
+    cursor?: string; // newest tx of the mint already read
+    clockPot: string;
+    luckyPot: string;
+    clock?: { endsAt: number; last: Buy[] }; // last qualifying buyers, newest first
+    queue: Buy[]; // buys waiting for their lucky roll
+    luckyLast: Record<string, number>; // last lucky win per wallet
+    paying?: {
+      kind: "clock" | "lucky";
+      to: string;
+      lamports: string;
+      at: number;
+      buySig: string;
+      seed?: string;
+      sig?: string;
+    };
+    wins: {
+      kind: "clock" | "lucky";
+      to: string;
+      lamports: string;
+      at: string;
+      sig: string;
+      buySig: string;
+      seed?: string;
+    }[];
+  };
   xFeed?: { at: string; text: string; url?: string }[]; // the latest posts on x, shown on the site
   xPostedAt?: number[]; // times of the x posts of the last 24 hours, for the daily cap
   dexPaid?: { posted?: boolean; checkedAt?: number };
@@ -508,6 +537,7 @@ export class Bot {
     const mint = this.env.MINT!;
     const token = await fetchToken(this.env.JUP_API_KEY, mint);
     if (!token?.usdPrice) throw new Error("no price for our mint yet");
+    this.state.priceUsd = token.usdPrice;
     const balances = await fetchHolders(this.env.HELIUS_API_KEY, mint, token.decimals);
     await this.refreshExclusions(balances);
     const red = await this.redSet(balances, token.usdPrice);
@@ -634,6 +664,25 @@ export class Bot {
       [],
       `first hour: ${buys} buys, ${opened} boxes opened, ${sol(given)} sol paid out`,
     );
+  }
+
+  /** Share of claimed fees that goes to the box: all of it until the bond, then FEES.boxSharePct. */
+  boxPct() {
+    return this.state.bond?.at ? FEES.boxSharePct : 100;
+  }
+
+  /** The clock and lucky pots take their share of what goes into the box. Returns the total set aside. */
+  private addToPots(boxLamports: bigint) {
+    const g = this.gamesState();
+    const c = (boxLamports * BigInt(GAMES.clockPct)) / 100n;
+    const l = (boxLamports * BigInt(GAMES.luckyPct)) / 100n;
+    g.clockPot = (BigInt(g.clockPot) + c).toString();
+    g.luckyPot = (BigInt(g.luckyPot) + l).toString();
+    return c + l;
+  }
+
+  gamesState() {
+    return (this.state.games ??= { clockPot: "0", luckyPot: "0", queue: [], luckyLast: {}, wins: [] });
   }
 
   private addToVault(boxLamports: bigint) {
@@ -901,13 +950,13 @@ export class Bot {
       this.state.dryBalance = (BigInt(this.state.dryBalance ?? "0") + box).toString();
       this.state.feeLedger.push({ at: now, lamports: total.toString() });
       this.state.feeLedger = this.state.feeLedger.slice(-500);
-      const v = this.addToVault(box);
+      const v = this.addToVault(box) + this.addToPots(box);
       const lastFee = [...(this.state.feed ?? [])].reverse().find((f) => f.tag === "fee");
       const quiet = lastFee && now - Date.parse(lastFee.at) < 5 * 60_000; // fast test mode claims every minute, log one fee line per 5 min
       if (total > 0n && !quiet)
         await this.line(
           "fee",
-          `claimed ${sol(total)} sol of trading fees (test mode, fake fees). ${sol(box - v)} went in the box, ${sol(v)} into the vault`,
+          `claimed ${sol(total)} sol of trading fees (test mode, fake fees). ${sol(box - v)} went in the box, ${sol(v)} set aside for the vault, the clock and lucky buys`,
           [sol(total)],
           say.fee(sol(total), sol(box - v), sol(v)) + " (test)",
         );
@@ -947,6 +996,7 @@ export class Bot {
       this.box.publicKey,
       this.env.TEAM_WALLET,
       BigInt(st.pendingFees ?? "0"),
+      this.boxPct(),
     );
     if (!split) return;
     const inflight = {
@@ -1012,11 +1062,11 @@ export class Bot {
     const pending = BigInt(this.state.pendingFees ?? "0") - total;
     this.state.pendingFees = (pending > 0n ? pending : 0n).toString();
     this.state.feeLedger.push({ at: Date.now(), lamports: s.total, splitSig: s.sig });
-    const v = this.addToVault(box);
-    this.log(`split ${sol(total)} SOL: box ${sol(box)} (vault ${sol(v)}), team ${sol(BigInt(s.team))}`);
+    const v = this.addToVault(box) + this.addToPots(box);
+    this.log(`split ${sol(total)} SOL: box ${sol(box)} (vault and pots ${sol(v)}), team ${sol(BigInt(s.team))}`);
     await this.line(
       "fee",
-      `claimed ${sol(total)} sol of trading fees. ${sol(box - v)} went in the box, ${sol(v)} into the vault`,
+      `claimed ${sol(total)} sol of trading fees. ${sol(box - v)} went in the box, ${sol(v)} set aside for the vault, the clock and lucky buys`,
       [sol(total)],
       say.fee(sol(total), sol(box - v), sol(v)),
     );
@@ -1035,7 +1085,10 @@ export class Bot {
     const capMax = this.env.MAX_BOX_SOL ? BigInt(Math.round(Number(this.env.MAX_BOX_SOL) * 1e9)) : 0n;
     let cap = threshold * BigInt(LOOP.boxCapX);
     if (capMax > 0n && capMax < cap) cap = capMax;
-    let budget = available - vault; // the box itself; the vault is set aside
+    const g = this.gamesState();
+    const pots = BigInt(g.clockPot) + BigInt(g.luckyPot);
+    let budget = available - vault - pots; // the box itself; the vault and the game pots are set aside
+    if (budget < 0n) budget = 0n;
     if (!final && budget > cap) budget = cap;
     if (this.state.pub) {
       this.state.pub.boxLamports = budget.toString();
@@ -1651,6 +1704,7 @@ who you are, only for context: a pink pixel gift box on solana, not live yet. tr
   async claimTick(now = Date.now()) {
     if (!this.env.MINT || this.state.mintSeen !== this.env.MINT) return;
     if (this.state.phase === "done") return;
+    await this.gamesTick(now).catch((e) => this.log(`games: ${(e as Error).message}`));
     // a draw waiting on its block finishes here, not on the next cron minute
     if (this.state.phase === "drawing") return this.drawSoon(12_000);
     if (this.claimDue(now)) await this.claimAndSplit();
@@ -1688,6 +1742,139 @@ who you are, only for context: a pink pixel gift box on solana, not live yet. tr
       false,
       "always",
     );
+  }
+
+  /** The clock and lucky buys: read new buys, pay the clock when it runs out, roll buys that held. */
+  async gamesTick(now = Date.now()) {
+    if (this.dry || !this.env.MINT || this.state.mintSeen !== this.env.MINT) return;
+    const g = this.gamesState();
+    if (g.paying) {
+      await this.gamesResolve(now);
+      if (g.paying) return; // still not sure where that payment is: nothing else moves
+    }
+    if (this.state.priceUsd) {
+      try {
+        const own = [this.box.publicKey, this.env.TEAM_WALLET, this.dev?.publicKey, ...(this.state.excluded ?? [])];
+        const r = await fetchNewBuys(
+          this.env.HELIUS_API_KEY,
+          this.env.MINT,
+          g.cursor,
+          this.state.priceUsd,
+          new Set(own.filter(Boolean) as string[]),
+        );
+        g.cursor = r.cursor;
+        for (const b of r.buys) {
+          if (b.usd < GAMES.minBuyUsd) continue;
+          const last = [b, ...(g.clock?.last ?? []).filter((x) => x.buyer !== b.buyer)].slice(0, 5);
+          g.clock = { endsAt: b.at + GAMES.clockMinutes * 60_000, last };
+          g.queue = [...g.queue, b].slice(-GAMES.queueMax);
+        }
+      } catch (e) {
+        this.log(`buys read failed: ${(e as Error).message}`);
+      }
+    }
+    // the clock ran out: the last buyer who still holds takes the pot
+    const pot = BigInt(g.clockPot);
+    if (g.clock && now > g.clock.endsAt && pot >= GAMES.minClockPotLamports) {
+      for (const c of g.clock.last) if (await this.stillHolds(c)) return this.gamesPay("clock", c, pot);
+      this.feed("win", `the clock ran out but every last buyer already sold. the pot (${sol(pot)} sol) rolls over`);
+      g.clock = undefined;
+    }
+    // lucky buys: rolled once they held long enough, a few per tick
+    const due = g.queue.filter((b) => now - b.at >= GAMES.holdMinutes * 60_000).slice(0, 5);
+    for (const b of due) {
+      g.queue = g.queue.filter((x) => x.sig !== b.sig);
+      if (now - (g.luckyLast[b.buyer] ?? 0) < GAMES.luckyCooldownMinutes * 60_000) continue;
+      if (BigInt(g.luckyPot) < GAMES.luckyPrizeLamports) continue;
+      const bh = await blockhashAt(this.rpc, b.slot + GAMES.rollDelaySlots, 20_000);
+      const roll = await luckyRoll(b.sig, bh.blockhash);
+      if (!roll.win) continue;
+      if (!(await this.stillHolds(b))) {
+        this.feed("win", `${short(b.buyer)} hit a lucky buy and sold before it paid. 7 minutes was too long for you`);
+        continue;
+      }
+      return this.gamesPay("lucky", b, GAMES.luckyPrizeLamports, roll.seed);
+    }
+  }
+
+  async stillHolds(b: Buy) {
+    const acc = await this.rpc.tokenAccount(b.buyer, this.env.MINT!);
+    return !!acc && acc.amount >= mustHold(b.tokens);
+  }
+
+  /** Pays a clock or lucky win in SOL. Saved before signing and again with the signature. */
+  async gamesPay(kind: "clock" | "lucky", b: Buy, lamports: bigint, seed?: string) {
+    const g = this.gamesState();
+    await this.guard?.();
+    g.paying = { kind, to: b.buyer, lamports: lamports.toString(), at: Date.now(), buySig: b.sig, seed };
+    await this.checkpoint?.();
+    try {
+      const sig = await sendSol(this.rpc, this.box, b.buyer, lamports, async (s) => {
+        g.paying!.sig = s;
+        await this.checkpoint?.();
+      });
+      g.paying.sig = sig;
+      await this.gamesBook();
+    } catch (e) {
+      this.log(`${kind} payout not confirmed yet: ${(e as Error).message}`); // checked again next tick
+    }
+  }
+
+  async gamesResolve(now = Date.now()) {
+    const p = this.gamesState().paying!;
+    if (!p.sig) {
+      this.gamesState().paying = undefined; // never signed, nothing went out
+      return;
+    }
+    const s = await this.rpc.signatureStatus(p.sig);
+    if (s === "landed") return this.gamesBook();
+    // failed, or never seen long after its blockhash expired: nothing went out
+    if (s === "failed" || now - p.at > 150_000) this.gamesState().paying = undefined;
+  }
+
+  async gamesBook() {
+    const g = this.gamesState();
+    const p = g.paying!;
+    const lam = BigInt(p.lamports);
+    if (p.kind === "clock") {
+      g.clockPot = (BigInt(g.clockPot) - lam > 0n ? BigInt(g.clockPot) - lam : 0n).toString();
+      g.clock = undefined;
+    } else {
+      g.luckyPot = (BigInt(g.luckyPot) - lam > 0n ? BigInt(g.luckyPot) - lam : 0n).toString();
+      g.luckyLast[p.to] = Date.now();
+    }
+    g.wins = [
+      ...g.wins,
+      {
+        kind: p.kind,
+        to: p.to,
+        lamports: p.lamports,
+        at: new Date().toISOString(),
+        sig: p.sig!,
+        buySig: p.buySig,
+        seed: p.seed,
+      },
+    ].slice(-30);
+    g.paying = undefined;
+    this.log(`${p.kind} paid ${sol(lam)} SOL to ${p.to} (${p.sig})`);
+    if (p.kind === "clock") {
+      this.feed(
+        "win",
+        `the clock hit zero. ${short(p.to)} was the last buyer and took the pot: ${sol(lam)} sol`,
+        p.sig,
+      );
+      await this.post(
+        `the clock hit zero.\n\n${short(p.to)} was the last $PULLIT buyer and took the pot: ${sol(lam)} sol.\nnew round starts with the next buy.`,
+        ["pullit.fun"],
+        false,
+        true,
+      );
+    } else
+      this.feed(
+        "win",
+        `lucky buy: ${short(p.to)} bought, held 7 minutes and the block said yes. ${sol(lam)} sol sent`,
+        p.sig,
+      );
   }
 
   /** Posts "dex paid" once, and only after dexscreener itself shows the paid token profile. */
@@ -1771,6 +1958,7 @@ who you are, only for context: a pink pixel gift box on solana, not live yet. tr
     }
     await this.dexPaid(now);
     await this.bondWatch(now);
+    await this.gamesTick(now).catch((e) => this.log(`games: ${(e as Error).message}`));
     if (this.state.phase === "drawing") return this.finishBox();
     if (this.claimDue(now)) await this.claimAndSplit();
     if (now - this.state.lastHoldersAt >= (this.dry ? LOOP.dry.holdersEveryMin : LOOP.holdersEveryMin) * 60_000) {

@@ -148,13 +148,14 @@ export async function buildSplit(
   boxWallet: string,
   teamWallet: string,
   amount: bigint,
+  boxPct = FEES.boxSharePct, // 100 before the bond: every lamport of fees goes to the box
 ): Promise<Split | null> {
   if (amount < FEES.minSplitLamports) return null;
   const bal = await rpc.balance(dev.publicKey);
   const room = bal - FEES.keepInDevLamports - 10_000n; // the dev wallet keeps its gas
   const total = amount < room ? amount : room;
   if (total < FEES.minSplitLamports) return null;
-  const box = (total * BigInt(FEES.boxSharePct)) / 100n;
+  const box = (total * BigInt(boxPct)) / 100n;
   const team = total - box;
   const kept = !teamWallet || teamWallet === dev.publicKey;
   const { blockhash } = await rpc.latestBlockhash();
