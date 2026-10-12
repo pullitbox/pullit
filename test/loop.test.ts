@@ -52,8 +52,15 @@ test("24h holders get crowned once", async () => {
   assert.equal(b.state.feed.filter((f) => /24h/.test(f.m)).length, 1);
 });
 
-test("next box size follows the last hour of fees", async () => {
-  const { nextBoxSize, boxSize } = await import("../src/loop.ts");
+test("next box size follows the last hour of fees", async (t) => {
+  const { nextBoxSize, boxSize, FIXED_BOX } = await import("../src/loop.ts");
+  if (FIXED_BOX) {
+    // fixed size for now: every box is FIXED_BOX whatever the volume
+    const big = [{ at: Date.now(), lamports: String(50e9) }];
+    assert.equal(nextBoxSize(big).lamports, BigInt(FIXED_BOX * 1e9));
+    assert.equal(boxSize(3, "4000000000"), BigInt(FIXED_BOX * 1e9));
+    return t.skip("FIXED_BOX is on");
+  }
   const now = Date.now();
   const at = (minAgo: number, sol: number) => ({ at: now - minAgo * 60_000, lamports: String(sol * 1e9) });
   // dead: 0.1 sol of fees in an hour -> smallest box

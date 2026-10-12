@@ -241,6 +241,8 @@ export function criteria(c: Candidate | undefined, kind: "fresh" | "meta"): stri
 /** The sizes a box can have, in SOL. The first box is always 0.15 so the launch sees one open fast. */
 export const BOX_SIZES = [0.3, 0.5, 0.75, 1, 1.5, 2, 2.75, 3.5, 4];
 export const FIRST_BOX = 0.15;
+/** While set, every box is this size no matter the volume. null turns the volume sizing back on. */
+export const FIXED_BOX: number | null = 0.15;
 const FILL_MINUTES = 25; // a box should fill in about this long at the current volume
 
 /**
@@ -252,12 +254,13 @@ export function nextBoxSize(ledger: FeeLedgerEntry[], now = Date.now()): { lampo
   // what reaches the box: 80% of fees, minus the vault's tenth
   const perHour = (hour * 80n * BigInt(100 - LOOP.vaultPct)) / 10_000n;
   const fillable = (Number(perHour) / 1e9) * (FILL_MINUTES / 60);
-  const sol = [...BOX_SIZES].reverse().find((x) => x <= fillable) ?? BOX_SIZES[0];
+  const sol = FIXED_BOX ?? [...BOX_SIZES].reverse().find((x) => x <= fillable) ?? BOX_SIZES[0];
   return { lamports: BigInt(Math.round(sol * 1e9)), perHour };
 }
 
 export function boxSize(opened: number, target?: string): bigint {
   if (opened === 0) return BigInt(Math.round(FIRST_BOX * 1e9));
+  if (FIXED_BOX) return BigInt(Math.round(FIXED_BOX * 1e9));
   return target ? BigInt(target) : BigInt(Math.round(BOX_SIZES[0] * 1e9));
 }
 
