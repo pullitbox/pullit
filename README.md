@@ -30,11 +30,22 @@ The bot can only buy. It buys the prize for the winner and buys $PULLIT to burn 
 
 Whatever a pull leaves in the box rolls into the next one.
 
+<p align="center"><img src="assets/site.png" alt="pullit.fun: the box filling, the vault safe, the live log and opened boxes" width="860"></p>
+
+### The box grows with the volume
+
+The first box opens at 0.15 SOL. After that every box is sized from the fees of the last hour, so it fills in about 25 minutes: 0.3, 0.5, 0.75, 1, 1.5, 2, 2.75, 3.5 up to 4 SOL. Busy market, bigger boxes. The entry grows with the box (see below).
+
+### Every win gets a card
+
+Each opened box has its own page, `pullit.fun/box/<n>`. Shared on X or Telegram it unfurls as the winner card, drawn by the worker itself:
+
+<p align="center"><img src="assets/card.png" alt="winner card of a secret pull" width="640"></p>
+
 ## Boosts
 
 - **Frenzy.** The more $PULLIT trades in an hour, the better the odds of the next box. Four levels, from epic 15% / secret 5% up to epic 24% / secret 11%. The odds are locked into the box when it is sealed, so they are part of the public record.
 - **Milestones.** The first box after the market cap crosses 50K, 100K, 250K, 500K, 1M, 2.5M, 5M or 10M is epic or better, also takes 20% of the vault, and burns another 10% of the vault (bought back from the market).
-- **Launch reserve.** At launch the box buys some $PULLIT for itself, in public. It can only burn it: 10% of it at 50K, 125K, 200K and 350K market cap. The amount and every burn are on the site.
 - **It can only buy.** Every box buys $PULLIT and burns it. The bot has no code that sells anything: every swap starts from SOL, and a test fails if that ever changes (`test/executor.test.ts`).
 
 All numbers live in [`src/boost.ts`](src/boost.ts).
@@ -79,6 +90,15 @@ This downloads box #12 from the site, checks the seal against the revealed coins
 
 How the draw works in detail: [docs/draw.md](docs/draw.md).
 
+## Tested
+
+```
+npm install
+npm run check
+```
+
+Formatting, strict types and 57 tests. One of them runs the real bot, not a dry run, against a simulated chain, Jupiter, PumpPortal and Helius, through hours of trading in fast forward. It checks every lamport: only claimed fees are split, exactly 80% reaches the box, SOL the dev adds itself is never touched, every box pays its winner once, buys back once and burns once, and a stale copy of the bot finds the payout on chain instead of paying again (`test/e2e.test.ts`).
+
 ## Docs
 
 - [docs/architecture.md](docs/architecture.md): how it fits together, with diagrams
@@ -109,5 +129,5 @@ src/solana.ts     keys, transactions and rpc, no dependencies
 worker/           Cloudflare Worker: cron, api, site
 scripts/verify.ts recompute any opened box
 scripts/dev/       local tools: scanner, preview, test runs
-test/             unit tests, run on every push
+test/             unit and end to end tests, run on every push
 ```

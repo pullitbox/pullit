@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.0.0 (launch)
+
+- two wallets only: the dev claims fees and keeps 20%, 80% goes to the box. only fees a claim brought in are ever split
+- winner cards: every box has a page at pullit.fun/box/n that unfurls as its card on x and telegram
+- top holders: biggest pulls, longest in the draw, longest without a win
+- the vault is a gold safe on the card, burns and the draw size sit under it
+- no ticket bonus for buying right before a box opens
+- the scanner takes meta runners from 500K, drops coins that stopped trading or crash on the day, one coin per ticker
+- payouts and buybacks check the chain before paying, a tick that lost its lock never writes
+- end to end test of the whole money path
+
 ## 0.10.0
 
 - bigger pool: the agent sees the top 20 fresh and top 20 meta runners instead of 12, plus a few big liquid coins of the week

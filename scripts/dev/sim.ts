@@ -10,11 +10,27 @@ import type { State } from "../../src/loop.ts";
 
 const path = process.argv[2] ?? "out/state-dry-Aqv8Gj.json";
 const speed = Number(process.argv[3]) || 20;
-const S = JSON.parse(readFileSync(path, "utf8")) as State;
+// ANON=1 swaps every wallet and mint for a made-up one (for videos and screenshots)
+const anonMap = new Map<string, string>();
+const B58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+const fake = (a: string) => {
+  if (!anonMap.has(a))
+    anonMap.set(a, Array.from({ length: a.length }, () => B58[Math.floor(Math.random() * 58)]).join(""));
+  return anonMap.get(a)!;
+};
+const anon = (t: string) => {
+  if (!process.env.ANON) return t;
+  t = t.replace(/[1-9A-HJ-NP-Za-km-z]{32,44}/g, fake);
+  for (const [a, f] of anonMap) t = t.replaceAll(`${a.slice(0, 4)}…${a.slice(-4)}`, `${f.slice(0, 4)}…${f.slice(-4)}`);
+  return t.replaceAll(" (test)", "");
+};
+const S = JSON.parse(anon(readFileSync(path, "utf8"))) as State;
+// only after the state is mapped, so short names in the log are known
+for (const f of S.feed) f.m = anon(f.m);
 const DRAW_MS = 20_000; // a box opens about 20 s after it is sealed
 const opened = (b: State["history"][number]) => Date.parse(b.at) + DRAW_MS;
 
-const t0 = Date.parse(S.history[0]!.at) - 3 * 60_000;
+const t0 = Date.parse(S.history[0]!.at) - 3 * 60_000 + (Number(process.env.SIM_FROM_MIN) || 0) * 60_000;
 const tEnd = Math.max(...S.feed.map((f) => Date.parse(f.at)), opened(S.history.at(-1)!)) + 60_000;
 const start = Date.now();
 /** Dry-run time now, and dry-run time mapped back onto the wall clock. */
@@ -24,7 +40,7 @@ const wallN = (at: number) => new Date(start + (at - t0) / speed).toISOString();
 
 const rows = (id: number) =>
   existsSync(`out/box-${id}.json`)
-    ? (JSON.parse(readFileSync(`out/box-${id}.json`, "utf8")) as { owner: string; tickets: number }[])
+    ? (JSON.parse(anon(readFileSync(`out/box-${id}.json`, "utf8"))) as { owner: string; tickets: number }[])
     : [];
 
 function stateAt(now: number): State {
@@ -72,7 +88,7 @@ const KV = {
   async get(k: string, type?: string) {
     let v: string | null = null;
     if (k === "state") v = JSON.stringify(stateAt(T()));
-    else if (k === "tickets" && existsSync("out/tickets.json")) v = readFileSync("out/tickets.json", "utf8");
+    else if (k === "tickets" && existsSync("out/tickets.json")) v = anon(readFileSync("out/tickets.json", "utf8"));
     else if (k.startsWith("box:")) v = JSON.stringify(rows(Number(k.slice(4))));
     return v == null ? null : type === "json" ? JSON.parse(v) : v;
   },
