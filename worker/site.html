@@ -27,8 +27,8 @@ button,input{font:inherit;color:inherit}
 .muted{color:var(--muted)}.dim{color:var(--dim)}
 
 /* ticker */
-.tick{background:var(--pink);color:var(--ink);font-size:12px;white-space:nowrap;overflow:hidden;padding:6px 0;position:fixed;left:0;right:0;bottom:0;z-index:5}
-body{padding-bottom:44px}
+.tick{background:var(--pink);color:var(--ink);font-size:12px;white-space:nowrap;overflow:hidden;padding:6px 0;margin-top:auto;padding-bottom:calc(6px + env(safe-area-inset-bottom))}
+body{display:flex;flex-direction:column;min-height:100vh;min-height:100dvh}
 .tick .run{display:inline-flex;gap:28px;padding-left:16px;animation:marq 40s linear infinite}
 .tick .run a:hover{text-decoration:underline}
 .tick:hover .run{animation-play-state:paused}
