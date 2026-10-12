@@ -109,6 +109,8 @@ footer{font-size:11px;color:var(--dim);margin-top:22px}
 .mini .log .m{overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .mini h3 button{background:none;border:0;color:var(--muted);font-size:11px;cursor:pointer;padding:0}
 .mini h3 button:hover{color:var(--pink)}
+/* kept in the page for the script, not shown: numbers, odds and the small print live in rules */
+.stats,.oddsh,.odds,footer,.badge{display:none!important}
 /* desktop */
 @media (min-width:900px){
   .tick{font-size:14px;padding:8px 0}
@@ -116,7 +118,7 @@ footer{font-size:11px;color:var(--dim);margin-top:22px}
   header{padding:20px 0}
   .logo{font-size:26px}
   nav .dk{display:inline-flex}
-  main{display:grid;grid-template-columns:1.1fr 1fr;gap:36px;align-items:start;margin-top:6px}
+  main{display:grid;grid-template-columns:1fr 1fr;gap:36px;align-items:start;margin-top:6px}
   .tagline{font-family:'Silkscreen',monospace;font-size:30px;line-height:1.15;margin:0 0 14px;color:var(--text)}
   .hero{padding:24px;text-align:left;display:grid;grid-template-columns:150px minmax(0,1fr);gap:24px;align-items:center;margin:0}
   .hero img{width:150px;margin:0}
@@ -124,6 +126,7 @@ footer{font-size:11px;color:var(--dim);margin-top:22px}
   .odds{margin-top:16px}
   .mini{margin-top:20px}
   .right{margin-top:0;padding-top:50px;gap:20px}
+  .tagline{font-size:34px}
   .stats div,.stats .vt{padding:14px 16px}
   .badge{margin:0 0 4px}
   .hero .k{display:inline-block;margin-right:8px}
@@ -197,7 +200,7 @@ dialog::backdrop{background:rgba(5,4,6,.8)}
     <span class="cabuy"><button class="chip" id="ca" type="button" title="copy contract address">ca <b id="caText">soon</b> ⧉</button><a class="buyc px" id="buy" href="https://x.com/Pullitbox" target="_blank" rel="noopener">buy</a></span>
     <a class="chip dk" href="https://x.com/Pullitbox" target="_blank" rel="noopener">x</a>
     <button class="chip dk" type="button" data-open="rules">rules</button>
-    <button class="chip dk" type="button" data-open="meSheet">check eligibility</button>
+    <a class="chip dk" href="https://github.com/pullitbox/pullit" target="_blank" rel="noopener">github</a>
   </nav>
 </header>
 
@@ -235,7 +238,7 @@ dialog::backdrop{background:rgba(5,4,6,.8)}
     </div>
   </div>
 </main>
-<div class="foot"><button type="button" data-open="rules">rules</button><button type="button" data-open="meSheet">check eligibility</button><a href="https://x.com/Pullitbox" target="_blank" rel="noopener">x</a></div>
+<div class="foot"><button type="button" data-open="rules">rules</button><a href="https://github.com/pullitbox/pullit" target="_blank" rel="noopener">github</a><a href="https://x.com/Pullitbox" target="_blank" rel="noopener">x</a></div>
 <footer><span id="holdersLine"></span><span id="resv" hidden> · reserve <b id="resvPct">100</b>% left</span><span id="journalWrap" hidden></span></footer>
 </div>
 <div class="tick" id="tick"><div class="run" id="tickRun"><span>nothing opened yet. the first box opens soon</span></div></div>
