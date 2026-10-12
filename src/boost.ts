@@ -8,10 +8,10 @@ export const BOOST = {
   burnPct: 10, // of every box, spent on $PULLIT that is burned right away
   // frenzy: more volume in the last hour, better odds for the next box. odds are common/rare/epic/secret
   frenzy: [
-    { minVolume1h: 0, odds: [50, 30, 19, 1] },
-    { minVolume1h: 20_000, odds: [45, 30, 24, 1] },
-    { minVolume1h: 60_000, odds: [40, 30, 29, 1] },
-    { minVolume1h: 150_000, odds: [35, 30, 34, 1] },
+    { minVolume1h: 0, odds: [50, 30, 19.5, 0.5] },
+    { minVolume1h: 20_000, odds: [45, 30, 24.5, 0.5] },
+    { minVolume1h: 60_000, odds: [40, 30, 29.5, 0.5] },
+    { minVolume1h: 150_000, odds: [35, 30, 34.5, 0.5] },
   ],
   // the first box after the market cap crosses one of these is a milestone box: epic or better, plus vault
   milestonesUsd: [50_000, 100_000, 250_000, 500_000, 1_000_000, 2_500_000, 5_000_000, 10_000_000],

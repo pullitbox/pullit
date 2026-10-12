@@ -26,7 +26,7 @@ When a box opens:
 
 1. 10% of the box buys $PULLIT on the market and burns it (SPL `Burn`, the supply goes down). Each burn has its own transaction on the site log.
 2. 0.005 SOL stays for transaction fees and token account rent, so they never eat into the vault.
-3. The tier decides the prize: common 50% of what is left, rare 75%, epic 100%, secret 100% plus the whole vault. Secret is 1% per box, and it is the only pull that opens the vault.
+3. The tier decides the prize: common 50% of what is left, rare 75%, epic 100%, secret 100% plus the whole vault. Secret is 0.5% per box. The vault is no longer filled; what is in it goes to a secret pull or into the final box.
 4. The prize is swapped into the sealed coin and goes straight to the winner's wallet.
 
 Every payment is saved the moment it is signed, before it is sent, and again when it lands. If the bot restarts in the middle of a payout it first asks the chain whether that transaction landed, so it never pays twice. The draw itself is saved once computed, so a retry pays the same winner. If the sealed coin can no longer be bought after 5 tries, the prize is paid in SOL. If the buyback fails, that SOL stays in the box and rolls over; if only the burn fails, it is retried every minute until the bought $PULLIT is gone.

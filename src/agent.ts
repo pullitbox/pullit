@@ -17,8 +17,8 @@ export const AGENT = {
 export const TIERS = [
   { key: "common", pct: 50, boxPct: 50, vaultPct: 0, asset: "fresh runner" },
   { key: "rare", pct: 30, boxPct: 75, vaultPct: 0, asset: "meta runner" },
-  { key: "epic", pct: 19, boxPct: 100, vaultPct: 0, asset: "meta runner" },
-  { key: "secret", pct: 1, boxPct: 100, vaultPct: 100, asset: "meta runner" }, // the only way the vault opens
+  { key: "epic", pct: 19.5, boxPct: 100, vaultPct: 0, asset: "meta runner" },
+  { key: "secret", pct: 0.5, boxPct: 100, vaultPct: 100, asset: "meta runner" }, // the only way the vault opens
 ] as const;
 export type Tier = (typeof TIERS)[number]["key"];
 
@@ -290,7 +290,9 @@ export async function packBox(
  * locked when the box was sealed (frenzy changes them). A milestone box is epic or better.
  */
 export function rollTier(seedHex: string, odds: readonly number[] = TIERS.map((t) => t.pct), milestone = false): Tier {
-  const n = parseInt(seedHex.slice(13, 21), 16) % 100; // different bits than the winner pick
+  // different bits than the winner pick. odds with decimals (0.5%) roll on 0.0..99.9, whole odds on 0..99 as before
+  const fine = odds.some((o) => !Number.isInteger(o));
+  const n = fine ? (parseInt(seedHex.slice(13, 21), 16) % 1000) / 10 : parseInt(seedHex.slice(13, 21), 16) % 100;
   let acc = 0;
   let tier: Tier = "common";
   for (let i = 0; i < TIERS.length; i++) {

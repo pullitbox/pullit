@@ -46,7 +46,7 @@ export const LOOP = {
   claimEverySec: 15, // the worker runs claim passes at 15s, 30s and 45s into every cron minute
   holdersEveryMin: 5,
   topHoldersToInspect: 40, // pools and curves are always among the biggest holders
-  vaultPct: 10, // of everything that goes into the box, this share is set aside in the vault
+  vaultPct: 0, // the vault is no longer filled: everything goes into the box. what is in it stays for a secret pull or the final box
   // dry run runs fast so a full cycle can be watched in minutes
   dry: { solPerMin: 0.05, claimEverySec: 60, holdersEveryMin: 1, minHoldMinutes: 1 },
   boxCapX: 3, // one box pays out at most 3x its size, the rest waits for the next boxes

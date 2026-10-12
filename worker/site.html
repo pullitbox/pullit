@@ -337,10 +337,10 @@ html:has(dialog[open]),body:has(dialog[open]){overflow:hidden}
   <h2 class="px">rules<button class="x" type="button" data-close aria-label="close">x</button></h2>
   <dl class="rg">
     <dt>the box</dt><dd>trading fees fill it. the agent picks the coins. a future solana block picks the holder and the tier</dd>
-    <dt>odds</dt><dd class="odds" id="oddsLine"><b class="t-common">common 50</b><b class="t-rare">rare 30</b><b class="t-epic">epic 19</b><b class="t-secret">secret 1</b></dd>
+    <dt>odds</dt><dd class="odds" id="oddsLine"><b class="t-common">common 50</b><b class="t-rare">rare 30</b><b class="t-epic">epic 19.5</b><b class="t-secret">secret 0.5</b></dd>
     <dt>get in</dt><dd>hold the entry for 7 min. bigger bag, more tickets</dd>
     <dt>in the red</dt><dd>bag worth less than the sol you paid? 3x tickets until you are back up</dd>
-    <dt>vault</dt><dd>10% of every box is set aside. <a href="#" data-open="vaultSheet">now <span id="vault">0 sol</span></a>. only a secret pull opens it</dd>
+    <dt>vault</dt><dd>no longer filled, every lamport goes into the box. <a href="#" data-open="vaultSheet">now <span id="vault">0 sol</span></a>. a secret pull or the final box opens it</dd>
     <dt>burn</dt><dd>10% of every box buys $pullit and burns it</dd>
     <dt>fees</dt><dd>100% to the box until $pullit bonds. after that 80% to the box, 20% to the dev</dd>
     <dt>the clock</dt><dd>every $50+ buy resets a 3 min timer. when it hits zero the last buyer takes the clock pot, if they still hold what they bought</dd>
@@ -360,10 +360,10 @@ html:has(dialog[open]),body:has(dialog[open]){overflow:hidden}
   <h2 class="px">the vault<button class="x" type="button" data-close aria-label="close">x</button></h2>
   <div class="vbig px" id="vaultBig">0 sol</div>
   <dl class="rg">
-    <dt>what</dt><dd>10% of everything that goes into a box is set aside here. it sits in the box wallet, on chain</dd>
+    <dt>what</dt><dd>what was set aside from the first boxes. it is no longer filled: every lamport now goes into the box. it sits in the box wallet, on chain</dd>
     <dt>why</dt><dd>so some pulls are way bigger than the box. one lucky holder walks off with a chunk</dd>
     <dt>grows</dt><dd>every box adds to it. it only goes down when something opens it</dd>
-    <dt>opens</dt><dd>only a secret pull, 1% per box. whoever hits it takes the whole vault on top of the box</dd>
+    <dt>opens</dt><dd>a secret pull, 0.5% per box, takes the whole vault on top of the box. if fees ever dry up, the final box pays it out</dd>
   </dl>
 </div></dialog>
 
@@ -380,7 +380,7 @@ html:has(dialog[open]),body:has(dialog[open]){overflow:hidden}
 <script>
 const Q = /[?&]preview=/.test(location.search) ? location.search : '';
 const $ = (id) => document.getElementById(id);
-const TIERS = [{ key: 'common', pct: 50 }, { key: 'rare', pct: 30 }, { key: 'epic', pct: 19 }, { key: 'secret', pct: 1 }];
+const TIERS = [{ key: 'common', pct: 50 }, { key: 'rare', pct: 30 }, { key: 'epic', pct: 19.5 }, { key: 'secret', pct: 0.5 }];
 const COLOR = { common: '#c9c2d6', rare: '#8ec5ff', epic: '#cfa8ff', secret: '#ffc94d' };
 const TAG = { fee: '#7be0c3', scan: '#9a8f99', pick: '#8ec5ff', box: '#ff8dc0', draw: '#ffc94d', win: '#ff8dc0', sent: '#9a8f99', info: '#9a8f99', roast: '#ff6b6b', hold: '#7be0c3', x: '#f4eef2', boost: '#ffc94d', burn: '#ff9a4d' };
 const MSG = { boost: 'gd', burn: 'or', x: 'hi', pick: 'hi', box: 'pk', win: 'pk', draw: 'gd', roast: 'rd', hold: 'mt' };
@@ -635,8 +635,8 @@ async function recompute(b) {
   const roll = (parseInt(seed.slice(0, 13), 16) / 2 ** 52) * total;
   let acc = 0, winner = list[list.length - 1]?.owner;
   for (const r of list) { acc += r.tickets; if (roll < acc) { winner = r.owner; break; } }
-  const n = parseInt(seed.slice(13, 21), 16) % 100;
   const odds = b.odds || TIERS.map((x) => x.pct);
+  const n = odds.some((o) => !Number.isInteger(o)) ? (parseInt(seed.slice(13, 21), 16) % 1000) / 10 : parseInt(seed.slice(13, 21), 16) % 100;
   let t = 0, tier = 'common';
   for (let i = 0; i < TIERS.length; i++) { t += odds[i]; if (n < t) { tier = TIERS[i].key; break; } }
   if ((b.milestone || b.bond) && (tier === 'common' || tier === 'rare')) tier = 'epic';
