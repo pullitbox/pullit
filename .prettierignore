@@ -2,5 +2,6 @@ node_modules
 out
 worker/site.ts
 worker/site.html
+worker/soon.html
 assets
 package-lock.json

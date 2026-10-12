@@ -80,6 +80,9 @@ function classify(t: JupToken, age: number): { bucket: Bucket } | { reject: stri
   const liq = n(t.liquidity);
   const vol = volume24h(t);
   const top = t.audit?.topHoldersPercentage ?? null;
+  // a market cap the pool cannot back is a painted one (bot-inflated "dividend" coins): never a prize
+  if (mcap > 0 && liq < mcap * SCANNER.safety.minLiqToMcap) return { reject: "thin_liquidity" };
+  if (buySellRatio(t.stats6h) > SCANNER.safety.maxBuySellRatio6h) return { reject: "painted_buys" };
 
   const E = SCANNER.established;
   if (age >= E.minAgeHours && age <= E.maxAgeHours) {
@@ -168,6 +171,7 @@ export function hotCandidates(tokens: (JupToken | null)[], now = Date.now()): Ca
     const t = tokens.find((x) => x?.id === h.mint);
     if (!t || t.audit?.isSus) continue;
     if (n(t.liquidity) < HOT.minLiquidity || n(t.organicScore) < HOT.minOrganicScore) continue;
+    if (n(t.mcap) > 0 && n(t.liquidity) < n(t.mcap) * SCANNER.safety.minLiqToMcap) continue;
     out.push(toCandidate({ ...t, symbol: h.symbol }, "established", ageHours(t, now) ?? 24 * 365));
   }
   return score(out);

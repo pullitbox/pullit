@@ -27,6 +27,8 @@ export const SCANNER = {
   safety: {
     maxDevBalancePct: 10,
     minOrganicScore: 25, // Jupiter organic score 0..100, filters wash-traded tokens
+    minLiqToMcap: 0.01, // pool must hold at least 1% of the market cap (painted caps sit far below)
+    maxBuySellRatio6h: 15, // buy volume 15x sell volume is a bot painting the chart, not demand
   },
 
   // Never put these in a box (old dinosaurs, majors, stables). Symbols, upper case.

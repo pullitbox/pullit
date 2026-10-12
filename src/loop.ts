@@ -10,7 +10,7 @@ import { HOT } from "./config.ts";
 import { say, remember } from "./voice.ts";
 import { TEASERS, TEASE_TOPICS } from "./teasers.ts";
 import { packBox, quip, similar, fillQuip, type BoxPlan } from "./agent.ts";
-import { claimPumpCreatorFees, splitFees, shouldRunFinalBox, type FeeLedgerEntry } from "./fees.ts";
+import { claimPumpCreatorFees, splitFees, shouldRunFinalBox, FEES, type FeeLedgerEntry } from "./fees.ts";
 import {
   blockhashAt,
   draw,
@@ -126,6 +126,7 @@ export interface State {
   reserve?: { initial: string; left: string; burns: { at: string; sig: string; amount: string; milestone: number }[] };
   nextTeaseAt?: number; // before launch: when the next teaser goes out on x
   xPostedAt?: number[]; // times of the x posts of the last 24 hours, for the daily cap
+  recapPosted?: boolean; // the first-hour recap went out
   teaseUsed?: number[]; // hand-written teasers already posted this round
   teaseTopics?: string[]; // topics of the last pre-launch posts, oldest first
   journal?: JournalEntry[]; // what changed in the project, in the box's words
@@ -469,6 +470,7 @@ export class Bot {
 
   /** Frenzy level from the last hour of volume, and market cap milestones. */
   async market(token: JupToken) {
+    await this.firstHourRecap(token);
     const mcap = token.mcap ?? (token.usdPrice ?? 0) * (token.circSupply ?? token.totalSupply ?? 1e9);
     const vol = volume1h(token);
     this.state.market = { mcap, volume1h: vol, at: new Date().toISOString() };
@@ -516,6 +518,45 @@ export class Bot {
       this.state.pub.mcap = Math.round(mcap);
       this.state.pub.nextMilestone = BOOST.milestonesUsd.find((m) => !(this.state.milestonesHit ?? []).includes(m));
     }
+  }
+
+  /**
+   * One plain post an hour after launch: what happened, in numbers, with nothing to sell.
+   * Posted once, only between 60 and 80 minutes after the mint was set (later the 1h stats are not the first hour).
+   */
+  async firstHourRecap(token: JupToken, now = Date.now()) {
+    if (this.state.recapPosted || this.dry || !this.env.MINT) return;
+    const age = (now - this.state.launchedAt) / 60_000;
+    if (age < 60) return;
+    this.state.recapPosted = true;
+    if (age > 80) return;
+    const st = token.stats1h;
+    const buys = Math.round(st?.numBuys ?? 0);
+    const traders = Math.round(st?.numTraders ?? 0);
+    const vol = (st?.buyVolume ?? 0) + (st?.sellVolume ?? 0);
+    const fees = this.state.feeLedger.reduce((a, e) => a + BigInt(e.lamports), 0n);
+    const toBox = (fees * BigInt(FEES.boxSharePct)) / 100n;
+    const opened = this.state.history.length;
+    const given = this.state.history.reduce((a, b) => a + BigInt(b.prize?.lamports ?? "0"), 0n);
+    const lines = [
+      `first hour of $PULLIT:`,
+      ``,
+      ...(buys ? [`${buys.toLocaleString("en-US")} buys from ${traders.toLocaleString("en-US")} wallets`] : []),
+      ...(vol ? [`$${usdShort(vol)} volume, ${(token.holderCount ?? 0).toLocaleString("en-US")} holders`] : []),
+      `${sol(fees)} sol of fees claimed, ${sol(toBox)} went in the box`,
+      opened
+        ? `${opened} ${opened === 1 ? "box" : "boxes"} opened, ${sol(given)} sol paid out to holders`
+        : `box #1 is still filling`,
+      ``,
+      `every claim, payout and burn has a tx on pullit.fun`,
+    ];
+    await this.post(lines.join("\n"), [], false, true);
+    await this.line(
+      "info",
+      `first hour done: ${buys} buys, ${traders} wallets, ${sol(fees)} sol in fees, ${opened} boxes opened`,
+      [],
+      `first hour: ${buys} buys, ${opened} boxes opened, ${sol(given)} sol paid out`,
+    );
   }
 
   private addToVault(boxLamports: bigint) {

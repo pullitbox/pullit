@@ -4,7 +4,7 @@
 // Vars (wrangler.jsonc): TEAM_WALLET, MINT, PUBLIC ("1" = site open to everyone), DRY_RUN.
 
 import { Bot, newState, type Env as BotEnv, type State } from "../src/loop.ts";
-import { HTML } from "./site.ts";
+import { HTML, SOON } from "./site.ts";
 import { keypairFromSecret, Rpc } from "../src/solana.ts";
 import { fetchToken } from "../src/jupiter.ts";
 import { HOLDERS } from "../src/holders.ts";
@@ -203,7 +203,14 @@ export default {
     const url = new URL(req.url);
     const preview = !!env.PREVIEW_KEY && url.searchParams.get("preview") === env.PREVIEW_KEY;
     // before launch the site is hidden from the public; open it with ?preview=PREVIEW_KEY
-    if (env.PUBLIC !== "1" && !preview) return new Response("not found", { status: 404 });
+    if (env.PUBLIC !== "1" && !preview) {
+      // before launch everyone sees the box and "coming soon"; the full site opens with ?preview=PREVIEW_KEY
+      if (url.pathname === "/" || url.pathname === "/index.html")
+        return new Response(SOON, {
+          headers: { "content-type": "text/html; charset=utf-8", "cache-control": "public, max-age=60" },
+        });
+      return new Response("not found", { status: 404 });
+    }
     if (url.pathname === "/api/selftest")
       return preview ? json(await selftest(env)) : new Response("not found", { status: 404 });
     if (url.pathname === "/api/state")
