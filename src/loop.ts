@@ -93,6 +93,7 @@ export interface State {
   bagMemo?: BagMemo; // last amounts and last buys, for the buy boost and the sell reset
   lastHoldersAt: number;
   lastClaimAt: number;
+  misses?: Record<string, number>; // wallet -> boxes in a row it was in the draw and did not win
   devFloor?: string; // dev wallet SOL that is not fees: what was there at launch plus the dev share kept since
   lastClaimOkAt?: number; // last time a claim went through (even with no fees), for the final box rule
   feeLedger: FeeLedgerEntry[];
@@ -1238,7 +1239,8 @@ export class Bot {
         winPlain,
         short(d.winner),
       )) || winPlain; // a win always gets its post, even if every joke was used
-    const proof = `${p.plan.reveal ? p.plan.reveal.slice(0, 160) + "\n\n" : ""}tx: https://solscan.io/tx/${prize.sig}${p.burn && p.burn.burnSig !== "dry-run" ? `\nburn: https://solscan.io/tx/${p.burn.burnSig}` : ""}\ncheck the seal and the draw: https://pullit.fun`;
+    // the box page unfurls as the winner card; it links the tx, the burn and the seal check
+    const proof = `${p.plan.reveal ? p.plan.reveal.slice(0, 160) + "\n\n" : ""}https://pullit.fun/box/${p.boxId}`;
     const resultPost = winText;
     // on x only the wins worth a post: epic, secret, milestone and the final box (x posts are capped per day)
     if (d.tier === "epic" || d.tier === "secret" || p.milestone || p.final)
@@ -1275,6 +1277,11 @@ export class Bot {
         [sol(left)],
         say.rollover(sol(left), p.boxId + 1),
       );
+    // unlucky streaks: everyone in this draw who did not win goes up by one, the winner and anyone who left start over
+    const missed = this.state.misses ?? {};
+    const misses: Record<string, number> = {};
+    for (const r of p.rows) if (r.tickets > 0 && r.owner !== d.winner) misses[r.owner] = (missed[r.owner] ?? 0) + 1;
+    this.state.misses = misses;
     const rec: BoxRecord = { ...p, draw: d, prize, posts: [...p.posts, resultPost] };
     delete (rec as Partial<typeof p>).rows;
     delete rec.paid;

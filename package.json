@@ -22,6 +22,7 @@
   },
   "scripts": {
     "bot": "node --experimental-strip-types --no-warnings --env-file-if-exists=.env scripts/dev/run.ts",
+    "card": "node --experimental-strip-types --no-warnings scripts/dev/card.ts",
     "check": "npm run lint && npm test",
     "deploy": "npm run site && npx wrangler deploy --var BUILD_COMMITS:$(node --experimental-strip-types --no-warnings scripts/commits.ts)",
     "format": "prettier --write .",
@@ -33,6 +34,7 @@
     "quips": "node --experimental-strip-types --no-warnings --env-file-if-exists=.env scripts/dev/quips.ts",
     "scan": "node --experimental-strip-types --no-warnings --env-file-if-exists=.env scripts/dev/scan.ts",
     "secrets": "node --experimental-strip-types --no-warnings --env-file-if-exists=.env scripts/dev/secrets.ts",
+    "sim": "node --experimental-strip-types --no-warnings scripts/dev/sim.ts",
     "site": "node --experimental-strip-types --no-warnings scripts/build-site.ts",
     "test": "node --experimental-strip-types --no-warnings --test test/*.test.ts",
     "testbox": "node --experimental-strip-types --no-warnings --env-file-if-exists=.env scripts/dev/testbox.ts",

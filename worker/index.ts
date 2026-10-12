@@ -4,7 +4,8 @@
 // Vars (wrangler.jsonc): TEAM_WALLET, MINT, PUBLIC ("1" = site open to everyone), DRY_RUN.
 
 import { Bot, newState, type Env as BotEnv, type State } from "../src/loop.ts";
-import { HTML, SOON } from "./site.ts";
+import { HTML, SOON, BOXSVG } from "./site.ts";
+import { renderCard, type CardData } from "./card.ts";
 import { keypairFromSecret, Rpc } from "../src/solana.ts";
 import { fetchToken } from "../src/jupiter.ts";
 import { HOLDERS } from "../src/holders.ts";
@@ -195,6 +196,77 @@ async function boxDetail(env: Env, id: number) {
   return { ...rec, rows: rows ?? [] };
 }
 
+const shortAddr = (a: string) => `${a.slice(0, 4)}…${a.slice(-4)}`;
+const solStr = (l: string | bigint | undefined, d = 2) => {
+  const s = (Number(l ?? 0) / 1e9).toFixed(d);
+  return s.includes(".") ? s.replace(/0+$/, "").replace(/\.$/, "") : s;
+};
+
+/** What the share card of a box shows, or null while the box is not opened. */
+async function cardData(env: Env, id: number): Promise<CardData | null> {
+  const state = (await env.STATE.get("state", "json")) as State | null;
+  const b = state?.history.find((x) => x.boxId === id);
+  if (!b?.draw || !b.prize) return null;
+  return {
+    boxId: b.boxId,
+    tier: b.draw.tier,
+    sol: solStr(b.prize.lamports),
+    symbol: b.prize.symbol,
+    winner: shortAddr(b.draw.winner),
+    eligible: b.eligible,
+    slot: b.draw.slot,
+  };
+}
+
+/** The site with link-preview tags of one box, opening that box when it loads. */
+function boxPage(d: CardData, origin: string): string {
+  const title = `box #${d.boxId}: ${d.tier} pull, ${d.sol} sol of $${d.symbol}`;
+  const esc = (t: string) => t.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+  const img = `${origin}/card/${d.boxId}.png`;
+  const tags = [
+    `<meta property="og:title" content="${esc(title)}">`,
+    `<meta property="og:description" content="${esc(`${d.winner} pulled it. 1 of ${d.eligible} in the draw. block ${d.slot} picked them.`)}">`,
+    `<meta property="og:image" content="${img}">`,
+    `<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">`,
+    `<meta property="og:url" content="${origin}/box/${d.boxId}">`,
+    `<meta name="twitter:card" content="summary_large_image">`,
+    `<meta name="twitter:image" content="${img}">`,
+    `<script>if(!location.hash)history.replaceState(null,"","/#box-${d.boxId}")</script>`,
+  ].join("\n");
+  return HTML.replace(/<meta property="og:title"[^>]*>\n<meta property="og:description"[^>]*>/, tags);
+}
+
+/** Holder leaderboards: biggest winners, longest in the draw, longest without a win. */
+async function top(env: Env) {
+  const state = (await env.STATE.get("state", "json")) as State | null;
+  const snap = (await env.STATE.get("tickets", "json")) as Snap | null;
+  const excluded = new Set(state?.excluded ?? []);
+  const won = new Map<string, { lamports: bigint; wins: number; best: string }>();
+  const rank = ["common", "rare", "epic", "secret"];
+  for (const b of state?.history ?? []) {
+    if (!b.draw || !b.prize) continue;
+    const w = won.get(b.draw.winner) ?? { lamports: 0n, wins: 0, best: "common" };
+    w.lamports += BigInt(b.prize.lamports);
+    w.wins++;
+    if (rank.indexOf(b.draw.tier) > rank.indexOf(w.best)) w.best = b.draw.tier;
+    won.set(b.draw.winner, w);
+  }
+  const winners = [...won.entries()]
+    .sort((a, b) => (b[1].lamports > a[1].lamports ? 1 : b[1].lamports < a[1].lamports ? -1 : 0))
+    .slice(0, 10)
+    .map(([w, v]) => ({ wallet: w, sol: solStr(v.lamports, 3), wins: v.wins, best: v.best }));
+  const holders = (snap?.rows ?? [])
+    .filter((r) => !excluded.has(r[0]))
+    .sort((a, b) => b[2] - a[2])
+    .slice(0, 10)
+    .map((r) => ({ wallet: r[0], heldMinutes: r[2], multiplier: r[3] }));
+  const unlucky = Object.entries(state?.misses ?? {})
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10)
+    .map(([w, n]) => ({ wallet: w, boxes: n }));
+  return { winners, holders, unlucky, at: snap?.at };
+}
+
 export default {
   async scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
     ctx.waitUntil(run(env));
@@ -225,6 +297,24 @@ export default {
     if (url.pathname === "/api/wallet") {
       const a = url.searchParams.get("a") ?? "";
       return ADDR.test(a) ? json(await walletStatus(env, a)) : json({ error: "not a solana address" }, 400);
+    }
+    if (url.pathname === "/api/top") return json(await top(env));
+    const bm = url.pathname.match(/^\/box\/(\d+)\/?$/);
+    if (bm) {
+      const d = await cardData(env, Number(bm[1]));
+      if (!d) return Response.redirect(`${url.origin}/`, 302);
+      return new Response(boxPage(d, url.origin), {
+        headers: { "content-type": "text/html; charset=utf-8", "cache-control": "public, max-age=300" },
+      });
+    }
+    const cm = url.pathname.match(/^\/card\/(\d+)\.png$/);
+    if (cm) {
+      const d = await cardData(env, Number(cm[1]));
+      if (!d) return new Response("not found", { status: 404 });
+      return new Response(await renderCard(d, BOXSVG), {
+        // an opened box never changes, so its card can be cached for good
+        headers: { "content-type": "image/png", "cache-control": "public, max-age=31536000, immutable" },
+      });
     }
     if (url.pathname === "/api/box") {
       const d = await boxDetail(env, Number(url.searchParams.get("id")));

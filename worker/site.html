@@ -72,6 +72,18 @@ nav{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-
 h3.h{font-family:'Silkscreen',monospace;font-weight:400;font-size:13px;margin:0 0 10px;display:flex;justify-content:space-between;align-items:baseline}
 h3.h button{background:none;border:0;color:var(--muted);font-size:11px;cursor:pointer;padding:0}
 h3.h button:hover{color:var(--pink)}
+h3.h .hb{display:flex;gap:14px}
+.card-img{width:100%;height:auto;image-rendering:pixelated;border:2px solid var(--line);display:block}
+.share{display:flex;gap:8px;flex-wrap:wrap}
+.share button{background:none;border:2px solid var(--line);color:var(--muted);padding:8px 12px;cursor:pointer;font:inherit;font-size:12px}
+.share button:hover{border-color:var(--pink);color:var(--text)}
+.top h3{font:400 13px 'Silkscreen',monospace;margin:4px 0 6px;color:var(--pink)}
+.top ol{list-style:none;margin:0;padding:0;display:grid;gap:4px;font-size:12px}
+.top li{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:8px;align-items:baseline}
+.top li .n{color:var(--dim)}
+.top li a{color:var(--text)}
+.top li .v{color:var(--muted);text-align:right;white-space:nowrap}
+.top .empty{color:var(--dim);font-size:12px}
 .op{margin-right:-16px}
 .op h3{margin-right:16px}
 .cards{display:flex;gap:10px;overflow-x:auto;padding:0 16px 6px 0;scrollbar-width:none;scroll-snap-type:x mandatory}
@@ -238,7 +250,7 @@ html:has(dialog[open]),body:has(dialog[open]){overflow:hidden}
       <button class="vt" type="button" data-open="vaultSheet"><span class="k">vault ⓘ</span><span class="v"><span id="vaultTile">0</span><span class="u dk-u"> sol</span></span></button>
     </div>
     <div class="op">
-      <h3 class="h">opened <button type="button" data-open="allSheet" id="allBtn" hidden>all →</button></h3>
+      <h3 class="h">opened <span class="hb"><button type="button" data-open="topSheet">top holders →</button><button type="button" data-open="allSheet" id="allBtn" hidden>all →</button></span></h3>
       <div class="cards" id="cards"><span class="empty">nothing opened yet</span></div>
     </div>
   </div>
@@ -301,6 +313,14 @@ html:has(dialog[open]),body:has(dialog[open]){overflow:hidden}
 </div></dialog>
 
 <dialog id="boxSheet"><div class="sheet" id="boxBody"></div></dialog>
+
+<dialog id="topSheet" class="small"><div class="sheet top">
+  <h2 class="px">top holders<button class="x" type="button" data-close aria-label="close">x</button></h2>
+  <div><h3>biggest pulls</h3><ol id="topWin"><li class="empty">nobody pulled yet</li></ol></div>
+  <div><h3>longest in the draw</h3><ol id="topHold"><li class="empty">nobody yet</li></ol></div>
+  <div><h3>still waiting for a win</h3><ol id="topUnlucky"><li class="empty">nobody yet</li></ol></div>
+  <p class="fine">updated every few minutes. pools and our wallets are never listed.</p>
+</div></dialog>
 
 <script>
 const Q = /[?&]preview=/.test(location.search) ? location.search : '';
@@ -498,7 +518,7 @@ $('check').onsubmit = async (e) => {
 
 document.addEventListener('click', (e) => {
   const o = e.target.closest('[data-open]');
-  if (o) { e.preventDefault(); document.querySelectorAll('dialog[open]').forEach((d) => d.id !== o.dataset.open && d.close()); $(o.dataset.open).showModal(); if (o.dataset.open === 'logSheet') $('feed').scrollTop = $('feed').scrollHeight; if (o.dataset.open === 'meSheet') $('wallet').focus(); return; }
+  if (o) { e.preventDefault(); document.querySelectorAll('dialog[open]').forEach((d) => d.id !== o.dataset.open && d.close()); $(o.dataset.open).showModal(); if (o.dataset.open === 'logSheet') $('feed').scrollTop = $('feed').scrollHeight; if (o.dataset.open === 'meSheet') $('wallet').focus(); if (o.dataset.open === 'topSheet') loadTop(); return; }
   if (e.target.matches('[data-close]')) e.target.closest('dialog').close();
   if (e.target.tagName === 'DIALOG') e.target.close();
   const b = e.target.closest('a[href^="#box-"]');
@@ -557,7 +577,22 @@ async function openBox(id) {
       el('div', {}, el('span', { className: okSeal ? 'ok' : 'bad', textContent: okSeal ? 'seal matches. ' : 'seal mismatch. ' }), 'the coins were picked before the block'),
       el('div', {}, el('span', { className: okDraw ? 'ok' : 'bad', textContent: okDraw ? 'draw matches. ' : 'draw mismatch. ' }), `${b.rows.length} wallets, ${Math.round(r.total).toLocaleString()} tickets → ${short(r.winner)}, ${r.tier}`));
   };
-  body.replaceChildren(el('h2', { className: 'px' }, 'box #' + b.boxId, el('button', { className: 'x', type: 'button', textContent: 'x', ariaLabel: 'close', onclick: () => $('boxSheet').close() })), dl, how, btn, res);
+  const shareUrl = location.origin + '/box/' + b.boxId;
+  const img = el('img', { className: 'card-img', src: '/card/' + b.boxId + '.png' + Q, alt: `box #${b.boxId}: ${d.tier}, ${fmt(sol(pr.lamports))} sol of $${pr.symbol || '?'}`, width: 1200, height: 630 });
+  const copyBtn = el('button', { type: 'button', textContent: 'copy link to this box' });
+  copyBtn.onclick = () => { const ok = () => { copyBtn.textContent = 'copied'; setTimeout(() => (copyBtn.textContent = 'copy link to this box'), 1200); };
+    if (navigator.clipboard) navigator.clipboard.writeText(shareUrl).then(ok, () => prompt('link', shareUrl)); else prompt('link', shareUrl); };
+  const xBtn = el('a', { href: 'https://x.com/intent/post?text=' + encodeURIComponent(`pulled ${d.tier} from the pullit box\n${shareUrl}`), target: '_blank', rel: 'noopener' }, el('button', { type: 'button', textContent: 'post on x', tabIndex: -1 }));
+  body.replaceChildren(el('h2', { className: 'px' }, 'box #' + b.boxId, el('button', { className: 'x', type: 'button', textContent: 'x', ariaLabel: 'close', onclick: () => $('boxSheet').close() })), img, el('div', { className: 'share' }, copyBtn, xBtn), dl, how, btn, res);
+}
+const heldTxt = (m) => m < 60 ? m + ' min' : m < 2880 ? Math.round(m / 60) + 'h' : Math.round(m / 1440) + 'd';
+async function loadTop() {
+  let t; try { t = await api('/api/top'); } catch { return; }
+  const row = (i, w, v, extra) => el('li', {}, el('span', { className: 'n', textContent: i + 1 }), el('a', { href: acct(w), target: '_blank', rel: 'noopener', textContent: short(w) }), el('span', { className: 'v' }, ...(extra ? [extra, ' '] : []), v));
+  const fill = (id, list, f, none) => $(id).replaceChildren(...(list.length ? list.map(f) : [el('li', { className: 'empty', textContent: none })]));
+  fill('topWin', t.winners || [], (r, i) => row(i, r.wallet, `${r.sol} sol · ${r.wins} ${r.wins === 1 ? 'win' : 'wins'}`, el('span', { className: 'px t-' + r.best, textContent: r.best })), 'nobody pulled yet');
+  fill('topHold', t.holders || [], (r, i) => row(i, r.wallet, `${heldTxt(r.heldMinutes)} · ${r.multiplier}x`), 'nobody yet');
+  fill('topUnlucky', t.unlucky || [], (r, i) => row(i, r.wallet, `${r.boxes} ${r.boxes === 1 ? 'box' : 'boxes'} in a row`), 'nobody yet');
 }
 function route() { const m = location.hash.match(/^#box-(\d+)$/); if (m) openBox(Number(m[1])); }
 window.addEventListener('hashchange', route); route();
