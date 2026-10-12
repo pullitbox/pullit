@@ -484,6 +484,7 @@ function render() {
       else if (f.tx) m.append(el('a', { className: 'tx', href: 'https://solscan.io/tx/' + f.tx, target: '_blank', rel: 'noopener', textContent: 'tx ↗' }));
       return el('li', {}, el('span', { className: 't', textContent: hhmm(f.at) }), el('span', { className: 'tag', textContent: f.tag, style: `color:${TAG[f.tag] || '#9a8f99'};border-color:${TAG[f.tag] || '#9a8f99'}` }), m);
     }));
+    if (!feed.length) box.replaceChildren(el('li', {}, el('span', { className: 't' }), el('span', {}), el('span', { className: 'm', textContent: 'quiet so far. the box talks here once fees come in' })));
     if (atBottom) box.scrollTop = box.scrollHeight;
     const mini = feed.slice(0, 4);
     if (mini.length) $('miniLog').replaceChildren(...mini.map((f) => el('li', {}, el('span', { className: 't', textContent: hhmm(f.at) }),
