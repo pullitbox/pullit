@@ -93,6 +93,7 @@ export interface State {
   bagMemo?: BagMemo; // last amounts and last buys, for the buy boost and the sell reset
   lastHoldersAt: number;
   lastClaimAt: number;
+  devFloor?: string; // dev wallet SOL that is not fees: what was there at launch plus the dev share kept since
   lastClaimOkAt?: number; // last time a claim went through (even with no fees), for the final box rule
   feeLedger: FeeLedgerEntry[];
   excluded: string[]; // pools, curves, our own wallets
@@ -837,6 +838,12 @@ export class Bot {
       return;
     }
     if (!this.dev) return;
+    // first real claim: whatever the dev wallet holds now is the dev's own SOL, not fees
+    const devBal = await this.rpc.balance(this.dev.publicKey);
+    if (this.state.devFloor === undefined) {
+      this.state.devFloor = devBal.toString();
+      this.log(`dev floor set: ${sol(devBal)} SOL is never split`);
+    } else if (devBal < BigInt(this.state.devFloor)) this.state.devFloor = devBal.toString(); // the dev took some out
     try {
       const sig = await claimPumpCreatorFees(this.rpc, this.dev);
       if (sig) this.log(`claimed creator fees ${sig}`);
@@ -844,8 +851,10 @@ export class Bot {
     } catch (e) {
       this.log(`claim failed: ${(e as Error).message}`);
     }
-    const split = await splitFees(this.rpc, this.dev, this.box.publicKey, this.env.TEAM_WALLET);
+    const floor = BigInt(this.state.devFloor ?? "0");
+    const split = await splitFees(this.rpc, this.dev, this.box.publicKey, this.env.TEAM_WALLET, floor);
     if (split) {
+      if (split.kept) this.state.devFloor = (floor + split.teamLamports).toString(); // the dev share is not split again
       this.state.feeLedger.push({ at: Date.now(), lamports: split.totalLamports.toString(), splitSig: split.sig });
       const v = this.addToVault(split.boxLamports);
       this.log(

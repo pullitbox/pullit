@@ -50,6 +50,7 @@ export interface SplitResult {
   boxLamports: bigint;
   teamLamports: bigint;
   sig: string;
+  kept: boolean; // the team share stayed in the dev wallet
 }
 
 /** Moves everything above the gas reserve out of the dev wallet: box share + team share. */
@@ -58,9 +59,11 @@ export async function splitFees(
   dev: Keypair,
   boxWallet: string,
   teamWallet: string,
+  floor = 0n, // SOL that was in the dev wallet before any fees (and the dev share kept so far): never split
 ): Promise<SplitResult | null> {
   const bal = await rpc.balance(dev.publicKey);
-  const available = bal - FEES.keepInDevLamports - 10_000n; // minus tx fee
+  const keepBase = floor > FEES.keepInDevLamports ? floor : FEES.keepInDevLamports;
+  const available = bal - keepBase - 10_000n; // minus tx fee
   if (available < FEES.minSplitLamports) return null;
   const box = (available * BigInt(FEES.boxSharePct)) / 100n;
   const team = available - box;
@@ -78,7 +81,7 @@ export async function splitFees(
     blockhash,
   );
   const sig = await rpc.sendAndConfirm(tx);
-  return { totalLamports: available, boxLamports: box, teamLamports: team, sig };
+  return { totalLamports: available, boxLamports: box, teamLamports: team, sig, kept: keep };
 }
 
 /** True when the coin has been live long enough and fees over the window are below the floor. */

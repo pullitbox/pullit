@@ -109,3 +109,27 @@ test("a signed tx knows its own id before it is sent", async () => {
   assert.equal(b58decode(txSignature(tx)).length, 64);
   assert.deepEqual(b58decode(txSignature(tx)), tx.slice(1, 65));
 });
+
+test("split: dev SOL from before launch and the kept dev share are never split again", async () => {
+  const { splitFees } = await import("../src/fees.ts");
+  const dev = await keypairFromSecret(await newKeypairSecret());
+  const box = (await keypairFromSecret(await newKeypairSecret())).publicKey;
+  let bal = 0n;
+  const rpc = {
+    balance: async () => bal,
+    latestBlockhash: async () => ({ blockhash: "11111111111111111111111111111111" }),
+    sendAndConfirm: async () => "sig",
+  } as never;
+  // 0.1 SOL left after the dev buy, no fees yet: nothing moves
+  bal = 100_000_000n;
+  assert.equal(await splitFees(rpc, dev, box, dev.publicKey, 100_000_000n), null);
+  // 1 SOL of fees lands: 0.8 to the box, 0.2 stays
+  bal = 1_100_000_000n;
+  const r = await splitFees(rpc, dev, box, dev.publicKey, 100_000_000n);
+  assert.ok(r && r.kept);
+  assert.equal(r.totalLamports, 1_000_000_000n - 10_000n);
+  assert.equal(r.boxLamports, ((1_000_000_000n - 10_000n) * 80n) / 100n);
+  // after the transfer the dev holds floor + its share; with the floor raised by that share nothing is split again
+  bal = 100_000_000n + r.teamLamports;
+  assert.equal(await splitFees(rpc, dev, box, dev.publicKey, 100_000_000n + r.teamLamports), null);
+});
