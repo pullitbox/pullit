@@ -64,13 +64,17 @@ export async function splitFees(
   if (available < FEES.minSplitLamports) return null;
   const box = (available * BigInt(FEES.boxSharePct)) / 100n;
   const team = available - box;
+  // when the team wallet is the dev wallet itself (or unset), the team share simply stays where it is
+  const keep = !teamWallet || teamWallet === dev.publicKey;
   const { blockhash } = await rpc.latestBlockhash();
   const tx = await buildTransferTx(
     dev,
-    [
-      { to: boxWallet, lamports: box },
-      { to: teamWallet, lamports: team },
-    ],
+    keep
+      ? [{ to: boxWallet, lamports: box }]
+      : [
+          { to: boxWallet, lamports: box },
+          { to: teamWallet, lamports: team },
+        ],
     blockhash,
   );
   const sig = await rpc.sendAndConfirm(tx);

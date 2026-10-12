@@ -8,7 +8,7 @@
   "kv_namespaces": [{ "binding": "STATE", "id": "9ad40522615340b28c1df817106dc1c4" }],
   "limits": { "cpu_ms": 30000 },
   "vars": {
-    "TEAM_WALLET": "6wEKPStvZScwL2USJHza24KEGEDpiJSzcMcEDeJMkV5D",
+    "TEAM_WALLET": "BQF2WHxY7ZmWdBPMatYdQZ9UygJuCtRmmRrkQQg3qD59",
     "MINT": "",
     "PUBLIC": "",
     "DRY_RUN": "",

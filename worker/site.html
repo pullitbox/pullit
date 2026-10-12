@@ -192,12 +192,12 @@ dialog::backdrop{background:rgba(5,4,6,.8)}
 <div class="test px" id="testBar" hidden>test mode. simulated fees, no real prizes</div>
 <div class="wrap">
 <header>
-  <a class="logo px" href="/">pullit</a>
+  <span></span>
   <nav>
     <span class="cabuy"><button class="chip" id="ca" type="button" title="copy contract address">ca <b id="caText">soon</b> ⧉</button><a class="buyc px" id="buy" href="https://x.com/Pullitbox" target="_blank" rel="noopener">buy</a></span>
     <a class="chip dk" href="https://x.com/Pullitbox" target="_blank" rel="noopener">x</a>
     <button class="chip dk" type="button" data-open="rules">rules</button>
-    <button class="chip dk" type="button" data-open="meSheet">am i in?</button>
+    <button class="chip dk" type="button" data-open="meSheet">check eligibility</button>
   </nav>
 </header>
 
@@ -209,12 +209,12 @@ dialog::backdrop{background:rgba(5,4,6,.8)}
       <div>
         <span class="k px" id="kick">box #1 is filling</span><span class="badge px" id="badge" hidden></span>
         <span class="big px" id="big">0 sol</span>
-        <span class="s" id="sline">a random holder gets it, in a coin the ai picks</span>
+        <span class="s" id="sline">box agent picks the coin you'll get</span>
         <div class="bar"><i id="fill" style="width:0"></i></div>
         <div class="bl"><span id="bl1">opens when full</span><span id="bl2"></span></div>
       </div>
     </section>
-    <p class="how">hold <b id="entry">$20</b>+ for 7 min and you're in · <button type="button" data-open="meSheet">am i in?</button></p>
+    <p class="how">hold <b id="entry">$20</b>+ for 7 min and you're in · <button type="button" data-open="meSheet">check eligibility</button></p>
     <div class="oddsh">next box odds</div>
     <div class="odds" id="oddsRow"></div>
     <div class="mini">
@@ -235,19 +235,19 @@ dialog::backdrop{background:rgba(5,4,6,.8)}
     </div>
   </div>
 </main>
-<div class="foot"><button type="button" data-open="rules">rules</button><button type="button" data-open="meSheet">am i in?</button><a href="https://x.com/Pullitbox" target="_blank" rel="noopener">x</a></div>
-<footer><span id="holdersLine"></span><span id="resv" hidden> · reserve <b id="resvPct">100</b>% left</span><span id="journalWrap" hidden> · <a href="#" data-open="journal">journal</a></span></footer>
+<div class="foot"><button type="button" data-open="rules">rules</button><button type="button" data-open="meSheet">check eligibility</button><a href="https://x.com/Pullitbox" target="_blank" rel="noopener">x</a></div>
+<footer><span id="holdersLine"></span><span id="resv" hidden> · reserve <b id="resvPct">100</b>% left</span><span id="journalWrap" hidden></span></footer>
 </div>
 <div class="tick" id="tick"><div class="run" id="tickRun"><span>nothing opened yet. the first box opens soon</span></div></div>
 
 <dialog id="meSheet" class="small"><div class="sheet">
-  <h2 class="px">am i in?<button class="x" type="button" data-close aria-label="close">x</button></h2>
+  <h2 class="px">check eligibility<button class="x" type="button" data-close aria-label="close">x</button></h2>
   <form class="check" id="check">
     <label for="wallet" style="position:absolute;left:-9999px">your wallet</label>
     <input id="wallet" placeholder="paste your wallet" autocomplete="off" spellcheck="false">
     <button type="submit" class="px">check</button>
   </form>
-  <div class="answer" id="answer">hold <b id="entry2">$20</b> for 7 min and youre in. bigger bag, more tickets. bought in the last 15 min: +25%. sold: back to 1x</div>
+  <div class="answer" id="answer"></div><b id="entry2" hidden></b>
 </div></dialog>
 
 <dialog id="logSheet"><div class="sheet">
@@ -264,18 +264,14 @@ dialog::backdrop{background:rgba(5,4,6,.8)}
 <dialog id="rules" class="small"><div class="sheet">
   <h2 class="px">rules<button class="x" type="button" data-close aria-label="close">x</button></h2>
   <dl class="rg">
-    <dt>the box</dt><dd>trading fees fill it. an ai seals two coins inside. a future solana block picks the holder and the tier. nobody knows in advance, us included</dd>
+    <dt>the box</dt><dd>trading fees fill it. the agent picks the coins. a future solana block picks the holder and the tier</dd>
     <dt>odds</dt><dd class="odds" id="oddsLine"><b class="t-common">common 50</b><b class="t-rare">rare 30</b><b class="t-epic">epic 15</b><b class="t-secret">secret 5</b></dd>
-    <dt>get in</dt><dd>hold for 7 min. bigger box, bigger entry: $20 up to 0.5 sol · $50 up to 1.5 · $75 under 2.5 · $100 from 2.5 · $250 from 5. bigger bag, more tickets. 24h hold = 3x</dd>
-    <dt>timing</dt><dd>bought in the last 15 min = +25%. sold anything = back to 1x</dd>
-    <dt>frenzy</dt><dd>more volume in the last hour, better odds for the next box</dd>
+    <dt>get in</dt><dd>hold the entry for 7 min. bigger bag, more tickets</dd>
     <dt>vault</dt><dd>10% of every box is set aside. <a href="#" data-open="vaultSheet">now <span id="vault">0 sol</span></a>. milestone boxes open it</dd>
-    <dt>milestones</dt><dd>first box after 50K, 100K, 250K, 500K, 1M cap and up is epic or better, takes 20% of the vault, and burns 10% of what is left</dd>
-    <dt>burn</dt><dd>10% of every box buys $pullit and burns it. the bot cannot sell, only buy and burn</dd>
-    <dt>reserve</dt><dd>the box bought $pullit at launch. it can only burn it: 10% at 50K, 125K, 200K and 350K cap</dd>
-    <dt>fees</dt><dd>80% to the box, 20% runs the agent and the team. leftovers roll into the next box</dd>
+    <dt>burn</dt><dd>10% of every box buys $pullit and burns it</dd>
+    <dt>fees</dt><dd>80% to the box, 20% to the dev</dd>
   </dl>
-  <p class="fine">a bag counts up to 1% of supply, max 10% of all tickets per wallet. pools and our wallets are never in. if the box ever stops, everything left goes out in a final box. not financial advice. its a box.</p>
+  <p class="fine">pools and our wallets are never in. not financial advice.</p>
   <dl id="wallets"></dl>
 </div></dialog>
 
@@ -360,7 +356,7 @@ function render() {
     setText('bl1', 'next box is filling'); setText('bl2', '');
     say(won.posts?.[won.posts.length - 1] || `${short(won.draw.winner)} pulled ${won.draw.tier}. next box is filling`);
   } else if (!mint) {
-    setText('kick', 'box #1'); setText('big', 'soon'); setText('sline', 'a random holder gets it, in a coin the ai picks');
+    setText('kick', 'box #1'); setText('big', 'soon'); setText('sline', "box agent picks the coin you'll get");
     $('fill').style.width = '0'; setText('bl1', 'not live yet'); setText('bl2', '');
     say('not live yet. soon');
   } else if (s.phase === 'done') {
@@ -378,7 +374,7 @@ function render() {
   } else {
     setText('kick', `box #${id} is filling`);
     setText('big', fmt(have, 2) + ' sol');
-    setText('sline', p.milestoneBox ? `milestone box: epic or better` : 'a random holder gets it, in a coin the ai picks');
+    setText('sline', p.milestoneBox ? `milestone box: epic or better` : "box agent picks the coin you'll get");
     $('fill').style.width = Math.round(pct * 100) + '%';
     setText('bl1', need ? `opens at ${fmt(need, 2)} sol` : 'opens when full');
     setText('bl2', Math.round(pct * 100) + '%');
@@ -468,7 +464,7 @@ function render() {
   }
 
   const dl = $('wallets'); dl.replaceChildren();
-  for (const [k, v] of [['box', p.box], ['team', p.team], ['dev', p.dev]]) if (v) dl.append(el('dt', { textContent: k }), el('dd', {}, el('a', { href: acct(v), target: '_blank', rel: 'noopener', textContent: v })));
+  for (const [k, v] of [['box', p.box], ['dev', p.dev]]) if (v) dl.append(el('dt', { textContent: k }), el('dd', {}, el('a', { href: acct(v), target: '_blank', rel: 'noopener', textContent: v })));
 }
 
 async function load() { try { S = await api('/api/state'); render(); } catch { setText('bl1', 'cant reach the box. retrying'); } }
