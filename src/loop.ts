@@ -366,12 +366,17 @@ export class Bot {
    * Posts on x, at most X_MAX_PER_DAY (default 3) in any 24 hours. `important` posts (big wins,
    * milestones) may use the last slot of the day; shitposts and teasers leave it free.
    */
-  async post(text: string, replies: string[] = [], evenInDryRun = false, important = false): Promise<boolean> {
+  async post(
+    text: string,
+    replies: string[] = [],
+    evenInDryRun = false,
+    important: boolean | "always" = false,
+  ): Promise<boolean> {
     if (!text.trim()) return false;
     const now = Date.now();
     const cap = Number(this.env.X_MAX_PER_DAY) || 3;
     const today = (this.state.xPostedAt ?? []).filter((t) => now - t < 86_400_000);
-    if (today.length >= cap || (!important && today.length >= cap - 1)) {
+    if (important !== "always" && (today.length >= cap || (!important && today.length >= cap - 1))) {
       this.log(`[x cap ${cap}/day, skipped] ${text}`);
       return false;
     }
@@ -1605,7 +1610,8 @@ who you are, only for context: a pink pixel gift box on solana, not live yet. tr
     const n = this.state.history.length;
     const text = `dex paid for $PULLIT\n\n${n} boxes opened, ${n} holders paid in random coins.\nthe box keeps filling from every trade.\n\nhold, wait, maybe it's yours.`;
     const replies = [`ca: ${this.env.MINT}\ndexscreener.com/solana/${this.env.MINT}\npullit.fun`];
-    if (await this.post(text, replies, false, true)) {
+    // a one-time announcement: it skips the daily cap
+    if (await this.post(text, replies, false, "always")) {
       d.posted = true;
       this.feed("info", "dex paid. i have a profile picture now, unlike your burner");
     }
