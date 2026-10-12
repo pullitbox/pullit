@@ -462,7 +462,7 @@ function render() {
     setText('big', fmt(sol(pk.budgetLamports), 2) + ' sol');
     setText('sline', 'block ' + pk.targetSlot.toLocaleString('en-US') + ' picks the holder');
     $('fill').style.width = '100%';
-    setText('bl1', left > 0 ? `opens in ~${left}s` : 'opening…'); setText('bl2', '');
+    setText('bl1', left > 0 ? `opens in ~${left}s` : 'opening…'); setText('bl2', pk.seal ? 'seal ' + pk.seal.slice(0, 8) + '…' + pk.seal.slice(-6) : '');
     say(pk.posts?.[0] || 'packed and sealed. even i cant peek');
   } else {
     setText('kick', `box #${id} is filling`);
