@@ -253,16 +253,16 @@ async function top(env: Env) {
   }
   const winners = [...won.entries()]
     .sort((a, b) => (b[1].lamports > a[1].lamports ? 1 : b[1].lamports < a[1].lamports ? -1 : 0))
-    .slice(0, 10)
+    .slice(0, 5)
     .map(([w, v]) => ({ wallet: w, sol: solStr(v.lamports, 3), wins: v.wins, best: v.best }));
   const holders = (snap?.rows ?? [])
     .filter((r) => !excluded.has(r[0]))
     .sort((a, b) => b[2] - a[2])
-    .slice(0, 10)
+    .slice(0, 5)
     .map((r) => ({ wallet: r[0], heldMinutes: r[2], multiplier: r[3] }));
   const unlucky = Object.entries(state?.misses ?? {})
     .sort((a, b) => b[1] - a[1])
-    .slice(0, 10)
+    .slice(0, 5)
     .map(([w, n]) => ({ wallet: w, boxes: n }));
   return { winners, holders, unlucky, at: snap?.at };
 }
