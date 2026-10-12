@@ -333,7 +333,7 @@ html:has(dialog[open]),body:has(dialog[open]){overflow:hidden}
     <dt>what</dt><dd>10% of everything that goes into a box is set aside here. it sits in the box wallet, on chain</dd>
     <dt>why</dt><dd>so some pulls are way bigger than the box. one lucky holder walks off with a chunk</dd>
     <dt>grows</dt><dd>every box adds to it. it only goes down when something opens it</dd>
-    <dt>opens</dt><dd>milestone boxes give 20% to the winner and burn another 10%: bought back and gone. the rest? something opens it. you will see</dd>
+    <dt>opens</dt><dd>milestone boxes give 20% to the winner and burn another 10%: bought back and gone. the rest goes to the bond box: when $PULLIT bonds, the whole vault goes into one box, epic or better</dd>
   </dl>
 </div></dialog>
 
@@ -429,7 +429,7 @@ function render() {
   } else {
     setText('kick', `box #${id} is filling`);
     setText('big', down(have) + ' sol');
-    setText('sline', p.milestoneBox ? `milestone box: epic or better` : "box agent picks the coin you'll get");
+    setText('sline', p.bondBox ? `bond box: the whole vault, epic or better` : p.milestoneBox ? `milestone box: epic or better` : "box agent picks the coin you'll get");
     $('fill').style.width = Math.round(pct * 100) + '%';
     setText('bl1', need ? `opens at ${fmt(need, 2)} sol` : 'opens when full');
     setText('bl2', Math.round(pct * 100) + '%');
@@ -438,7 +438,7 @@ function render() {
     if (fresh) say(last.posts?.[last.posts.length - 1] || `${short(last.draw.winner)} pulled ${last.draw.tier}. next box is filling`);
     else say(n < 30 ? 'im mostly air right now. trades fill me' : n < 80 ? `${n}% full. i can feel it` : `${n}%. almost. dont leave`);
   }
-  const badge = won || !mint || pk ? '' : p.milestoneBox ? `milestone box · ${capShort(p.milestoneBox)} cap` : p.frenzy ? `frenzy ${p.frenzy}/3 · better odds` : '';
+  const badge = won || !mint || pk ? '' : p.bondBox ? 'bond box · whole vault' : p.milestoneBox ? `milestone box · ${capShort(p.milestoneBox)} cap` : p.frenzy ? `frenzy ${p.frenzy}/3 · better odds` : '';
   $('badge').hidden = !badge; setText('badge', badge);
 
   // numbers
@@ -572,7 +572,7 @@ async function recompute(b) {
   const odds = b.odds || TIERS.map((x) => x.pct);
   let t = 0, tier = 'common';
   for (let i = 0; i < TIERS.length; i++) { t += odds[i]; if (n < t) { tier = TIERS[i].key; break; } }
-  if (b.milestone && (tier === 'common' || tier === 'rare')) tier = 'epic';
+  if ((b.milestone || b.bond) && (tier === 'common' || tier === 'rare')) tier = 'epic';
   const seal = b.salt ? await sha256(`${b.plan.common.mint}|${b.plan.rare.mint}|${b.salt}`) : '';
   return { seed, winner, tier, total, seal };
 }
@@ -596,7 +596,7 @@ async function openBox(id) {
     el('dt', { textContent: 'blockhash' }), el('dd', { textContent: d.blockhash }),
     el('dt', { textContent: 'seed' }), el('dd', { textContent: d.seed }));
   const odds = (b.odds || TIERS.map((t) => t.pct)).join(' / ');
-  const how = el('pre', { textContent: `seal = sha256(common mint | rare mint | salt)\nseed = sha256(blockhash:${b.boxId})\nwinner = weighted pick by tickets, wallets sorted a-z\ntier = seed[13..21] mod 100 → ${odds}${b.frenzy ? ` (frenzy ${b.frenzy})` : ''}${b.milestone ? '\nmilestone box: common or rare becomes epic' : ''}` });
+  const how = el('pre', { textContent: `seal = sha256(common mint | rare mint | salt)\nseed = sha256(blockhash:${b.boxId})\nwinner = weighted pick by tickets, wallets sorted a-z\ntier = seed[13..21] mod 100 → ${odds}${b.frenzy ? ` (frenzy ${b.frenzy})` : ''}${b.milestone || b.bond ? `\n${b.bond ? 'bond' : 'milestone'} box: common or rare becomes epic` : ''}` });
   const res = el('div', { className: 'muted', textContent: b.rows.length ? '' : 'ticket list for this box isnt stored, cant recompute' });
   const btn = el('button', { className: 'pbtn px', type: 'button', textContent: 'check it myself', disabled: !b.rows.length });
   btn.onclick = async () => {

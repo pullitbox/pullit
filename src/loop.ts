@@ -70,6 +70,7 @@ export interface BoxRecord {
   odds?: number[]; // common/rare/epic/secret %, locked when the box was sealed (frenzy)
   frenzy?: number; // frenzy level when sealed
   milestone?: number; // market cap in USD this box celebrates: epic or better, plus vault
+  bond?: boolean; // the bond box: the whole vault, epic or better
   burnLamports?: string; // part of the box spent on buyback and burn
   burn?: { buySig: string; burnSig: string; amount: string; lamports: string; fromVault?: string };
   // progress, so a retry never pays twice: signed (inflight), landed (coin), buyback bought, burn done
@@ -135,7 +136,8 @@ export interface State {
   reserve?: { initial: string; left: string; burns: { at: string; sig: string; amount: string; milestone: number }[] };
   nextTeaseAt?: number; // before launch: when the next teaser goes out on x
   xPostedAt?: number[]; // times of the x posts of the last 24 hours, for the daily cap
-  dexPaid?: { posted?: boolean; checkedAt?: number }; // the one "dex paid" post, once dexscreener confirms it
+  dexPaid?: { posted?: boolean; checkedAt?: number };
+  bond?: { at?: number; queued?: boolean; checkedAt?: number }; // migration to pumpswap: the next box gets the whole vault // the one "dex paid" post, once dexscreener confirms it
   recapPosted?: boolean; // the first-hour recap went out
   teaseUsed?: number[]; // hand-written teasers already posted this round
   teaseTopics?: string[]; // topics of the last pre-launch posts, oldest first
@@ -166,6 +168,7 @@ export interface State {
     nextMilestone?: number;
     entryUsd?: number; // bag needed to be in the draw for this box
     milestoneBox?: number; // the box that is filling is a milestone box for this market cap
+    bondBox?: boolean; // the box that is filling is the bond box
     reserve?: { initial: string; left: string }; // launch reserve, raw $PULLIT
     burned?: { lamports: string; tokens: string };
   };
@@ -980,6 +983,7 @@ export class Bot {
       this.state.pub.vaultLamports = vault.toString();
       this.state.pub.entryUsd = this.entry();
       this.state.pub.milestoneBox = this.state.milestoneQueue?.[0];
+      this.state.pub.bondBox = !!this.state.bond?.queued || undefined;
       this.state.pub.updatedAt = new Date().toISOString();
     }
     if (!final && budget < threshold) {
@@ -1014,7 +1018,10 @@ export class Bot {
       : plan.post;
     // locked now, before the draw block exists: odds from the frenzy level, milestone, buyback size
     const frenzy = this.state.frenzy ?? 0;
-    const milestone = final ? undefined : this.state.milestoneQueue?.[0];
+    // the bond box goes first; a milestone waiting at the same time takes the box after it
+    const bond = !final && !!this.state.bond?.queued;
+    if (bond) this.state.bond!.queued = false;
+    const milestone = final || bond ? undefined : this.state.milestoneQueue?.[0];
     if (milestone) this.state.milestoneQueue = this.state.milestoneQueue!.slice(1);
     const burnLamports = final ? 0n : (budget * BigInt(BOOST.burnPct)) / 100n;
     this.state.pending = {
@@ -1023,6 +1030,7 @@ export class Bot {
       odds: oddsAt(frenzy),
       frenzy,
       milestone,
+      ...(bond ? { bond: true } : {}),
       burnLamports: burnLamports.toString(),
       budgetLamports: budget.toString(),
       seal,
@@ -1217,7 +1225,7 @@ export class Bot {
       const tip = await this.rpc.call<number>("getSlot", [{ commitment: "confirmed" }]);
       if (tip < p.targetSlot + 2) return; // block not there yet, next tick
       const bh = await blockhashAt(this.rpc, p.targetSlot);
-      p.draw = await draw(p.rows, p.boxId, bh.slot, bh.blockhash, p.odds, !!p.milestone);
+      p.draw = await draw(p.rows, p.boxId, bh.slot, bh.blockhash, p.odds, !!p.milestone || !!p.bond);
       await save();
     }
     const d = p.draw;
@@ -1231,7 +1239,7 @@ export class Bot {
       bank,
       vault,
       !!p.final,
-      p.milestone ? BOOST.milestoneVaultPct : 0,
+      p.bond ? 100 : p.milestone ? BOOST.milestoneVaultPct : 0, // the bond box empties the vault
     );
     const lamports = fromBank + fromVault;
     // a milestone box also burns a slice of what is left in the vault, on top of the usual 10% of the box
@@ -1382,7 +1390,11 @@ export class Bot {
     const extra = fromVault > 0n ? ` (${sol(fromVault)} from the vault)` : "";
     const both = `${sol(lamports)} sol of $${symbol}`;
     const tx = prize.sig;
-    const ms = p.milestone ? ` milestone box for ${usdShort(p.milestone)} cap.` : "";
+    const ms = p.bond
+      ? " the bond box, the whole vault."
+      : p.milestone
+        ? ` milestone box for ${usdShort(p.milestone)} cap.`
+        : "";
     const winPlain = `box #${p.boxId} opened. ${short(d.winner)} pulled ${d.tier}: ${both}${extra}. block ${d.slot} decided it`;
     const winText =
       (await this.xLine(
@@ -1395,7 +1407,7 @@ export class Bot {
     const proof = `${p.plan.reveal ? [...p.plan.reveal].slice(0, 120).join("") + "\n\n" : ""}https://pullit.fun/box/${p.boxId}`;
     const resultPost = winText;
     // on x only the wins worth a post: epic, secret, milestone and the final box (x posts are capped per day)
-    if (d.tier === "epic" || d.tier === "secret" || p.milestone || p.final)
+    if (d.tier === "epic" || d.tier === "secret" || p.milestone || p.bond || p.final)
       await this.post(winText, [proof], false, true);
     await this.line(
       "win",
@@ -1591,6 +1603,37 @@ who you are, only for context: a pink pixel gift box on solana, not live yet. tr
     if ((this.state.phase as State["phase"]) === "drawing") return this.drawSoon();
   }
 
+  /** Watches for the migration to pumpswap. Once it happens, the next box is the bond box. */
+  async bondWatch(now = Date.now()) {
+    const b = (this.state.bond ??= {});
+    if (b.at || this.dry || !this.env.MINT) return;
+    if (b.checkedAt && now - b.checkedAt < 60_000) return;
+    b.checkedAt = now;
+    try {
+      const r = await fetch(`https://api.dexscreener.com/tokens/v1/solana/${this.env.MINT}`);
+      const pairs = (await r.json()) as { dexId?: string }[];
+      if (!Array.isArray(pairs) || !pairs.some((p) => p.dexId === "pumpswap")) return;
+    } catch {
+      return;
+    }
+    b.at = now;
+    b.queued = true;
+    const vault = sol(BigInt(this.state.vaultLamports ?? "0"));
+    this.log(`bonded: the next box is the bond box (vault ${vault} sol)`);
+    await this.line(
+      "box",
+      `$PULLIT just bonded. the next box is the bond box: the whole vault, ${vault} sol, goes into it, and whoever pulls it gets epic or better`,
+      [vault],
+      `bonded. next box gets the whole vault, ${vault} sol. epic or better guaranteed`,
+    );
+    await this.post(
+      `$PULLIT bonded.\n\nthe next box is the bond box: the whole vault (${vault} sol) goes in, epic or better guaranteed.\nhold $${this.entry()}+ to be in the draw.`,
+      ["pullit.fun"],
+      false,
+      "always",
+    );
+  }
+
   /** Posts "dex paid" once, and only after dexscreener itself shows the paid token profile. */
   async dexPaid(now = Date.now()) {
     const d = (this.state.dexPaid ??= {});
@@ -1671,6 +1714,7 @@ who you are, only for context: a pink pixel gift box on solana, not live yet. tr
       }
     }
     await this.dexPaid(now);
+    await this.bondWatch(now);
     if (this.state.phase === "drawing") return this.finishBox();
     if (this.claimDue(now)) await this.claimAndSplit();
     if (now - this.state.lastHoldersAt >= (this.dry ? LOOP.dry.holdersEveryMin : LOOP.holdersEveryMin) * 60_000) {
