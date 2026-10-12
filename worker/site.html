@@ -22,7 +22,6 @@ background-image:radial-gradient(rgba(255,141,192,.10) 1px,transparent 1.4px);ba
 a{color:inherit;text-decoration:none}
 button,input{font:inherit;color:inherit}
 .px{font-family:'Silkscreen',monospace;font-weight:400}
-.test{background:var(--gold);color:var(--ink);text-align:center;font-size:12px;padding:6px}
 .t-common{color:var(--common)}.t-rare{color:var(--rare)}.t-epic{color:var(--epic)}.t-secret{color:var(--secret)}
 .muted{color:var(--muted)}.dim{color:var(--dim)}
 
@@ -221,7 +220,6 @@ html:has(dialog[open]),body:has(dialog[open]){overflow:hidden}
 </style>
 </head>
 <body>
-<div class="test px" id="testBar" hidden>test mode. simulated fees, no real prizes</div>
 <div class="wrap">
 <header>
   <span></span>
@@ -370,7 +368,6 @@ function render() {
   const s = S; if (!s) return;
   const p = s.pub || {};
   if (p.mint && p.mint !== mint) { mint = p.mint; $('caText').textContent = short(mint); $('buy').href = 'https://pump.fun/coin/' + mint; }
-  $('testBar').hidden = !s.dry;
   const pk = s.pending;
   const id = pk ? pk.boxId : s.nextBoxId || 1;
   const have = sol(p.boxLamports), need = sol(p.thresholdLamports);
