@@ -111,7 +111,7 @@ footer{font-size:11px;color:var(--dim);margin-top:22px}
 .mini h3 button{background:none;border:0;color:var(--muted);font-size:11px;cursor:pointer;padding:0}
 .mini h3 button:hover{color:var(--pink)}
 /* kept in the page for the script, not shown: numbers, odds and the small print live in rules */
-.stats,.oddsh,.odds,footer,.badge{display:none!important}
+main .stats,main .oddsh,main .odds,footer,main .badge{display:none!important}
 /* desktop */
 @media (min-width:900px){
   .tick{font-size:14px;padding:8px 0}
@@ -145,6 +145,8 @@ dialog{background:var(--bg);color:var(--text);border:3px solid var(--pink);box-s
 dialog::backdrop{background:rgba(5,4,6,.8)}
 .sheet{padding:18px;display:flex;flex-direction:column;gap:12px;font-size:13px}
 .sheet h2{margin:0;font-size:20px;font-weight:400;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.sheet .x:focus:not(:focus-visible){outline:none}
+#answer:empty{display:none}
 .sheet .x{background:none;border:2px solid var(--line);width:40px;height:40px;cursor:pointer;color:var(--muted);flex:0 0 auto}
 .sheet dl{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:0}
 .sheet dt{color:var(--muted)}
@@ -161,7 +163,7 @@ dialog::backdrop{background:rgba(5,4,6,.8)}
 .pbtn:disabled{opacity:.4;cursor:default}
 .ok{color:var(--mint)}.bad{color:#ff6b6b}
 .check{display:flex;border:2px solid var(--line)}
-.check input{flex:1;min-width:0;background:var(--panel);border:0;color:var(--text);font-size:12px;padding:12px 10px;outline:none}
+.check input{flex:1;min-width:0;background:var(--panel);border:0;color:var(--text);font-size:16px;padding:12px 10px;outline:none}
 .check input::placeholder{color:var(--dim)}
 .check button{background:var(--pink);color:var(--ink);border:0;padding:0 14px;font-size:11px;cursor:pointer;min-height:44px}
 .answer{font-size:13px;line-height:1.5;min-height:20px}
