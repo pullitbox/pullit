@@ -14,7 +14,9 @@ import {
 } from "./solana.ts";
 
 export const FEES = {
-  boxSharePct: 80, // the rest (20%) goes to the team wallet
+  boxSharePct: 80, // after the bond. the rest (20%) goes to the team wallet
+  lowCapUsd: 15_000, // before the bond, under this market cap...
+  lowCapBoxPct: 50, // ...half the fees go to the box and half stay in the dev wallet. at or above it, all of it
   keepInDevLamports: 20_000_000n, // 0.02 SOL stays for tx fees
   minSplitLamports: 5_000_000n, // don't split dust, wait until 0.005 SOL accumulated
   priorityFeeSol: 0.0001, // claims kept dropping when the chain got busy at 0.00001

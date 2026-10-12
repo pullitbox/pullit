@@ -255,3 +255,16 @@ test("journal drops entries of commits that were rewritten", async () => {
   );
   assert.equal(state.journal[1].text, "bigger coin pool");
 });
+
+test("fee share: half under $15k before the bond, all of it at $15k+, 80% after the bond", () => {
+  const b = bot();
+  const s = (b as unknown as { state: ReturnType<typeof newState> }).state;
+  assert.equal(b.boxPct(), 100, "unknown cap: all to the box");
+  s.market = { mcap: 12_400, volume1h: 0, at: "" };
+  assert.equal(b.boxPct(), 50);
+  s.market = { mcap: 15_000, volume1h: 0, at: "" };
+  assert.equal(b.boxPct(), 100);
+  s.bond = { at: 1 };
+  s.market = { mcap: 12_000, volume1h: 0, at: "" };
+  assert.equal(b.boxPct(), 80);
+});
