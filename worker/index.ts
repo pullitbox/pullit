@@ -57,7 +57,7 @@ interface Env extends BotEnv {
 type Snap = NonNullable<State["lastSnap"]>;
 
 // longer than the slowest possible tick (AI lines, packing, waiting for the draw block)
-const LOCK_MS = 15 * 60_000;
+const LOCK_MS = 4 * 60_000; // a deploy can kill a tick mid-run: its lock must not freeze the bot for long
 
 async function run(env: Env, claimOnly = false) {
   const lock = await env.STATE.get("lock");
