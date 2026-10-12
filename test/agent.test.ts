@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { fresher, packBox, rollTier, validate, TIERS } from "../src/agent.ts";
+import { fresher, packBox, rollTier, validate, worthy, TIERS } from "../src/agent.ts";
 import type { ScanResult, Candidate } from "../src/scanner.ts";
 
 const cand = (symbol: string, mint: string, bucket: "fresh" | "established"): Candidate => ({
@@ -188,4 +188,15 @@ test("x prompt does not push the no-sell joke, teaser topics are unique", async 
   const ids = TEASE_TOPICS.map((t) => t.id);
   assert.equal(new Set(ids).size, ids.length);
   assert.ok(ids.length >= 10);
+});
+
+test("worthy: one coin per ticker (the biggest), no coin far below the best score", () => {
+  const big = { ...cand("SI", "A", "established"), mcap: 23e6, score: 50 };
+  const copy = { ...cand("si", "B", "established"), mcap: 1.6e6, score: 60 };
+  const dying = { ...cand("QCAT", "C", "fresh"), score: 5 };
+  const ok = { ...cand("W", "D", "fresh"), score: 66 };
+  const out = worthy([big, copy, dying, ok]);
+  assert.deepEqual(out.map((c) => c.mint).sort(), ["A", "D"]);
+  // the best coin always stays, even alone
+  assert.equal(worthy([dying]).length, 1);
 });

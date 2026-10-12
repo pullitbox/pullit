@@ -92,6 +92,24 @@ export function buildPrompt(scan: ScanResult, boxId: number, recentSymbols: stri
 }
 
 /** Where the rare coin comes from: the meta runners plus the hand-picked big coins, mixed together. */
+/**
+ * Only coins worth giving away: one coin per ticker (the biggest, so a copycat with the same name never
+ * wins over the real one) and nothing far below the best score of its list (a dying coin that only got
+ * in because the list was short). The best coin always stays.
+ */
+export function worthy(list: Candidate[]): Candidate[] {
+  const byTicker = new Map<string, Candidate>();
+  for (const c of list) {
+    const k = c.symbol.toLowerCase();
+    const had = byTicker.get(k);
+    if (!had || c.mcap > had.mcap) byTicker.set(k, c);
+  }
+  const one = [...byTicker.values()].sort((a, b) => b.score - a.score);
+  if (!one.length) return one;
+  const floor = Math.max(25, one[0].score * 0.4);
+  return one.filter((c, i) => i === 0 || c.score >= floor);
+}
+
 export function rarePool(scan: ScanResult): Candidate[] {
   const seen = new Set(scan.established.map((c) => c.mint));
   return [...scan.established, ...(scan.hot ?? []).filter((c) => !seen.has(c.mint))];
@@ -233,9 +251,9 @@ export async function packBox(
   if (scan.fresh.length === 0 || scan.established.length === 0) throw new Error("scanner returned an empty bucket");
   scan = {
     ...scan,
-    fresh: fresher(scan.fresh, recentSymbols),
+    fresh: fresher(worthy(scan.fresh), recentSymbols),
     // the big hand-picked coins sit in the same list as the meta runners, shuffled in
-    established: fresher(rarePool(scan), recentSymbols),
+    established: fresher(worthy(rarePool(scan)), recentSymbols),
     hot: [],
   };
   if (!apiKey) return { plan: fallback(scan, boxId, recentSymbols), problems: ["no OPENROUTER_API_KEY"] };
