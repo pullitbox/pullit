@@ -84,7 +84,7 @@ async function pinTweet(env: Env, url: string): Promise<Pin> {
       const t = (await r.json()) as {
         text?: string;
         created_at?: string;
-        entities?: { media?: { url: string }[] };
+        entities?: { media?: { url: string }[]; urls?: { url: string; display_url: string }[] };
         mediaDetails?: {
           type: string;
           media_url_https: string;
@@ -93,6 +93,7 @@ async function pinTweet(env: Env, url: string): Promise<Pin> {
       };
       let text = t.text ?? "";
       for (const m of t.entities?.media ?? []) text = text.replace(m.url, ""); // the t.co link of the media itself
+      for (const u of t.entities?.urls ?? []) text = text.replace(u.url, u.display_url); // short links read as what they are
       pin.text = text.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").trim();
       if (t.created_at)
         pin.at = new Date(t.created_at).toLocaleDateString("en-US", {
@@ -122,6 +123,7 @@ async function pinTweet(env: Env, url: string): Promise<Pin> {
         .replace(/&amp;/g, "&")
         .replace(/&quot;/g, '"')
         .replace(/&#39;/g, "'")
+        .replace(/pic\.twitter\.com\/\w+/g, "")
         .trim();
     } catch {
       // no text either: the site skips it
@@ -413,7 +415,7 @@ export default {
       );
       // tweets pinned by hand with `npm run tweet -- <link>`, shown on the site next to the bot's own posts
       const pins = live ? ((await env.STATE.get("xpins", "json")) as string[] | null) : null;
-      const ok = (pins ?? []).filter((u) => /^https:\/\/(x|twitter)\.com\/\w+\/status\/\d+$/.test(u)).slice(0, 2);
+      const ok = (pins ?? []).filter((u) => /^https:\/\/(x|twitter)\.com\/\w+\/status\/\d+$/.test(u)).slice(0, 3);
       return json({ ...st, pins: await Promise.all(ok.map((u) => pinTweet(env, u))) });
     }
     if (url.pathname === "/api/wallet") {
