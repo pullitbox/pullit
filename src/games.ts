@@ -2,16 +2,17 @@
 // - the clock: every buy of $50+ resets a 3 minute timer. when it runs out, the last buyer
 //   (if they still hold what they bought) takes the clock pot.
 // - lucky buys: every buy of $50+ is rolled against a block that did not exist yet when they bought.
-//   1 in 15 wins a small prize, paid 7 minutes later if they still hold.
+//   1 in 15 wins half the lucky pot, paid 7 minutes later if they still hold.
 // Pure helpers live here; the bot in loop.ts does the network and the payments.
 
 export const GAMES = {
   clockPct: 10, // of what goes into the box, this share feeds the clock pot
-  luckyPct: 5, // and this share the lucky pot
+  luckyPct: 10, // and this share the lucky pot
   clockMinutes: 3,
   minBuyUsd: 50,
   luckyOdds: 15, // 1 in this many qualifying buys
-  luckyPrizeLamports: 20_000_000n, // 0.02 SOL per lucky buy (or the whole pot if it is smaller than that... never: we wait)
+  luckyPotPct: 50, // a lucky buy takes half the lucky pot
+  luckyPrizeLamports: 20_000_000n, // ...and never less than 0.02 SOL: below that the pot keeps growing first
   luckyCooldownMinutes: 60, // one lucky win per wallet per hour
   holdMinutes: 7, // a win only pays if the buyer still holds this long after the buy
   keepRatio: 0.9, // ...and still has at least 90% of what they bought

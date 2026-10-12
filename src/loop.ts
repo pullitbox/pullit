@@ -1785,7 +1785,8 @@ who you are, only for context: a pink pixel gift box on solana, not live yet. tr
     for (const b of due) {
       g.queue = g.queue.filter((x) => x.sig !== b.sig);
       if (now - (g.luckyLast[b.buyer] ?? 0) < GAMES.luckyCooldownMinutes * 60_000) continue;
-      if (BigInt(g.luckyPot) < GAMES.luckyPrizeLamports) continue;
+      const prize = (BigInt(g.luckyPot) * BigInt(GAMES.luckyPotPct)) / 100n;
+      if (prize < GAMES.luckyPrizeLamports) continue;
       const bh = await blockhashAt(this.rpc, b.slot + GAMES.rollDelaySlots, 20_000);
       const roll = await luckyRoll(b.sig, bh.blockhash);
       if (!roll.win) continue;
@@ -1793,7 +1794,7 @@ who you are, only for context: a pink pixel gift box on solana, not live yet. tr
         this.feed("win", `${short(b.buyer)} hit a lucky buy and sold before it paid. 7 minutes was too long for you`);
         continue;
       }
-      return this.gamesPay("lucky", b, GAMES.luckyPrizeLamports, roll.seed);
+      return this.gamesPay("lucky", b, prize, roll.seed);
     }
   }
 
