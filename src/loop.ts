@@ -31,7 +31,7 @@ import { BOOST, frenzyLevel, oddsAt, newMilestones, usdShort, volume1h } from ".
 import { findXAccount, zernioPost } from "./zernio.ts";
 
 export const LOOP = {
-  claimEverySec: 30, // the worker runs a claim-only pass 30s into every cron minute
+  claimEverySec: 15, // the worker runs claim passes at 15s, 30s and 45s into every cron minute
   holdersEveryMin: 5,
   topHoldersToInspect: 40, // pools and curves are always among the biggest holders
   vaultPct: 10, // of everything that goes into the box, this share is set aside in the vault
@@ -1538,11 +1538,14 @@ who you are, only for context: a pink pixel gift box on solana, not live yet. tr
     return now - this.state.lastClaimAt >= ((this.dry ? LOOP.dry.claimEverySec : LOOP.claimEverySec) - 5) * 1000;
   }
 
-  // the extra pass between cron ticks: only claim and split, nothing else
+  // the extra passes between cron ticks: claim, split and open the box when it is full
   async claimTick(now = Date.now()) {
     if (!this.env.MINT || this.state.mintSeen !== this.env.MINT) return;
     if (this.state.phase === "done" || this.state.phase === "drawing") return;
     if (this.claimDue(now)) await this.claimAndSplit();
+    // fees just landed: show them and open the box right away, not on the next cron minute
+    await this.openBox(false);
+    if ((this.state.phase as State["phase"]) === "drawing") return this.drawSoon();
   }
 
   async tick(now = Date.now()) {

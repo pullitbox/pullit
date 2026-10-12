@@ -16,7 +16,7 @@ import {
 export const FEES = {
   boxSharePct: 80, // the rest (20%) goes to the team wallet
   keepInDevLamports: 20_000_000n, // 0.02 SOL stays for tx fees
-  minSplitLamports: 20_000_000n, // don't split dust, wait until 0.02 SOL accumulated
+  minSplitLamports: 5_000_000n, // don't split dust, wait until 0.005 SOL accumulated
   priorityFeeSol: 0.00001,
   // Final Box: if claimed fees over the window are below this, the box closes for good
   finalWindowHours: 6,

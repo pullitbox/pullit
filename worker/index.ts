@@ -297,13 +297,15 @@ async function top(env: Env, preview: boolean) {
 
 export default {
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
-    // cron can't go below a minute: a second, claim-only pass 30s later
+    // cron can't go below a minute: claim passes every 15s in between
     ctx.waitUntil(
       (async () => {
         await run(env);
-        const wait = event.scheduledTime + 30_000 - Date.now();
-        if (wait > 0) await new Promise((r) => setTimeout(r, wait));
-        await run(env, true);
+        for (const at of [15_000, 30_000, 45_000]) {
+          const wait = event.scheduledTime + at - Date.now();
+          if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+          await run(env, true);
+        }
       })(),
     );
   },

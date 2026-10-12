@@ -23,7 +23,7 @@ The bot can only buy. It buys the prize for the winner and buys $PULLIT to burn 
 
 ## How it works
 
-1. **Fees fill the box.** Every 30 seconds the bot claims the creator fees of $PULLIT. 80% goes to the box wallet, 20% stays in the dev wallet (agent costs, servers, building). A small part of the box share is set aside in the vault.
+1. **Fees fill the box.** Every 15 seconds the bot claims the creator fees of $PULLIT. 80% goes to the box wallet, 20% stays in the dev wallet (agent costs, servers, building). A small part of the box share is set aside in the vault.
 2. **The AI packs it.** When the box is full, the agent scans the market, throws out anything that looks unsafe, and picks two coins: a fresh runner and a runner of the meta. It writes a joke about its picks on the site log, never the names.
 3. **The box is sealed.** The bot publishes a seal: `sha256(common mint | rare mint | salt)`. The contents cannot change after that without the seal breaking.
 4. **A future block decides.** The bot commits to a slot about 20 seconds ahead. When that block exists, its hash picks the winner (weighted by tickets) and the tier.
