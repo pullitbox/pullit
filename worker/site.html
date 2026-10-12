@@ -488,7 +488,7 @@ $('check').onsubmit = async (e) => {
     out.replaceChildren();
     const tip = r.ifBuy ? [' · ', el('b', { className: 'pk', textContent: `+$${r.ifBuy.addUsd} → ${r.ifBuy.sharePct}%` })] : [];
     if (r.status === 'in') {
-      out.append('youre in. ', el('b', { textContent: r.sharePct + '% chance' }), ` this box · ${r.multiplier}x${r.multiplier < r.maxMultiplier ? `, ${r.maxMultiplier}x in ${r.hoursToMax}h` : ''}${r.boosted ? ' · +25% fresh buy' : ''}`, ...tip);
+      out.append('youre in. ', el('b', { textContent: r.sharePct + '% chance' }), ` this box · ${r.multiplier}x${r.multiplier < r.maxMultiplier ? `, ${r.maxMultiplier}x in ${r.hoursToMax}h` : ''}`, ...tip);
     } else if (r.status === 'waiting') out.append('almost. in after ', el('b', { textContent: r.minutesLeft + ' more min' }), '. dont sell');
     else if (r.status === 'excluded') out.append('pool or our wallet. not in the draw');
     else if (r.short) out.append(`your bag is under $${r.minUsd} for this box. top it up`, ...tip);

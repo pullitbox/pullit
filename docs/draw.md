@@ -8,10 +8,10 @@ Every 5 minutes the bot takes a snapshot of all $PULLIT holders (Helius `getToke
 
 - a wallet needs a bag worth the entry of the box, valued at the current price: $20 for boxes up to 0.5 SOL, $50 up to 1.5, $75 above 1.5, $100 from 2.5, $250 from 5 (`entryUsd` in `src/holders.ts`). the hold timer runs for any bag of $20 or more
 - it must stay at $20+ for 7 minutes before its tickets count. dropping below $20 resets the timer
-- tickets = `min(bag, 1% of supply) × multiplier × buy boost`
+- tickets = `min(bag, 1% of supply) × multiplier`
 - the multiplier grows from 1x to 3x over the first 24 hours of holding
 - any sell (the bag shrinks by more than 0.5% between snapshots) puts the hold timer back to the minimum: the wallet stays in, at 1x
-- buy boost: if the bag grew in the last 15 minutes, 1.25, otherwise 1
+- buying right before a box opens gives no extra tickets
 - if one wallet would have more than 10% of all tickets, it is capped at 10% (repeated until nobody is over)
 - pools, the bonding curve and our own wallets are excluded. any big holder whose account is owned by a program (not a normal wallet) is excluded automatically
 

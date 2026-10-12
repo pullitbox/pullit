@@ -44,7 +44,6 @@ All numbers live in [`src/boost.ts`](src/boost.ts).
 - hold $PULLIT for 7 minutes. no claiming, no buttons
 - how much depends on the box: $20 for boxes up to 0.5 SOL, $50 up to 1.5, $75 above 1.5, $100 from 2.5, $250 from 5. a smaller bag keeps its hold time and joins again when a smaller box comes
 - the longer you hold, the more tickets, up to 3x at 24 hours
-- bought in the last 15 minutes before the box opens: +25% tickets
 - any sell puts your hold back to 1x. you stay in the draw
 - check your chance on the site: it also shows what $50 more would do
 - a bag counts up to 1% of supply, and no wallet can have more than 10% of all tickets
