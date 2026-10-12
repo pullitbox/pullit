@@ -6,7 +6,7 @@
 // Pure helpers live here; the bot in loop.ts does the network and the payments.
 
 export const GAMES = {
-  clockPct: 10, // of what goes into the box, this share feeds the clock pot
+  clockPct: 20, // of what goes into the box, this share feeds the clock pot
   luckyPct: 10, // and this share the lucky pot
   clockMinutes: 3,
   minBuyUsd: 50,

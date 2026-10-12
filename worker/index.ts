@@ -222,6 +222,10 @@ function publicState(s: State | null, repo?: string, dryRun = false, live = true
       endsAt: s.games.clock?.endsAt,
       lastBuyer: s.games.clock?.last[0]?.buyer,
       wins: s.games.wins.slice(-6).reverse(),
+      recent: (s.games.recent ?? [])
+        .slice(-5)
+        .reverse()
+        .map((b) => ({ buyer: b.buyer, usd: Math.round(b.usd), at: b.at, sig: b.sig })),
     },
     journal: (s.journal ?? [])
       .slice(-30)

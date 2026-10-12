@@ -115,6 +115,14 @@ h3.h .hb{display:flex;gap:14px}
 .games .k{color:var(--muted);font-size:11px}
 .games b.px{font-size:28px;color:var(--gold);font-weight:400}
 .games .dim{color:var(--muted)}
+.clkbox{position:relative;overflow:hidden}
+.clkbox.hot{border-color:#ff5f6d}
+.clkbox.hot #clkTime{color:#ff5f6d;animation:clkpulse .5s steps(2) infinite}
+@keyframes clkpulse{50%{opacity:.45}}
+.toast{position:absolute;left:0;right:0;top:0;background:var(--gold);color:var(--ink);font-size:12px;padding:6px 12px;transform:translateY(-110%);transition:transform .25s steps(4)}
+.toast.on{transform:none}
+.games .wins{display:flex;flex-direction:column;gap:2px;font-size:11px;color:var(--muted)}
+.games .wins a{color:inherit;text-decoration:none}.games .wins b{color:var(--gold);font-weight:400}
 @media (max-width:700px){.games{grid-template-columns:1fr}}
 .xs{margin-top:22px}
 .xp .xf{margin-bottom:8px}
@@ -279,8 +287,8 @@ html:has(dialog[open]),body:has(dialog[open]){overflow:hidden}
     <p class="how">hold <b id="entry">$20</b>+ for 7 min and you're in · <button type="button" data-open="meSheet">check eligibility</button></p>
     <p class="meta"><span class="bn">burned <b id="mBurn">0 sol</b></span><span>in the draw <b id="mIn">0</b></span></p>
     <section class="games" id="games" hidden>
-      <div><span class="k">the clock</span><b class="px" id="clkTime">--:--</b><span>every $50+ buy resets it to 3:00. the last buyer when it hits zero takes <b id="clkPot">0 sol</b> (pays from 0.01 sol)</span><span class="dim" id="clkLast"></span></div>
-      <div><span class="k">lucky buys</span><b class="px" id="lkPot">0 sol</b><span>every $50+ buy: 1 in 15 takes half this pot, paid if you still hold 7 min later</span></div>
+      <div class="clkbox" id="clkBox"><span class="k">the clock</span><div class="toast" id="clkToast"></div><b class="px" id="clkTime">--:--</b><span>every $50+ buy resets it to 3:00. the last buyer when it hits zero takes <b id="clkPot">0 sol</b> (pays from 0.01 sol)</span><span class="dim" id="clkLast"></span><span class="wins" id="clkWins"></span></div>
+      <div><span class="k">lucky buys</span><b class="px" id="lkPot">0 sol</b><span>every $50+ buy: 1 in 15 takes half this pot, paid if you still hold 7 min later</span><span class="wins" id="lkWins"></span></div>
     </section>
     <div class="oddsh">next box odds</div>
     <div class="odds" id="oddsRow"></div>
@@ -526,6 +534,19 @@ function render() {
     setText('clkPot', fmt(sol(G.clockPot), 3) + ' sol');
     setText('lkPot', fmt(sol(G.luckyPot), 3) + ' sol');
     setText('clkLast', G.lastBuyer ? 'last buyer ' + short(G.lastBuyer) : 'waiting for the first buy');
+    // a new $50+ buy: show who reset the clock
+    const R = G.recent || [];
+    if (R[0] && render.lastBuy !== undefined && R[0].sig !== render.lastBuy) {
+      const t = $('clkToast');
+      t.textContent = `${short(R[0].buyer)} reset the clock · $${R[0].usd} buy`;
+      t.classList.add('on'); clearTimeout(render.toastT); render.toastT = setTimeout(() => t.classList.remove('on'), 4500);
+    }
+    render.lastBuy = R[0]?.sig || null;
+    const W = G.wins || [];
+    const win = (k) => W.filter((w) => w.kind === k).slice(0, 2).map((w) => el('a', { href: 'https://solscan.io/tx/' + w.sig, target: '_blank', rel: 'noopener' },
+      short(w.to) + ' took ', el('b', { textContent: fmt(sol(w.lamports), 3) + ' sol' }), ' · ' + ago(w.at)));
+    $('clkWins').replaceChildren(...win('clock'));
+    $('lkWins').replaceChildren(...win('lucky'));
     clock();
   }
 
@@ -592,7 +613,7 @@ function render() {
 }
 
 async function load() { try { S = await api('/api/state'); render(); } catch { setText('bl1', 'cant reach the box. retrying'); } }
-function clock() { const e = render.clockEnds; if (!e) { setText('clkTime', '--:--'); return; } const r = Math.max(0, Math.round((e - Date.now()) / 1000)); setText('clkTime', r ? String(Math.floor(r / 60)).padStart(2, '0') + ':' + String(r % 60).padStart(2, '0') : '00:00'); }
+function clock() { const e = render.clockEnds; const r = e ? Math.max(0, Math.round((e - Date.now()) / 1000)) : 0; $('clkBox').classList.toggle('hot', !!e && r > 0 && r <= 30); if (!e) { setText('clkTime', '--:--'); return; } setText('clkTime', r ? String(Math.floor(r / 60)).padStart(2, '0') + ':' + String(r % 60).padStart(2, '0') : '00:00'); }
 setInterval(clock, 1000);
 load(); setInterval(load, 5_000); setInterval(() => S && (S.pending || Won.until > Date.now() - 2000) && render(), 1000);
 

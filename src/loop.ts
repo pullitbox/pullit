@@ -154,6 +154,7 @@ export interface State {
     luckyPot: string;
     clock?: { endsAt: number; last: Buy[] }; // last qualifying buyers, newest first
     queue: Buy[]; // buys waiting for their lucky roll
+    recent?: Buy[]; // the last qualifying buys, shown live on the site
     luckyLast: Record<string, number>; // last lucky win per wallet
     paying?: {
       kind: "clock" | "lucky";
@@ -1772,6 +1773,7 @@ who you are, only for context: a pink pixel gift box on solana, not live yet. tr
           const last = [b, ...(g.clock?.last ?? []).filter((x) => x.buyer !== b.buyer)].slice(0, 5);
           g.clock = { endsAt: b.at + GAMES.clockMinutes * 60_000, last };
           g.queue = [...g.queue, b].slice(-GAMES.queueMax);
+          g.recent = [...(g.recent ?? []), b].slice(-8);
         }
       } catch (e) {
         this.log(`buys read failed: ${(e as Error).message}`);

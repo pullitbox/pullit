@@ -50,7 +50,7 @@ Each opened box has its own page, `pullit.fun/box/<n>`. Shared on X or Telegram 
 - **Milestones.** The first box after the market cap crosses 50K, 100K, 250K, 500K, 1M, 2.5M, 5M or 10M is epic or better.
 - **Bond box.** When $PULLIT bonds and moves to PumpSwap, whoever pulls the next box gets epic or better.
 - **In the red.** A holder whose bag is worth less than the SOL they put in (buys minus sells, from their onchain history) gets 3x tickets until they are back up.
-- **The clock.** Every buy of $50+ resets a 3 minute timer. When it hits zero, the last buyer takes the clock pot (10% of every box), if they still hold at least 90% of what they bought.
+- **The clock.** Every buy of $50+ resets a 3 minute timer. When it hits zero, the last buyer takes the clock pot (20% of every box), if they still hold at least 90% of what they bought.
 - **Lucky buys.** Every buy of $50+ is rolled against a block that did not exist when they bought: 1 in 15 takes half the lucky pot (10% of every box goes into it), paid 7 minutes later if they still hold.
 - **Vault.** No longer filled: everything goes into the box. What is in it goes to a secret pull (0.5% per box), or into the final box if fees dry up.
 - **It can only buy.** Every box buys $PULLIT and burns it. The bot has no code that sells anything: every swap starts from SOL, and a test fails if that ever changes (`test/executor.test.ts`).
