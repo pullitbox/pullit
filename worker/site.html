@@ -110,6 +110,13 @@ h3.h .hb{display:flex;gap:14px}
 .foot a,.foot button{flex:1;text-align:center;border:2px solid var(--line);background:none;padding:9px 0;font-size:12px;color:var(--muted);cursor:pointer}
 .foot a:hover,.foot button:hover{border-color:var(--pink);color:var(--text)}
 .empty{color:var(--muted);font-size:12px}
+.xs{margin-top:22px}.hb a{color:inherit;text-decoration:none}
+.xf{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.xf li{border:2px solid var(--line);background:var(--panel);font-size:12px;line-height:1.5;white-space:pre-line}
+.xf li.empty{border:0;background:none;padding:0}
+.xf a{display:block;padding:10px 12px;color:inherit;text-decoration:none}
+.xf a:hover{border-color:var(--pink)}
+.xf time{display:block;margin-top:6px;color:var(--muted);font-size:11px}
 footer .dk-u,.dk-u{display:none}
 footer{font-size:11px;color:var(--dim);margin-top:22px}
 
@@ -277,6 +284,10 @@ html:has(dialog[open]),body:has(dialog[open]){overflow:hidden}
     <div class="op">
       <h3 class="h">opened <span class="hb"><button type="button" data-open="topSheet">top holders →</button><button type="button" data-open="allSheet" id="allBtn" hidden>all →</button></span></h3>
       <div class="cards" id="cards"><span class="empty">nothing opened yet</span></div>
+    </div>
+    <div class="xs">
+      <h3 class="h">on x <span class="hb"><a href="https://x.com/Pullitbox" target="_blank" rel="noopener">follow →</a></span></h3>
+      <ol class="xf" id="xFeed"><li class="empty">the box posts every big pull here</li></ol>
     </div>
   </div>
 </main>
@@ -487,6 +498,15 @@ function render() {
       $('tick').replaceChildren(el('div', { className: 'run', style: 'animation:none' }, el('span', { textContent: t })));
       $('cards').replaceChildren(el('span', { className: 'empty', textContent: 'nothing opened yet. be in the draw when the first one does' }));
     }
+  }
+
+  // the latest posts on x
+  const X = s.x || [];
+  const xkey = X.length ? X[0].at + X.length : '';
+  if (X.length && xkey !== render.xkey) {
+    render.xkey = xkey;
+    $('xFeed').replaceChildren(...X.slice(0, 4).map((p) => el('li', {}, el('a', { href: p.url || 'https://x.com/Pullitbox', target: '_blank', rel: 'noopener' },
+      p.text.length > 220 ? p.text.slice(0, 217) + '…' : p.text, el('time', { textContent: ago(p.at) + ' · open on x ↗' })))));
   }
 
   // journal

@@ -144,6 +144,7 @@ export interface State {
   // $PULLIT bought into the box at launch. the bot never sells it: 10% is burned at 50K, 125K, 200K and 350K cap
   reserve?: { initial: string; left: string; burns: { at: string; sig: string; amount: string; milestone: number }[] };
   nextTeaseAt?: number; // before launch: when the next teaser goes out on x
+  xFeed?: { at: string; text: string; url?: string }[]; // the latest posts on x, shown on the site
   xPostedAt?: number[]; // times of the x posts of the last 24 hours, for the daily cap
   dexPaid?: { posted?: boolean; checkedAt?: number };
   bond?: { at?: number; queued?: boolean; checkedAt?: number }; // migration to pumpswap: the next box is epic or better // the one "dex paid" post, once dexscreener confirms it
@@ -398,7 +399,10 @@ export class Bot {
     }
     try {
       this.xAccountId ??= (await findXAccount(this.env.ZERNIO_API_KEY))._id;
-      await zernioPost(this.env.ZERNIO_API_KEY, this.xAccountId, text, replies);
+      const r = await zernioPost(this.env.ZERNIO_API_KEY, this.xAccountId, text, replies);
+      this.state.xFeed = [...(this.state.xFeed ?? []), { at: new Date(now).toISOString(), text, url: r.url }].slice(
+        -12,
+      );
       this.state.xPostedAt = [...today, now];
       this.log(`posted: ${text}`);
       return true;

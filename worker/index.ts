@@ -139,6 +139,7 @@ function publicState(s: State | null, repo?: string, dryRun = false, live = true
     boxesOpened: s.history.length,
     givenLamports: s.history.reduce((a, b) => a + BigInt(b.prize?.lamports ?? "0"), 0n).toString(),
     burned: s.burned,
+    x: (s.xFeed ?? []).slice(-8).reverse(),
     journal: (s.journal ?? [])
       .slice(-30)
       .reverse()

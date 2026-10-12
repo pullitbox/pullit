@@ -42,7 +42,7 @@ export async function zernioPost(
   accountId: string,
   text: string,
   replies: string[] = [],
-): Promise<string> {
+): Promise<{ id: string; url?: string }> {
   if (/https?:\/\//i.test(text)) throw new Error("post contains a link; links cost more on X, put it in a reply");
   // x counts every link as 23 characters
   // x counts every link as 23 and most characters outside basic latin (emoji, cjk, "…") as 2
@@ -54,10 +54,15 @@ export async function zernioPost(
   const platform: Record<string, unknown> = { platform: "twitter", accountId };
   if (replies.length)
     platform.platformSpecificData = { threadItems: [text, ...replies].map((content) => ({ content })) };
-  const r = await call<{ _id?: string; post?: { _id: string }; status?: string }>(apiKey, "POST", "/posts", {
+  const r = await call<{
+    _id?: string;
+    post?: { _id: string; platforms?: { platformPostUrl?: string }[] };
+    platforms?: { platformPostUrl?: string }[];
+  }>(apiKey, "POST", "/posts", {
     content: text,
     publishNow: true,
     platforms: [platform],
   });
-  return r._id ?? r.post?._id ?? "unknown";
+  const url = (r.post?.platforms ?? r.platforms ?? []).find((p) => p.platformPostUrl)?.platformPostUrl;
+  return { id: r._id ?? r.post?._id ?? "unknown", url };
 }
