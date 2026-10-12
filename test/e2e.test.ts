@@ -339,6 +339,7 @@ class Chain {
       return new Response("not simulated", { status: 500 });
     }
     if (url.includes("openrouter.ai")) return json({ error: { message: "no credits" } }, 402);
+    if (url.includes("api.helius.xyz/v0/addresses/")) return json([]); // no buy history: nobody is in the red
     throw new Error(`http ${url} not simulated`);
   }
 }

@@ -3,7 +3,15 @@
 // crash or restart just continues from the saved state.
 
 import { Rpc, keypairFromSecret, LAMPORTS, type Keypair } from "./solana.ts";
-import { fetchHolders, computeTickets, entryUsd, type BagMemo, type HolderState, type TicketRow } from "./holders.ts";
+import {
+  fetchHolders,
+  fetchNetSolIn,
+  computeTickets,
+  entryUsd,
+  type BagMemo,
+  type HolderState,
+  type TicketRow,
+} from "./holders.ts";
 import { fetchToken, fetchUniverse, type JupToken } from "./jupiter.ts";
 import { hotCandidates, scan, type Candidate } from "./scanner.ts";
 import { HOT } from "./config.ts";
@@ -97,6 +105,7 @@ export interface State {
   prepack?: { boxId: number; at: number } & Awaited<ReturnType<Bot["pack"]>>;
   holderState: HolderState;
   bagMemo?: BagMemo; // last amounts and last buys, for the buy boost and the sell reset
+  redCache?: Record<string, { at: number; amount: number; netSol: number }>; // net SOL each holder put in, for the red bonus
   lastHoldersAt: number;
   lastClaimAt: number;
   misses?: Record<string, number>; // wallet -> boxes in a row it was in the draw and did not win
@@ -452,12 +461,52 @@ export class Bot {
     });
   }
 
+  /** Holders whose bag is worth less than the SOL they put in (from the cache, refreshed in refreshRed). */
+  async redSet(balances: { owner: string; amount: number }[], priceUsd: number): Promise<Set<string>> {
+    const cache = this.state.redCache ?? {};
+    const out = new Set<string>();
+    if (!Object.keys(cache).length) return out;
+    const sol = await fetchToken(this.env.JUP_API_KEY, MINTS.SOL).catch(() => null);
+    if (!sol?.usdPrice) return out;
+    for (const b of balances) {
+      const c = cache[b.owner];
+      if (!c || Math.abs(b.amount - c.amount) > c.amount * 0.005) continue; // bag changed since: wait for a refresh
+      if ((c.netSol / 1e9) * sol.usdPrice > b.amount * priceUsd) out.add(b.owner);
+    }
+    return out;
+  }
+
+  /** Looks up what each holder in the draw paid, a few wallets per snapshot. */
+  async refreshRed(rows: { owner: string; amount: number }[], now = Date.now()) {
+    if (this.dry || !this.env.MINT) return;
+    const cache = (this.state.redCache ??= {});
+    const due = rows.filter((r) => {
+      const c = cache[r.owner];
+      return !c || Math.abs(r.amount - c.amount) > c.amount * 0.005 || now - c.at > 30 * 60_000;
+    });
+    for (const r of due.slice(0, 20)) {
+      try {
+        cache[r.owner] = {
+          at: now,
+          amount: r.amount,
+          netSol: await fetchNetSolIn(this.env.HELIUS_API_KEY, r.owner, this.env.MINT),
+        };
+      } catch (e) {
+        this.log(`red check failed for ${short(r.owner)}: ${(e as Error).message}`);
+        break;
+      }
+    }
+    const live = new Set(rows.map((r) => r.owner));
+    for (const k of Object.keys(cache)) if (!live.has(k) && now - cache[k].at > 6 * 3_600_000) delete cache[k];
+  }
+
   async tickets() {
     const mint = this.env.MINT!;
     const token = await fetchToken(this.env.JUP_API_KEY, mint);
     if (!token?.usdPrice) throw new Error("no price for our mint yet");
     const balances = await fetchHolders(this.env.HELIUS_API_KEY, mint, token.decimals);
     await this.refreshExclusions(balances);
+    const red = await this.redSet(balances, token.usdPrice);
     const snap = computeTickets(balances, this.state.holderState, {
       priceUsd: token.usdPrice,
       totalSupply: token.totalSupply ?? 1e9,
@@ -465,6 +514,7 @@ export class Bot {
       minHoldMinutes: this.dry ? LOOP.dry.minHoldMinutes : undefined,
       memo: this.state.bagMemo ?? {},
       minUsd: this.entry(),
+      red,
     });
     this.state.bagMemo = snap.memo;
     await this.react(balances, token.totalSupply ?? 1e9, snap.state);
@@ -1721,7 +1771,8 @@ who you are, only for context: a pink pixel gift box on solana, not live yet. tr
     if (this.claimDue(now)) await this.claimAndSplit();
     if (now - this.state.lastHoldersAt >= (this.dry ? LOOP.dry.holdersEveryMin : LOOP.holdersEveryMin) * 60_000) {
       const s = await this.tickets();
-      this.log(`holders: ${s.holdersTotal}, eligible ${s.eligible}`);
+      this.log(`holders: ${s.holdersTotal}, eligible ${s.eligible}, in the red ${s.rows.filter((r) => r.red).length}`);
+      await this.refreshRed(s.rows);
       const lastInfo = [...(this.state.feed ?? [])].reverse().find((f) => f.tag === "info");
       if (s.eligible > 0 && (!lastInfo || now - Date.parse(lastInfo.at) > 30 * 60_000))
         await this.line(

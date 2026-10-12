@@ -106,3 +106,26 @@ test("bigger boxes need bigger bags, but a small bag keeps its hold timer", () =
   );
   assert.equal(snap.state.S, minAgo(60)); // still holding, timer kept for smaller boxes
 });
+
+test("holders in the red get the red multiplier on their tickets", () => {
+  const now = Date.now();
+  // plenty of other holders, so the 10% ticket cap does not flatten the two we compare
+  const others = Array.from({ length: 40 }, (_, i) => ({ owner: String(i).padStart(44, "x"), amount: 5_000_000 }));
+  const balances = [
+    { owner: "A".repeat(44), amount: 1_000_000 },
+    { owner: "B".repeat(44), amount: 1_000_000 },
+    ...others,
+  ];
+  const prev = Object.fromEntries(balances.map((b) => [b.owner, now - 60 * 60_000]));
+  const snap = computeTickets(balances, prev, {
+    priceUsd: 0.0001,
+    totalSupply: 1e9,
+    exclude: [],
+    now,
+    red: new Set(["B".repeat(44)]),
+  });
+  const a = snap.rows.find((r) => r.owner === "A".repeat(44))!;
+  const b = snap.rows.find((r) => r.owner === "B".repeat(44))!;
+  assert.ok(b.red && !a.red);
+  assert.ok(Math.abs(b.tickets / a.tickets - HOLDERS.redMultiplier) < 1e-9);
+});

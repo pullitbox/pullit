@@ -49,6 +49,7 @@ Each opened box has its own page, `pullit.fun/box/<n>`. Shared on X or Telegram 
 - **Frenzy.** The more $PULLIT trades in an hour, the better the odds of the next box. Four levels, from epic 19% up to epic 34%. Secret is always 1%. The odds are locked into the box when it is sealed, so they are part of the public record.
 - **Milestones.** The first box after the market cap crosses 50K, 100K, 250K, 500K, 1M, 2.5M, 5M or 10M is epic or better.
 - **Bond box.** When $PULLIT bonds and moves to PumpSwap, whoever pulls the next box gets epic or better.
+- **In the red.** A holder whose bag is worth less than the SOL they put in (buys minus sells, from their onchain history) gets 3x tickets until they are back up.
 - **Vault.** Only a secret pull (1% per box) opens the vault, and it takes all of it.
 - **It can only buy.** Every box buys $PULLIT and burns it. The bot has no code that sells anything: every swap starts from SOL, and a test fails if that ever changes (`test/executor.test.ts`).
 

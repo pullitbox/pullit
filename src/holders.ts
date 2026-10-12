@@ -17,6 +17,8 @@ export const HOLDERS = {
   buyBoostMinutes: 15,
   // any sell puts the hold multiplier back to 1x (you stay in the draw)
   sellResetsHold: true,
+  // holders whose bag is worth less than the SOL they put in get this many times the tickets
+  redMultiplier: 3,
 };
 
 /** The bag a wallet needs to be in the draw for a box of this size (SOL). Bigger box, bigger entry. */
@@ -46,6 +48,7 @@ export interface TicketRow {
   heldMinutes: number;
   multiplier: number;
   boosted: boolean; // bought in the last hour
+  red?: boolean; // in the red: the bag is worth less than what they paid
   tickets: number;
   sharePct: number;
 }
@@ -101,6 +104,39 @@ export async function fetchHolders(heliusKey: string, mint: string, decimals = 6
   return [...byOwner.entries()].map(([owner, amount]) => ({ owner, amount }));
 }
 
+/**
+ * Net SOL a wallet put into `mint` (lamports): what it paid on buys minus what it got on sells,
+ * from Helius parsed history. Transfers in without SOL count as free.
+ */
+export async function fetchNetSolIn(heliusKey: string, owner: string, mint: string): Promise<number> {
+  let net = 0;
+  let before: string | undefined;
+  for (let page = 0; page < 3; page++) {
+    const url = `https://api.helius.xyz/v0/addresses/${owner}/transactions?api-key=${heliusKey}&limit=100${before ? `&before=${before}` : ""}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Helius history ${res.status}`);
+    const txs = (await res.json()) as {
+      signature: string;
+      accountData?: {
+        account: string;
+        nativeBalanceChange?: number;
+        tokenBalanceChanges?: { mint: string; userAccount: string }[];
+      }[];
+    }[];
+    for (const t of txs) {
+      const data = t.accountData ?? [];
+      const touches = data.some((a) =>
+        (a.tokenBalanceChanges ?? []).some((c) => c.mint === mint && c.userAccount === owner),
+      );
+      if (!touches) continue;
+      net -= data.find((a) => a.account === owner)?.nativeBalanceChange ?? 0;
+    }
+    if (txs.length < 100) break;
+    before = txs[txs.length - 1].signature;
+  }
+  return net;
+}
+
 // ---------- tickets ----------
 
 export function holdMultiplier(heldMinutes: number): number {
@@ -137,6 +173,7 @@ export function computeTickets(
     minHoldMinutes?: number;
     minUsd?: number; // entry for the box being filled (entryUsd); the hold timer only needs HOLDERS.minHoldUsd
     memo?: BagMemo; // without it, buys and sells are not tracked
+    red?: Set<string>; // wallets in the red, they get HOLDERS.redMultiplier
   },
 ): TicketSnapshot {
   const now = opts.now ?? Date.now();
@@ -153,6 +190,7 @@ export function computeTickets(
     heldMinutes: number;
     multiplier: number;
     boosted: boolean;
+    red: boolean;
     raw: number;
   }[] = [];
 
@@ -178,6 +216,7 @@ export function computeTickets(
     if (usd < (opts.minUsd ?? HOLDERS.minHoldUsd)) continue; // timer keeps running, but this box needs a bigger bag
     const multiplier = holdMultiplier(heldMinutes);
     const boosted = now - lastBuy < HOLDERS.buyBoostMinutes * 60_000;
+    const red = !!opts.red?.has(b.owner);
     pre.push({
       owner: b.owner,
       amount: b.amount,
@@ -185,7 +224,12 @@ export function computeTickets(
       heldMinutes,
       multiplier,
       boosted,
-      raw: Math.min(b.amount, bagCap) * multiplier * (boosted ? 1 + HOLDERS.buyBoostPct / 100 : 1),
+      red,
+      raw:
+        Math.min(b.amount, bagCap) *
+        multiplier *
+        (boosted ? 1 + HOLDERS.buyBoostPct / 100 : 1) *
+        (red ? HOLDERS.redMultiplier : 1),
     });
   }
 
@@ -201,6 +245,7 @@ export function computeTickets(
         heldMinutes: Math.round(p.heldMinutes),
         multiplier: Math.round(p.multiplier * 100) / 100,
         boosted: p.boosted,
+        ...(p.red ? { red: true } : {}),
         tickets,
         sharePct: totalTickets ? Math.round((tickets / totalTickets) * 10000) / 100 : 0,
       };
