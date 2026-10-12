@@ -9,7 +9,8 @@
   "limits": { "cpu_ms": 30000 },
   "vars": {
     "TEAM_WALLET": "BQF2WHxY7ZmWdBPMatYdQZ9UygJuCtRmmRrkQQg3qD59",
-    "MINT": "",
+    "MINT": "5Uycj5BUozB87WgocSPhFzGDvoUftvANadiWS4cKWLgG",
+    "REPO_URL": "https://github.com/pullitbox/pullit",
     "PUBLIC": "1",
     "DRY_RUN": "",
   },

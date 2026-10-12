@@ -7,8 +7,10 @@
   <img src="https://img.shields.io/badge/dependencies-0-brightgreen" alt="no runtime dependencies">
 </p>
 
+<p align="center"><b>CA</b> <code>5Uycj5BUozB87WgocSPhFzGDvoUftvANadiWS4cKWLgG</code></p>
+
 <p align="center">
-  <a href="https://pullit.fun">pullit.fun</a> · <a href="https://x.com/Pullitbox">@Pullitbox</a> · <a href="docs/architecture.md">architecture</a> · <a href="#check-a-box-yourself">check a box</a>
+  <a href="https://pump.fun/coin/5Uycj5BUozB87WgocSPhFzGDvoUftvANadiWS4cKWLgG">pump.fun</a> · <a href="https://pullit.fun">pullit.fun</a> · <a href="https://x.com/Pullitbox">@Pullitbox</a> · <a href="docs/architecture.md">architecture</a> · <a href="#check-a-box-yourself">check a box</a>
 </p>
 
 # pullit
