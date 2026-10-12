@@ -12,7 +12,7 @@ export const GAMES = {
   minBuyUsd: 50,
   luckyOdds: 15, // 1 in this many qualifying buys
   luckyPotPct: 50, // a lucky buy takes half the lucky pot
-  luckyPrizeLamports: 20_000_000n, // ...and never less than 0.02 SOL: below that the pot keeps growing first
+  luckyPrizeLamports: 10_000_000n, // ...and never less than 0.01 SOL: below that the pot keeps growing first
   luckyCooldownMinutes: 60, // one lucky win per wallet per hour
   holdMinutes: 7, // a win only pays if the buyer still holds this long after the buy
   keepRatio: 0.9, // ...and still has at least 90% of what they bought
