@@ -1428,6 +1428,13 @@ who you are, only for context: a pink pixel gift box on solana, not live yet. tr
             ...pub,
             boxLamports: "0",
             vaultLamports: "0",
+            // nothing from the test coin may show on the real one, not even for a minute
+            thresholdLamports: boxSize(0).toString(),
+            entryUsd: entryUsd(FIRST_BOX),
+            holders: 0,
+            eligible: 0,
+            milestoneBox: undefined,
+            reserve: undefined,
             burned: undefined,
             frenzy: 0,
             odds: undefined,
