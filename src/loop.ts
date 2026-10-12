@@ -31,6 +31,8 @@ import { BOOST, frenzyLevel, oddsAt, newMilestones, usdShort, volume1h } from ".
 import { findXAccount, zernioPost } from "./zernio.ts";
 
 export const LOOP = {
+  prepackAtPct: 60, // pick the coins once the box is this full
+  prepackFreshMin: 8, // older picks are redone, the market moves
   claimEverySec: 15, // the worker runs claim passes at 15s, 30s and 45s into every cron minute
   holdersEveryMin: 5,
   topHoldersToInspect: 40, // pools and curves are always among the biggest holders
@@ -90,6 +92,8 @@ export interface State {
   nextBoxId: number;
   phase: "filling" | "drawing" | "done";
   pending?: BoxRecord & { rows: Pick<TicketRow, "owner" | "tickets">[] };
+  /** coins picked ahead while the box fills, so a full box seals in seconds */
+  prepack?: { boxId: number; at: number } & Awaited<ReturnType<Bot["pack"]>>;
   holderState: HolderState;
   bagMemo?: BagMemo; // last amounts and last buys, for the buy boost and the sell reset
   lastHoldersAt: number;
@@ -985,26 +989,12 @@ export class Bot {
       this.log("box ready but nobody eligible yet");
       return;
     }
-    const universe = await fetchUniverse(this.env.JUP_API_KEY);
-    const result = scan(universe);
-    result.hot = await this.hotCoins();
-    const thrown = Object.values(result.rejected).reduce((a, b) => a + b, 0);
-    await this.line(
-      "scan",
-      `scanned ${universe.length.toLocaleString("en-US")} coins for the box and threw out ${thrown}: devs holding too much, top holders too heavy, fake volume, mint not revoked`,
-      [String(thrown)],
-      say.scan(universe.length.toLocaleString("en-US"), thrown),
-    );
-    const recent = this.state.history.slice(-8).flatMap((b) => [b.plan.common.symbol, b.plan.rare.symbol]);
     const boxId = this.state.nextBoxId;
-    const { plan, problems } = await packBox(
-      this.env.OPENROUTER_API_KEY,
-      result,
-      boxId,
-      recent,
-      this.env.OPENROUTER_MODEL,
-    );
-    if (problems.length) this.log(`agent problems: ${problems.join("; ")}`);
+    const pre = this.state.prepack;
+    const picked =
+      pre && pre.boxId === boxId && Date.now() - pre.at < LOOP.prepackFreshMin * 60_000 ? pre : await this.pack(boxId);
+    const plan = picked.plan;
+    this.state.prepack = undefined;
 
     const { slot } = await this.rpc.latestBlockhash();
     const targetSlot = slot + EXEC.drawDelaySlots;
@@ -1044,8 +1034,8 @@ export class Bot {
     // a teaser per pick: what kind of coin it is, never which one
     const secret = [plan.common.symbol, plan.common.mint, plan.rare.symbol, plan.rare.mint];
     for (const [kind, c, h] of [
-      ["fresh", result.fresh.find((x) => x.mint === plan.common.mint), plan.hints?.common],
-      ["meta", [...result.established, ...(result.hot ?? [])].find((x) => x.mint === plan.rare.mint), plan.hints?.rare],
+      ["fresh", picked.common, plan.hints?.common],
+      ["meta", picked.rare, plan.hints?.rare],
     ] as const) {
       const fresh =
         h &&
@@ -1154,13 +1144,56 @@ export class Bot {
   checkpoint?: () => Promise<void>;
 
   /** After sealing, waits for the draw block in the same tick instead of the next one, so a box opens in ~30s. */
+  /** Scans the market and lets the agent pick the box coins. */
+  async pack(boxId: number) {
+    const universe = await fetchUniverse(this.env.JUP_API_KEY);
+    const result = scan(universe);
+    result.hot = await this.hotCoins();
+    const thrown = Object.values(result.rejected).reduce((a, b) => a + b, 0);
+    await this.line(
+      "scan",
+      `scanned ${universe.length.toLocaleString("en-US")} coins for the box and threw out ${thrown}: devs holding too much, top holders too heavy, fake volume, mint not revoked`,
+      [String(thrown)],
+      say.scan(universe.length.toLocaleString("en-US"), thrown),
+    );
+    const recent = this.state.history.slice(-8).flatMap((b) => [b.plan.common.symbol, b.plan.rare.symbol]);
+    const { plan, problems } = await packBox(
+      this.env.OPENROUTER_API_KEY,
+      result,
+      boxId,
+      recent,
+      this.env.OPENROUTER_MODEL,
+    );
+    if (problems.length) this.log(`agent problems: ${problems.join("; ")}`);
+    // the scan rows of the two picks, for the teasers at seal time
+    const common = result.fresh.find((x) => x.mint === plan.common.mint);
+    const rare = [...result.established, ...(result.hot ?? [])].find((x) => x.mint === plan.rare.mint);
+    return { plan, common, rare };
+  }
+
+  /** While the box fills, pick its coins ahead of time so a full box seals right away. */
+  async prepackSoon(now = Date.now()) {
+    const p = this.state.pub;
+    if (this.state.phase !== "filling" || !p) return;
+    const t = BigInt(p.thresholdLamports || "0");
+    if (t <= 0n || BigInt(p.boxLamports || "0") * 100n < t * BigInt(LOOP.prepackAtPct)) return;
+    const pre = this.state.prepack;
+    const id = this.state.nextBoxId;
+    if (pre && pre.boxId === id && now - pre.at < (LOOP.prepackFreshMin - 2) * 60_000) return;
+    try {
+      this.state.prepack = { boxId: id, at: now, ...(await this.pack(id)) };
+    } catch (e) {
+      this.log(`prepack failed: ${(e as Error).message}`);
+    }
+  }
+
   async drawSoon(maxWaitMs = 45_000) {
     const p = this.state.pending;
     if (!p || !this.checkpoint) return;
     await this.checkpoint();
     const until = Date.now() + maxWaitMs;
     while (Date.now() < until) {
-      await new Promise((r) => setTimeout(r, 4_000));
+      await new Promise((r) => setTimeout(r, 1_500));
       const tip = await this.rpc.call<number>("getSlot", [{ commitment: "confirmed" }]);
       if (tip >= p.targetSlot + 2) return this.finishBox();
     }
@@ -1541,7 +1574,9 @@ who you are, only for context: a pink pixel gift box on solana, not live yet. tr
   // the extra passes between cron ticks: claim, split and open the box when it is full
   async claimTick(now = Date.now()) {
     if (!this.env.MINT || this.state.mintSeen !== this.env.MINT) return;
-    if (this.state.phase === "done" || this.state.phase === "drawing") return;
+    if (this.state.phase === "done") return;
+    // a draw waiting on its block finishes here, not on the next cron minute
+    if (this.state.phase === "drawing") return this.drawSoon(12_000);
     if (this.claimDue(now)) await this.claimAndSplit();
     // fees just landed: show them and open the box right away, not on the next cron minute
     await this.openBox(false);
@@ -1621,6 +1656,7 @@ who you are, only for context: a pink pixel gift box on solana, not live yet. tr
     await this.openBox(final);
     if ((this.state.phase as State["phase"]) === "drawing") return this.drawSoon();
     if (this.state.phase === "filling") {
+      await this.prepackSoon(now);
       await this.watch(now);
       await this.shitpost(now);
       await this.chatter(now);

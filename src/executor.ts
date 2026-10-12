@@ -24,7 +24,7 @@ export const MINTS = {
 
 export const EXEC = {
   gasPerBoxLamports: 5_000_000n, // 0.005 SOL of every box stays for tx fees and token account rent
-  drawDelaySlots: 50, // ~20 seconds: the draw uses a block that does not exist yet when we announce it
+  drawDelaySlots: 25, // ~10 seconds: the draw uses a block that does not exist yet when we announce it
   keepInBoxLamports: 15_000_000n, // 0.015 SOL stays for fees and token accounts
   slippageBps: 300,
 };
