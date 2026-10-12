@@ -59,6 +59,33 @@ type Snap = NonNullable<State["lastSnap"]>;
 // longer than the slowest possible tick (AI lines, packing, waiting for the draw block)
 const LOCK_MS = 4 * 60_000; // a deploy can kill a tick mid-run: its lock must not freeze the bot for long
 
+/** A pinned tweet's text, from x's public oembed, cached in kv so the site shows it in its own style. */
+async function pinText(env: Env, url: string): Promise<{ url: string; text?: string; at?: string }> {
+  const key = "xpin:" + url.split("/").pop();
+  const hit = (await env.STATE.get(key, "json")) as { text?: string; at?: string } | null;
+  if (hit?.text) return { url, ...hit };
+  try {
+    const r = await fetch(`https://publish.twitter.com/oembed?omit_script=1&dnt=true&url=${encodeURIComponent(url)}`);
+    if (!r.ok) return { url };
+    const html = ((await r.json()) as { html?: string }).html ?? "";
+    const p = html.match(/<p[^>]*>([\s\S]*?)<\/p>/)?.[1] ?? "";
+    const text = p
+      .replace(/<br\s*\/?>/g, "\n")
+      .replace(/<[^>]+>/g, "")
+      .replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .trim();
+    const at = html.match(/>([A-Z][a-z]+ \d{1,2}, \d{4})<\/a><\/blockquote>/)?.[1];
+    if (text) await env.STATE.put(key, JSON.stringify({ text, at }));
+    return { url, text, at };
+  } catch {
+    return { url };
+  }
+}
+
 async function run(env: Env, claimOnly = false) {
   const lock = await env.STATE.get("lock");
   if (lock && Date.now() - Number(lock.split(":")[0]) < LOCK_MS) return; // previous tick still running
@@ -341,10 +368,8 @@ export default {
       );
       // tweets pinned by hand with `npm run tweet -- <link>`, shown on the site next to the bot's own posts
       const pins = live ? ((await env.STATE.get("xpins", "json")) as string[] | null) : null;
-      return json({
-        ...st,
-        pins: (pins ?? []).filter((u) => /^https:\/\/(x|twitter)\.com\/\w+\/status\/\d+$/.test(u)).slice(0, 6),
-      });
+      const ok = (pins ?? []).filter((u) => /^https:\/\/(x|twitter)\.com\/\w+\/status\/\d+$/.test(u)).slice(0, 2);
+      return json({ ...st, pins: await Promise.all(ok.map((u) => pinText(env, u))) });
     }
     if (url.pathname === "/api/wallet") {
       const a = url.searchParams.get("a") ?? "";
