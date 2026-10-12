@@ -90,6 +90,11 @@ function classify(t: JupToken, age: number): { bucket: Bucket } | { reject: stri
     if (liq < E.minLiquidity) return { reject: "est_liquidity" };
     if (vol < E.minVolume24h) return { reject: "est_volume" };
     if (top !== null && top > E.maxTopHoldersPct) return { reject: "est_top_holders" };
+    const turnover = vol / Math.max(mcap, 1);
+    if (turnover < E.minVolToMcap) return { reject: "est_quiet" };
+    const d24 = n(t.stats24h?.priceChange);
+    if (d24 < E.maxDrop24hPct) return { reject: "est_dumping" };
+    if (age > E.staleAfterHours && (turnover < E.staleMinVolToMcap || d24 < 0)) return { reject: "est_stale" };
     return { bucket: "established" };
   }
 

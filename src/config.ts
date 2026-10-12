@@ -4,12 +4,19 @@
 export const SCANNER = {
   // Established runners of the current meta (not DOGE/PEPE dinosaurs)
   established: {
-    minMcap: 1_500_000,
-    minLiquidity: 100_000,
-    minVolume24h: 300_000,
+    minMcap: 500_000,
+    minLiquidity: 50_000,
+    minVolume24h: 150_000,
     minAgeHours: 72, // 3 days
     maxAgeHours: 24 * 60, // 60 days
     maxTopHoldersPct: 40,
+    // still alive: a day's volume of at least 15% of the market cap
+    minVolToMcap: 0.15,
+    // a coin falling hard today is not a prize
+    maxDrop24hPct: -40,
+    // older than two weeks it has to be running again: high volume and green on the day
+    staleAfterHours: 24 * 14,
+    staleMinVolToMcap: 0.35,
   },
 
   // Fresh runners: graduated, young, gaining
@@ -63,7 +70,7 @@ export const SCANNER = {
   excludeMints: [] as string[],
 
   // How many candidates per bucket the agent gets to choose from
-  topN: { established: 20, fresh: 20 },
+  topN: { established: 30, fresh: 25 },
 };
 
 // Big liquid coins that are hot this week. They join the meta runners as extra options for the

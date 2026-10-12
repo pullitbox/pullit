@@ -66,7 +66,7 @@ test("hard safety filters reject bad tokens", () => {
 test("bucket thresholds apply", () => {
   const r = scan(
     [
-      tok({ id: "a", symbol: "SMALLEST", age: 24 * 5, mcap: 900_000 }),
+      tok({ id: "a", symbol: "SMALLEST", age: 24 * 5, mcap: 400_000 }),
       tok({
         id: "b",
         symbol: "DUMPING",
@@ -119,4 +119,36 @@ test("hot coins: only the listed mints with enough liquidity, authority not chec
     ["ZEC"],
   ); // symbol from our list, thin and missing ones dropped
   void wld;
+});
+
+test("meta runners must still be alive: volume, no crash, old ones running again", () => {
+  const r = scan(
+    [
+      // 1.1M volume on a 30M cap: nobody trades it any more
+      tok({ id: "q", symbol: "QUIET", age: 24 * 10, mcap: 30_000_000, liquidity: 1_000_000 }),
+      tok({
+        id: "d",
+        symbol: "CRASH",
+        age: 24 * 10,
+        stats24h: { buyVolume: 600_000, sellVolume: 500_000, holderChange: 0, numNetBuyers: 0, priceChange: -55 },
+      }),
+      // 4 weeks old, 1.1M volume on 5M: not enough to count as running again
+      tok({ id: "s", symbol: "STALE", age: 24 * 28, mcap: 5_000_000, liquidity: 300_000 }),
+      // 4 weeks old but trading hard and green: stays
+      tok({
+        id: "b",
+        symbol: "BACK",
+        age: 24 * 28,
+        stats24h: { buyVolume: 900_000, sellVolume: 800_000, holderChange: 0, numNetBuyers: 0, priceChange: 20 },
+      }),
+    ],
+    NOW,
+  );
+  assert.equal(r.rejected.est_quiet, 1);
+  assert.equal(r.rejected.est_dumping, 1);
+  assert.equal(r.rejected.est_stale, 1);
+  assert.deepEqual(
+    r.established.map((c) => c.symbol),
+    ["BACK"],
+  );
 });
