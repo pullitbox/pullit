@@ -75,7 +75,9 @@ async function pinTweet(env: Env, url: string): Promise<Pin> {
   const key = "xpin2:" + id;
   const hit = (await env.STATE.get(key, "json")) as (Pin & { fetchedAt?: number }) | null;
   // video links from x expire after a while: refetch every few hours
-  if (hit?.text && Date.now() - (hit.fetchedAt ?? 0) < 6 * 3_600_000) return hit;
+  // read on the dev's computer by `npm run tweet` (x does not answer cloudflare): always kept
+  if (hit?.text && ((hit as { local?: boolean }).local || Date.now() - (hit.fetchedAt ?? 0) < 6 * 3_600_000))
+    return hit;
   const pin: Pin = { url };
   try {
     const token = ((Number(id) / 1e15) * Math.PI).toString(36).replace(/(0+|\.)/g, "");
