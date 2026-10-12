@@ -31,12 +31,12 @@ import { BOOST, frenzyLevel, oddsAt, newMilestones, usdShort, volume1h } from ".
 import { findXAccount, zernioPost } from "./zernio.ts";
 
 export const LOOP = {
-  claimEveryMin: 1,
+  claimEverySec: 30, // the worker runs a claim-only pass 30s into every cron minute
   holdersEveryMin: 5,
   topHoldersToInspect: 40, // pools and curves are always among the biggest holders
   vaultPct: 10, // of everything that goes into the box, this share is set aside in the vault
   // dry run runs fast so a full cycle can be watched in minutes
-  dry: { solPerMin: 0.05, claimEveryMin: 1, holdersEveryMin: 1, minHoldMinutes: 1 },
+  dry: { solPerMin: 0.05, claimEverySec: 60, holdersEveryMin: 1, minHoldMinutes: 1 },
   boxCapX: 3, // one box pays out at most 3x its size, the rest waits for the next boxes
   // dry run: fake volume swings between quiet and busy every 40 minutes, so both moods show up
   quietMin: { live: 6, dry: 2 }, // minutes of silence before the box says something on its own
@@ -1530,6 +1530,18 @@ who you are, only for context: a pink pixel gift box on solana, not live yet. tr
     if (text) await this.post(text, [], true);
   }
 
+  // 5s slack: cron and the 30s pass don't land on the exact second
+  claimDue(now = Date.now()) {
+    return now - this.state.lastClaimAt >= ((this.dry ? LOOP.dry.claimEverySec : LOOP.claimEverySec) - 5) * 1000;
+  }
+
+  // the extra pass between cron ticks: only claim and split, nothing else
+  async claimTick(now = Date.now()) {
+    if (!this.env.MINT || this.state.mintSeen !== this.env.MINT) return;
+    if (this.state.phase === "done" || this.state.phase === "drawing") return;
+    if (this.claimDue(now)) await this.claimAndSplit();
+  }
+
   async tick(now = Date.now()) {
     await this.journal(now);
     await this.tease(now);
@@ -1584,8 +1596,7 @@ who you are, only for context: a pink pixel gift box on solana, not live yet. tr
       }
     }
     if (this.state.phase === "drawing") return this.finishBox();
-    if (now - this.state.lastClaimAt >= (this.dry ? LOOP.dry.claimEveryMin : LOOP.claimEveryMin) * 60_000)
-      await this.claimAndSplit();
+    if (this.claimDue(now)) await this.claimAndSplit();
     if (now - this.state.lastHoldersAt >= (this.dry ? LOOP.dry.holdersEveryMin : LOOP.holdersEveryMin) * 60_000) {
       const s = await this.tickets();
       this.log(`holders: ${s.holdersTotal}, eligible ${s.eligible}`);

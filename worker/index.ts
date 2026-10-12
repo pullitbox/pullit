@@ -59,7 +59,7 @@ type Snap = NonNullable<State["lastSnap"]>;
 // longer than the slowest possible tick (AI lines, packing, waiting for the draw block)
 const LOCK_MS = 15 * 60_000;
 
-async function run(env: Env) {
+async function run(env: Env, claimOnly = false) {
   const lock = await env.STATE.get("lock");
   if (lock && Date.now() - Number(lock.split(":")[0]) < LOCK_MS) return; // previous tick still running
   const token = `${Date.now()}:${crypto.randomUUID()}`;
@@ -89,7 +89,8 @@ async function run(env: Env) {
   };
   try {
     await bot.init();
-    await bot.tick();
+    if (claimOnly) await bot.claimTick();
+    else await bot.tick();
   } catch (e) {
     bot.log(`tick error: ${(e as Error).message}`);
   } finally {
@@ -295,8 +296,16 @@ async function top(env: Env, preview: boolean) {
 }
 
 export default {
-  async scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
-    ctx.waitUntil(run(env));
+  async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
+    // cron can't go below a minute: a second, claim-only pass 30s later
+    ctx.waitUntil(
+      (async () => {
+        await run(env);
+        const wait = event.scheduledTime + 30_000 - Date.now();
+        if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+        await run(env, true);
+      })(),
+    );
   },
   async fetch(req: Request, env: Env): Promise<Response> {
     const url = new URL(req.url);
