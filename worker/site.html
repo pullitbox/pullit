@@ -356,6 +356,8 @@ const TAG = { fee: '#7be0c3', scan: '#9a8f99', pick: '#8ec5ff', box: '#ff8dc0', 
 const MSG = { boost: 'gd', burn: 'or', x: 'hi', pick: 'hi', box: 'pk', win: 'pk', draw: 'gd', roast: 'rd', hold: 'mt' };
 const short = (a) => (a ? a.slice(0, 4) + '…' + a.slice(-4) : '-');
 const sol = (l) => Number(l || 0) / 1e9;
+// a filling box rounds down, so 0.146 never shows as a full 0.15
+const down = (n) => fmt(Math.floor(n * 1000) / 1000, 3);
 const fmt = (n, d = 3) => { const s = n.toFixed(d); return s.includes('.') ? s.replace(/0+$/, '').replace(/\.$/, '') : s; };
 const acct = (a) => 'https://solscan.io/account/' + a;
 const hhmm = (iso) => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
@@ -426,7 +428,7 @@ function render() {
     say(pk.posts?.[0] || 'packed and sealed. even i cant peek');
   } else {
     setText('kick', `box #${id} is filling`);
-    setText('big', fmt(have, 2) + ' sol');
+    setText('big', down(have) + ' sol');
     setText('sline', p.milestoneBox ? `milestone box: epic or better` : "box agent picks the coin you'll get");
     $('fill').style.width = Math.round(pct * 100) + '%';
     setText('bl1', need ? `opens at ${fmt(need, 2)} sol` : 'opens when full');
@@ -473,7 +475,7 @@ function render() {
         el('span', { className: 'coins', textContent: '$' + (b.prize?.symbol || '?') + ' · ' + ago(b.at) }),
         el('span', { textContent: short(b.draw.winner) }),
         el('span', { className: 'p', textContent: 'proof ↗' }));
-      const next = el('div', { className: 'card next' }, el('span', { className: 'n', textContent: 'box #' + id }), el('span', { className: 'w', textContent: fmt(have, 2) + ' sol' }), el('span', { className: 'coins', textContent: pk ? 'sealed' : 'filling…' }));
+      const next = el('div', { className: 'card next' }, el('span', { className: 'n', textContent: 'box #' + id }), el('span', { className: 'w', textContent: (pk ? fmt(have, 2) : down(have)) + ' sol' }), el('span', { className: 'coins', textContent: pk ? 'sealed' : 'filling…' }));
       $('cards').replaceChildren(...hist.slice(0, 3).map(card), next, ...hist.slice(3, 12).map(card));
       $('allList').replaceChildren(...hist.map((b) => el('li', {}, el('a', { href: '#box-' + b.boxId, style: '--c:' + COLOR[b.draw.tier] },
         el('span', {}, `#${b.boxId} · ${short(b.draw.winner)} · `, el('span', { className: 't-' + b.draw.tier, textContent: b.draw.tier }), el('span', { className: 'dim', textContent: ' · ' + ago(b.at) })),
