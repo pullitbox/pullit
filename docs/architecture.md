@@ -8,7 +8,7 @@ One Cloudflare Worker runs everything. A cron wakes it every minute, it does one
 flowchart LR
   T[trades of $PULLIT] -->|creator fees| D[dev wallet]
   D -->|80%| B[box wallet]
-  D -->|20%| TM[team wallet]
+  D -->|20% stays| D
   B -->|10% of inflow, tracked| V[(vault)]
   B -->|prize, swapped by Jupiter| W[winner wallet]
   B -->|10% of each box: buy $PULLIT| X[burn]

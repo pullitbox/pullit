@@ -21,7 +21,7 @@ The bot can only buy. It buys the prize for the winner and buys $PULLIT to burn 
 
 ## How it works
 
-1. **Fees fill the box.** Every 10 minutes the bot claims the creator fees of $PULLIT. 80% goes to the box wallet, 20% to the team wallet (agent costs, servers, building). A small part of the box share is set aside in the vault.
+1. **Fees fill the box.** Every 10 minutes the bot claims the creator fees of $PULLIT. 80% goes to the box wallet, 20% stays in the dev wallet (agent costs, servers, building). A small part of the box share is set aside in the vault.
 2. **The AI packs it.** When the box is full, the agent scans the market, throws out anything that looks unsafe, and picks two coins: a fresh runner and a runner of the meta. It writes a joke about its picks on the site log, never the names.
 3. **The box is sealed.** The bot publishes a seal: `sha256(common mint | rare mint | salt)`. The contents cannot change after that without the seal breaking.
 4. **A future block decides.** The bot commits to a slot about 20 seconds ahead. When that block exists, its hash picks the winner (weighted by tickets) and the tier.
@@ -56,7 +56,7 @@ The bot holds the keys of the dev wallet (to claim fees) and the box wallet (to 
 
 It can:
 
-- claim creator fees and split them 80/20 between the box and the team wallet
+- claim creator fees and send 80% of them to the box. the other 20% stays in the dev wallet
 - swap box SOL into the prize coin and send it to the winner
 - buy $PULLIT with box SOL and burn it
 - post on x
@@ -93,7 +93,7 @@ How the draw works in detail: [docs/draw.md](docs/draw.md).
 
 - prizes are memecoins picked from the current market. they can go to zero
 - the bot runs on Cloudflare and depends on Helius, Jupiter, OpenRouter and PumpPortal. if one is down, a box waits
-- the team controls the keys. the code limits what the bot does, the keys could in theory be used by hand. every transaction of every wallet is public, so watch them
+- we control the keys. the code limits what the bot does, the keys could in theory be used by hand. every transaction of every wallet is public, so watch them
 - not financial advice. its a box
 
 ## Map

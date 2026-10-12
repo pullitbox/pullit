@@ -12,9 +12,8 @@ All wallets are listed on the site under rules. Every transaction is public on S
 
 | wallet | what it does                                                                    |
 | ------ | ------------------------------------------------------------------------------- |
-| dev    | receives the creator fees and splits them 80/20, nothing else                   |
+| dev    | receives the creator fees, sends 80% to the box, keeps 20%, nothing else        |
 | box    | holds the prize pool and the vault. sends only to draw winners or into the burn |
-| team   | receives 20% of fees: the agent, the servers, the people building               |
 
 ## What the code guarantees
 

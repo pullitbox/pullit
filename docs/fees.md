@@ -6,9 +6,9 @@ $PULLIT launched on pump.fun. Its creator fees go to the dev wallet. Every 10 mi
 
 1. claims the creator fees (PumpPortal `collectCreatorFee`)
 2. keeps 0.02 SOL in the dev wallet for transaction fees
-3. sends 80% of the rest to the box wallet and 20% to the team wallet, in one transaction
+3. sends 80% of the new fees to the box wallet. the other 20% stays in the dev wallet
 
-The team share pays for the AI, the servers and the people building this.
+The bot remembers what the dev wallet held before the first claim and the 20% it kept since, so that SOL is never split again. The 20% pays for the AI, the servers and the people building this.
 
 ## The box and the vault
 
