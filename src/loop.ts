@@ -932,12 +932,18 @@ export class Bot {
       for (const x of sigs) {
         if (x.blockTime && x.blockTime * 1000 < sinceMs - 60_000) break;
         if (x.err) continue;
-        const t = await this.rpc.call<{
-          transaction: { message: { accountKeys: (string | { pubkey: string })[] } };
-        } | null>("getTransaction", [
-          x.signature,
-          { encoding: "json", maxSupportedTransactionVersion: 0, commitment: "confirmed" },
-        ]);
+        type Tx = { transaction: { message: { accountKeys: (string | { pubkey: string })[] } } } | null;
+        let t: Tx;
+        try {
+          t = await this.rpc.call<Tx>("getTransaction", [
+            x.signature,
+            { encoding: "json", maxSupportedTransactionVersion: 0, commitment: "confirmed" },
+          ]);
+        } catch (e) {
+          // a newer tx version in the winner's history: the box only ever sends legacy or v0, so it is not ours
+          if (/version|not supported/i.test((e as Error).message)) continue;
+          throw e;
+        }
         const k = t?.transaction.message.accountKeys[0];
         if ((typeof k === "string" ? k : k?.pubkey) === this.box.publicKey) return x.signature;
       }
