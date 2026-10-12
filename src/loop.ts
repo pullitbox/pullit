@@ -147,6 +147,7 @@ export interface State {
   reserve?: { initial: string; left: string; burns: { at: string; sig: string; amount: string; milestone: number }[] };
   nextTeaseAt?: number; // before launch: when the next teaser goes out on x
   priceUsd?: number; // last $PULLIT price seen
+  burnPendingIds?: number[]; // boxes whose burn is waiting for the leftover burn
   games?: {
     cursor?: string; // newest tx of the mint already read
     clockPot: string;
@@ -1467,7 +1468,10 @@ export class Bot {
             this.log(`burn failed, will retry: ${(e as Error).message}`);
             burnSig = "pending";
           }
-          if (burnSig === "pending") this.state.burnPending = true;
+          if (burnSig === "pending") {
+            this.state.burnPending = true;
+            this.state.burnPendingIds = [...(this.state.burnPendingIds ?? []), p.boxId];
+          }
         }
         p.burn = {
           buySig: paid.burnBuy.sig,
@@ -1957,7 +1961,14 @@ who you are, only for context: a pink pixel gift box on solana, not live yet. tr
       try {
         const r = await burnAll(this.rpc, this.box, this.env.MINT, this.reserveLeft());
         this.state.burnPending = false;
-        if (r) this.log(`burned leftover $PULLIT: ${r.amount} (${r.sig})`);
+        if (r) {
+          this.log(`burned leftover $PULLIT: ${r.amount} (${r.sig})`);
+          // the boxes whose own burn did not confirm were burned by this one: link it on their cards
+          const ids = this.state.burnPendingIds ?? [];
+          for (const b of this.state.history)
+            if (ids.includes(b.boxId) && b.burn?.burnSig === "pending") b.burn.burnSig = r.sig;
+          this.state.burnPendingIds = [];
+        }
       } catch (e) {
         this.log(`leftover burn failed again: ${(e as Error).message}`);
       }
