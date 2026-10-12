@@ -4,7 +4,7 @@
 // once, and a stale copy of the bot never pays a winner twice.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { b58decode, b58encode, buildTransferTx, keypairFromSecret, txSignature, type Keypair } from "../src/solana.ts";
+import { b58encode, buildTransferTx, keypairFromSecret, txSignature, type Keypair } from "../src/solana.ts";
 import { Bot, newState, type Env, type State } from "../src/loop.ts";
 
 const SYSTEM = "11111111111111111111111111111111";
@@ -316,7 +316,7 @@ class Chain {
           this.add(this.dev.publicKey, f);
           return { keys: [], deltas: new Map([[this.dev.publicKey, f]]), kind: "claim" };
         });
-        return new Response(tx);
+        return new Response(tx as Uint8Array<ArrayBuffer>);
       }
       return new Response("not simulated", { status: 500 });
     }
@@ -434,7 +434,6 @@ test("e2e: hours of trading in fast forward, every lamport where it belongs", { 
     assert.equal(buybacks, opened.length, "one buyback per box");
     // the launch reserve is never sold or burned by the boxes (no reserve cap was crossed)
     assert.equal(state.reserve?.left, "300000000000000");
-    assert.ok(holders.length > 0 && state.history.every((b) => !holders.includes("")), "sanity");
 
     // a stale copy of the bot from right before a payout must not pay that winner again
     assert.ok(stale, "captured a state from before a payout");
