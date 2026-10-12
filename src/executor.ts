@@ -4,6 +4,7 @@
 import {
   fromB64,
   buildTransferTx,
+  budgetIxs,
   buildTx,
   burnIx,
   signSerializedTx,
@@ -236,7 +237,7 @@ export async function sendSol(
   onSigned?: OnSigned,
 ): Promise<string> {
   const { blockhash } = await rpc.latestBlockhash();
-  const tx = await buildTransferTx(box, [{ to, lamports }], blockhash);
+  const tx = await buildTransferTx(box, [{ to, lamports }], blockhash, true);
   await onSigned?.(txSignature(tx));
   return rpc.sendAndConfirm(tx);
 }
@@ -285,6 +286,10 @@ export async function burnAll(
   const amount = exact ?? acc.amount - keep;
   if (amount <= 0n) return null;
   const { blockhash } = await rpc.latestBlockhash();
-  const tx = await buildTx(box, [burnIx(acc.program, acc.address, mint, box.publicKey, amount)], blockhash);
+  const tx = await buildTx(
+    box,
+    [...budgetIxs(), burnIx(acc.program, acc.address, mint, box.publicKey, amount)],
+    blockhash,
+  );
   return { sig: await rpc.sendAndConfirm(tx), amount: amount.toString() };
 }

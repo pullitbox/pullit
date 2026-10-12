@@ -124,11 +124,51 @@ export async function signSerializedTx(txBytes: Uint8Array, kp: Keypair): Promis
 }
 
 /** Legacy transaction: one sender, several SOL transfers. */
+/** Compute budget for a few simple instructions, with a priority fee so the tx lands when the chain is busy. */
+export const PRIORITY = { units: 60_000, microLamports: 1_000_000n }; // 0.00006 SOL per tx at most
+
+export function budgetIxs(p = PRIORITY): Instruction[] {
+  const limit = new Uint8Array(5);
+  limit[0] = 2; // SetComputeUnitLimit
+  new DataView(limit.buffer).setUint32(1, p.units, true);
+  const price = new Uint8Array(9);
+  price[0] = 3; // SetComputeUnitPrice
+  new DataView(price.buffer).setBigUint64(1, p.microLamports, true);
+  const program = "ComputeBudget111111111111111111111111111111";
+  return [
+    { programId: program, keys: [], data: limit },
+    { programId: program, keys: [], data: price },
+  ];
+}
+
 export async function buildTransferTx(
   from: Keypair,
   transfers: { to: string; lamports: bigint }[],
   recentBlockhash: string,
+  priority = false,
 ): Promise<Uint8Array> {
+  if (priority)
+    return buildTx(
+      from,
+      [
+        ...budgetIxs(),
+        ...transfers.map((t) => {
+          const data = new Uint8Array(12);
+          const dv = new DataView(data.buffer);
+          dv.setUint32(0, 2, true);
+          dv.setBigUint64(4, t.lamports, true);
+          return {
+            programId: "11111111111111111111111111111111",
+            keys: [
+              { pubkey: from.publicKey, signer: true, writable: true },
+              { pubkey: t.to, signer: false, writable: true },
+            ],
+            data,
+          };
+        }),
+      ],
+      recentBlockhash,
+    );
   const system = new Uint8Array(32);
   const keys = [from.pub, ...transfers.map((t) => b58decode(t.to)), system];
   const msg: number[] = [1, 0, 1, ...compactU16(keys.length)];

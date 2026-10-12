@@ -158,6 +158,8 @@ class Chain {
         const a = this.ata.get(ix.accounts[0]!)!;
         this.addTok(a.owner, a.mint, -amt);
         kind = "burn";
+      } else if (ix.program === "ComputeBudget111111111111111111111111111111") {
+        // priority fee setup: no lamports move in the simulation
       } else throw new Error(`unknown instruction ${ix.program}`);
     }
     this.record(sig, keys, deltas, kind);

@@ -17,7 +17,7 @@ export const FEES = {
   boxSharePct: 80, // the rest (20%) goes to the team wallet
   keepInDevLamports: 20_000_000n, // 0.02 SOL stays for tx fees
   minSplitLamports: 5_000_000n, // don't split dust, wait until 0.005 SOL accumulated
-  priorityFeeSol: 0.00001,
+  priorityFeeSol: 0.0001, // claims kept dropping when the chain got busy at 0.00001
   // Final Box: if claimed fees over the window are below this, the box closes for good
   finalWindowHours: 6,
   finalMinLamports: 100_000_000n, // 0.1 SOL in 6h
@@ -168,6 +168,7 @@ export async function buildSplit(
           { to: teamWallet, lamports: team },
         ],
     blockhash,
+    true, // priority fee: splits were dropped when the chain got busy
   );
   return { tx, sig: txSignature(tx), totalLamports: total, boxLamports: box, teamLamports: team, kept };
 }
