@@ -59,31 +59,76 @@ type Snap = NonNullable<State["lastSnap"]>;
 // longer than the slowest possible tick (AI lines, packing, waiting for the draw block)
 const LOCK_MS = 4 * 60_000; // a deploy can kill a tick mid-run: its lock must not freeze the bot for long
 
-/** A pinned tweet's text, from x's public oembed, cached in kv so the site shows it in its own style. */
-async function pinText(env: Env, url: string): Promise<{ url: string; text?: string; at?: string }> {
-  const key = "xpin:" + url.split("/").pop();
-  const hit = (await env.STATE.get(key, "json")) as { text?: string; at?: string } | null;
-  if (hit?.text) return { url, ...hit };
+type Pin = {
+  url: string;
+  text?: string;
+  at?: string;
+  media?: { type: "photo" | "video"; src: string; poster?: string }[];
+};
+
+/**
+ * A pinned tweet with its text, photos and video, from x's public embed data (the same source
+ * embedded tweets use), cached in kv. Falls back to oembed for the text alone.
+ */
+async function pinTweet(env: Env, url: string): Promise<Pin> {
+  const id = url.split("/").pop()!;
+  const key = "xpin2:" + id;
+  const hit = (await env.STATE.get(key, "json")) as (Pin & { fetchedAt?: number }) | null;
+  // video links from x expire after a while: refetch every few hours
+  if (hit?.text && Date.now() - (hit.fetchedAt ?? 0) < 6 * 3_600_000) return hit;
+  const pin: Pin = { url };
   try {
-    const r = await fetch(`https://publish.twitter.com/oembed?omit_script=1&dnt=true&url=${encodeURIComponent(url)}`);
-    if (!r.ok) return { url };
-    const html = ((await r.json()) as { html?: string }).html ?? "";
-    const p = html.match(/<p[^>]*>([\s\S]*?)<\/p>/)?.[1] ?? "";
-    const text = p
-      .replace(/<br\s*\/?>/g, "\n")
-      .replace(/<[^>]+>/g, "")
-      .replace(/&amp;/g, "&")
-      .replace(/&lt;/g, "<")
-      .replace(/&gt;/g, ">")
-      .replace(/&quot;/g, '"')
-      .replace(/&#39;/g, "'")
-      .trim();
-    const at = html.match(/>([A-Z][a-z]+ \d{1,2}, \d{4})<\/a><\/blockquote>/)?.[1];
-    if (text) await env.STATE.put(key, JSON.stringify({ text, at }));
-    return { url, text, at };
+    const token = ((Number(id) / 1e15) * Math.PI).toString(36).replace(/(0+|\.)/g, "");
+    const r = await fetch(`https://cdn.syndication.twimg.com/tweet-result?id=${id}&lang=en&token=${token}`);
+    if (r.ok) {
+      const t = (await r.json()) as {
+        text?: string;
+        created_at?: string;
+        entities?: { media?: { url: string }[] };
+        mediaDetails?: {
+          type: string;
+          media_url_https: string;
+          video_info?: { variants: { content_type: string; url: string; bitrate?: number }[] };
+        }[];
+      };
+      let text = t.text ?? "";
+      for (const m of t.entities?.media ?? []) text = text.replace(m.url, ""); // the t.co link of the media itself
+      pin.text = text.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").trim();
+      if (t.created_at)
+        pin.at = new Date(t.created_at).toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        });
+      pin.media = (t.mediaDetails ?? []).slice(0, 4).flatMap((m): NonNullable<Pin["media"]> => {
+        if (m.type === "photo") return [{ type: "photo", src: m.media_url_https }];
+        const mp4 = (m.video_info?.variants ?? [])
+          .filter((v) => v.content_type === "video/mp4")
+          .sort((a, b) => (b.bitrate ?? 0) - (a.bitrate ?? 0))
+          .find((v) => (v.bitrate ?? 0) <= 2_200_000);
+        return mp4 ? [{ type: "video", src: mp4.url, poster: m.media_url_https }] : [];
+      });
+    }
   } catch {
-    return { url };
+    // fall through to oembed
   }
+  if (!pin.text) {
+    try {
+      const r = await fetch(`https://publish.twitter.com/oembed?omit_script=1&dnt=true&url=${encodeURIComponent(url)}`);
+      const html = r.ok ? (((await r.json()) as { html?: string }).html ?? "") : "";
+      pin.text = (html.match(/<p[^>]*>([\s\S]*?)<\/p>/)?.[1] ?? "")
+        .replace(/<br\s*\/?>/g, "\n")
+        .replace(/<[^>]+>/g, "")
+        .replace(/&amp;/g, "&")
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .trim();
+    } catch {
+      // no text either: the site skips it
+    }
+  }
+  if (pin.text) await env.STATE.put(key, JSON.stringify({ ...pin, fetchedAt: Date.now() }));
+  return pin;
 }
 
 async function run(env: Env, claimOnly = false) {
@@ -369,7 +414,7 @@ export default {
       // tweets pinned by hand with `npm run tweet -- <link>`, shown on the site next to the bot's own posts
       const pins = live ? ((await env.STATE.get("xpins", "json")) as string[] | null) : null;
       const ok = (pins ?? []).filter((u) => /^https:\/\/(x|twitter)\.com\/\w+\/status\/\d+$/.test(u)).slice(0, 2);
-      return json({ ...st, pins: await Promise.all(ok.map((u) => pinText(env, u))) });
+      return json({ ...st, pins: await Promise.all(ok.map((u) => pinTweet(env, u))) });
     }
     if (url.pathname === "/api/wallet") {
       const a = url.searchParams.get("a") ?? "";

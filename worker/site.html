@@ -118,6 +118,9 @@ h3.h .hb{display:flex;gap:14px}
 @media (max-width:700px){.games{grid-template-columns:1fr}}
 .xs{margin-top:22px}
 .xp .xf{margin-bottom:8px}
+.xm{display:grid;gap:6px;margin-top:10px}
+.xm.two{grid-template-columns:1fr 1fr}
+.xm img,.xm video{width:100%;max-height:220px;object-fit:cover;display:block;border:2px solid var(--line);background:#000}
 .xf .tx{display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;overflow:hidden}
 .xf{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
 .xf li{border:2px solid var(--line);background:var(--panel);font-size:12px;line-height:1.5;white-space:pre-line}
@@ -532,7 +535,12 @@ function render() {
   if (pkey !== render.pkey) {
     render.pkey = pkey;
     $('xPins').replaceChildren(...P.map((p) => el('ol', { className: 'xf' }, el('li', {}, el('a', { href: p.url, target: '_blank', rel: 'noopener' },
-      el('span', { className: 'tx', textContent: p.text }), el('time', { textContent: (p.at ? p.at.toLowerCase() + ' · ' : '') + 'pinned · open on x ↗' }))))));
+      el('span', { className: 'tx', textContent: p.text }),
+      ...(p.media && p.media.length ? [el('span', { className: 'xm' + (p.media.length > 1 ? ' two' : '') }, ...p.media.slice(0, 2).map((m) => m.type === 'video'
+        ? Object.assign(el('video', { src: m.src, poster: m.poster || '', muted: true, loop: true, playsInline: true, autoplay: true, preload: 'metadata' }), { onclick: (e) => e.preventDefault() })
+        : el('img', { src: m.src, alt: '', loading: 'lazy' })))] : []),
+      el('time', { textContent: (p.at ? p.at.toLowerCase() + ' · ' : '') + 'pinned · open on x ↗' }))))));
+    for (const v of $('xPins').querySelectorAll('video')) { v.muted = true; v.play?.().catch(() => {}); }
     if (P.length && !(s.x || []).length) $('xFeed').replaceChildren();
   }
 
