@@ -135,6 +135,7 @@ export interface State {
   reserve?: { initial: string; left: string; burns: { at: string; sig: string; amount: string; milestone: number }[] };
   nextTeaseAt?: number; // before launch: when the next teaser goes out on x
   xPostedAt?: number[]; // times of the x posts of the last 24 hours, for the daily cap
+  dexPaid?: { posted?: boolean; checkedAt?: number }; // the one "dex paid" post, once dexscreener confirms it
   recapPosted?: boolean; // the first-hour recap went out
   teaseUsed?: number[]; // hand-written teasers already posted this round
   teaseTopics?: string[]; // topics of the last pre-launch posts, oldest first
@@ -365,26 +366,28 @@ export class Bot {
    * Posts on x, at most X_MAX_PER_DAY (default 3) in any 24 hours. `important` posts (big wins,
    * milestones) may use the last slot of the day; shitposts and teasers leave it free.
    */
-  async post(text: string, replies: string[] = [], evenInDryRun = false, important = false) {
-    if (!text.trim()) return;
+  async post(text: string, replies: string[] = [], evenInDryRun = false, important = false): Promise<boolean> {
+    if (!text.trim()) return false;
     const now = Date.now();
     const cap = Number(this.env.X_MAX_PER_DAY) || 3;
     const today = (this.state.xPostedAt ?? []).filter((t) => now - t < 86_400_000);
     if (today.length >= cap || (!important && today.length >= cap - 1)) {
       this.log(`[x cap ${cap}/day, skipped] ${text}`);
-      return;
+      return false;
     }
     if ((this.dry && !evenInDryRun) || !this.env.ZERNIO_API_KEY) {
       this.log(`[post] ${[text, ...replies].join(" // ")}`);
-      return;
+      return false;
     }
     try {
       this.xAccountId ??= (await findXAccount(this.env.ZERNIO_API_KEY))._id;
       await zernioPost(this.env.ZERNIO_API_KEY, this.xAccountId, text, replies);
       this.state.xPostedAt = [...today, now];
       this.log(`posted: ${text}`);
+      return true;
     } catch (e) {
       this.log(`post failed: ${(e as Error).message}`);
+      return false;
     } // x being down never stops a box
   }
 
@@ -1583,6 +1586,31 @@ who you are, only for context: a pink pixel gift box on solana, not live yet. tr
     if ((this.state.phase as State["phase"]) === "drawing") return this.drawSoon();
   }
 
+  /** Posts "dex paid" once, and only after dexscreener itself shows the paid token profile. */
+  async dexPaid(now = Date.now()) {
+    const d = (this.state.dexPaid ??= {});
+    if (d.posted || this.dry || !this.env.MINT) return;
+    if (d.checkedAt && now - d.checkedAt < 2 * 60_000) return;
+    d.checkedAt = now;
+    try {
+      const r = await fetch(`https://api.dexscreener.com/orders/v1/solana/${this.env.MINT}`);
+      const j = (await r.json()) as { orders?: { type?: string; status?: string }[] };
+      const paid = (j.orders ?? []).some(
+        (o) => o.type === "tokenProfile" && o.status !== "rejected" && o.status !== "cancelled",
+      );
+      if (!paid) return;
+    } catch {
+      return;
+    }
+    const n = this.state.history.length;
+    const text = `dex paid for $PULLIT\n\n${n} boxes opened, ${n} holders paid in random coins.\nthe box keeps filling from every trade.\n\nhold, wait, maybe it's yours.`;
+    const replies = [`ca: ${this.env.MINT}\ndexscreener.com/solana/${this.env.MINT}\npullit.fun`];
+    if (await this.post(text, replies, false, true)) {
+      d.posted = true;
+      this.feed("info", "dex paid. i have a profile picture now, unlike your burner");
+    }
+  }
+
   async tick(now = Date.now()) {
     await this.journal(now);
     await this.tease(now);
@@ -1636,6 +1664,7 @@ who you are, only for context: a pink pixel gift box on solana, not live yet. tr
         this.log(`leftover burn failed again: ${(e as Error).message}`);
       }
     }
+    await this.dexPaid(now);
     if (this.state.phase === "drawing") return this.finishBox();
     if (this.claimDue(now)) await this.claimAndSplit();
     if (now - this.state.lastHoldersAt >= (this.dry ? LOOP.dry.holdersEveryMin : LOOP.holdersEveryMin) * 60_000) {
