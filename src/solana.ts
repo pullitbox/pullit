@@ -83,7 +83,7 @@ function compactU16(n: number): number[] {
   }
 }
 
-function readCompactU16(buf: Uint8Array, off: number): [number, number] {
+export function readCompactU16(buf: Uint8Array, off: number): [number, number] {
   let val = 0,
     shift = 0,
     i = off;

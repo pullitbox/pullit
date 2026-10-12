@@ -133,3 +133,41 @@ test("split: only claimed fees are split, capped by what the dev wallet holds", 
   const c = await buildSplit(rpc, dev, box, dev.publicKey, 1_000_000_000n);
   assert.equal(c?.totalLamports, 100_000_000n - 20_000_000n - 10_000n);
 });
+
+test("claim tx check: pump claims pass, anything that moves the dev bag or its SOL is refused", async () => {
+  const { checkClaimTx } = await import("../src/fees.ts");
+  const dev = await keypairFromSecret(await newKeypairSecret());
+  const other = (await keypairFromSecret(await newKeypairSecret())).publicKey;
+  const bh = "11111111111111111111111111111111";
+  const ix = (programId: string, data: number[]) => ({
+    programId,
+    keys: [{ pubkey: dev.publicKey, signer: true, writable: true }],
+    data: new Uint8Array(data),
+  });
+  const claim = await buildTx(
+    dev,
+    [
+      ix("ComputeBudget111111111111111111111111111111", [3, 0, 0, 0, 0]),
+      ix("6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P", [1, 2, 3]),
+    ],
+    bh,
+  );
+  assert.equal(checkClaimTx(claim), null);
+  // spl token transfer (3) or burn (8) of the dev bag
+  for (const tag of [3, 8, 12, 4, 6])
+    assert.match(
+      checkClaimTx(
+        await buildTx(dev, [ix("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA", [tag, 0, 0, 0, 0, 0, 0, 0, 0])], bh),
+      ) ?? "",
+      /not allowed/,
+    );
+  // a SOL transfer away from the dev wallet
+  assert.match(
+    checkClaimTx(await buildTransferTx(dev, [{ to: other, lamports: 5_000_000_000n }], bh)) ?? "",
+    /not allowed/,
+  );
+  // a program nobody vetted
+  assert.match(checkClaimTx(await buildTx(dev, [ix(other, [0])], bh)) ?? "", /unknown program/);
+  // unwrapping SOL after a claim is fine
+  assert.equal(checkClaimTx(await buildTx(dev, [ix("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA", [9])], bh)), null);
+});

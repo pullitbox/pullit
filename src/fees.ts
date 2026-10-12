@@ -2,7 +2,16 @@
 // then split them on chain: BOX share to the box wallet, the rest to the team wallet.
 // Also decides when the Final Box should run (fees dried up).
 
-import { buildTransferTx, fromB64, signSerializedTx, txSignature, type Keypair, type Rpc } from "./solana.ts";
+import {
+  b58encode,
+  buildTransferTx,
+  fromB64,
+  readCompactU16,
+  signSerializedTx,
+  txSignature,
+  type Keypair,
+  type Rpc,
+} from "./solana.ts";
 
 export const FEES = {
   boxSharePct: 80, // the rest (20%) goes to the team wallet
@@ -20,6 +29,60 @@ export interface FeeLedgerEntry {
   lamports: string;
   claimSig?: string;
   splitSig?: string;
+}
+
+/**
+ * The dev wallet holds the dev bag, and the claim tx is built by PumpPortal, not by us. Before the dev
+ * key signs it, every instruction is checked: only pump's own programs, compute budget, account
+ * creation and unwrapping SOL. Anything that could move or burn tokens, or send SOL away, is refused,
+ * so a bad or hacked API can never touch the bag. Program ids always sit in the static keys of a tx.
+ */
+const CLAIM_PROGRAMS = new Set([
+  "ComputeBudget111111111111111111111111111111",
+  "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P", // pump
+  "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA", // pump amm
+  "pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ", // pump fees
+  "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL", // create a token account
+]);
+const TOKEN_PROGRAMS = new Set([
+  "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+  "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+]);
+const SYSTEM = "11111111111111111111111111111111";
+
+export function checkClaimTx(tx: Uint8Array): string | null {
+  const [n, a] = readCompactU16(tx, 0);
+  const m = tx.slice(a + n * 64);
+  let p = m[0]! & 0x80 ? 1 : 0;
+  p += 3;
+  const [nk, k0] = readCompactU16(m, p);
+  const keys = Array.from({ length: nk }, (_, i) => b58encode(m.slice(k0 + i * 32, k0 + (i + 1) * 32)));
+  p = k0 + nk * 32 + 32; // keys, then the blockhash
+  const [ni, i0] = readCompactU16(m, p);
+  p = i0;
+  for (let i = 0; i < ni; i++) {
+    const prog = keys[m[p++]!];
+    const [na, a0] = readCompactU16(m, p);
+    const [nd, d0] = readCompactU16(m, a0 + na);
+    const data = m.slice(d0, d0 + nd);
+    p = d0 + nd;
+    if (!prog) return "program not in the static keys";
+    if (CLAIM_PROGRAMS.has(prog)) continue;
+    // token programs: only init, close (unwrap) and sync native. no transfer, burn, approve, authority
+    if (TOKEN_PROGRAMS.has(prog)) {
+      if ([1, 9, 16, 17, 18].includes(data[0]!)) continue;
+      return `token instruction ${data[0]} is not allowed`;
+    }
+    // system: only creating an account with rent-sized lamports, never a transfer
+    if (prog === SYSTEM) {
+      const kind = new DataView(data.buffer, data.byteOffset).getUint32(0, true);
+      const lamports = data.length >= 12 ? new DataView(data.buffer, data.byteOffset).getBigUint64(4, true) : 0n;
+      if (kind === 0 && lamports <= 10_000_000n) continue;
+      return `system instruction ${kind} is not allowed`;
+    }
+    return `unknown program ${prog}`;
+  }
+  return null;
 }
 
 /** Ask PumpPortal for an unsigned claim tx (claims all pump creator fees of this wallet). */
@@ -41,6 +104,8 @@ export async function claimPumpCreatorFees(rpc: Rpc, dev: Keypair): Promise<stri
     throw new Error(`PumpPortal ${res.status}: ${text.slice(0, 200)}`);
   }
   const unsigned = new Uint8Array(await res.arrayBuffer());
+  const bad = checkClaimTx(unsigned);
+  if (bad) throw new Error(`refused to sign the claim tx: ${bad}`);
   const signed = await signSerializedTx(unsigned, dev);
   return rpc.sendAndConfirm(signed);
 }

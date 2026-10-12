@@ -4,7 +4,7 @@
 // once, and a stale copy of the bot never pays a winner twice.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { b58encode, buildTransferTx, keypairFromSecret, txSignature, type Keypair } from "../src/solana.ts";
+import { b58encode, buildTx, keypairFromSecret, txSignature, type Keypair } from "../src/solana.ts";
 import { Bot, newState, type Env, type State } from "../src/loop.ts";
 
 const SYSTEM = "11111111111111111111111111111111";
@@ -106,10 +106,24 @@ class Chain {
     this.log.push(kind);
   }
   /** A tx someone else builds for one of our wallets to sign; its effect runs when it is sent. */
-  async foreignTx(kp: Keypair, effect: (sig: string) => { keys: string[]; deltas: Map<string, bigint>; kind: string }) {
+  async foreignTx(
+    kp: Keypair,
+    effect: (sig: string) => { keys: string[]; deltas: Map<string, bigint>; kind: string },
+    program = "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+  ) {
     const bh = randKey();
     this.effects.set(bh, effect);
-    return buildTransferTx(kp, [{ to: kp.publicKey, lamports: 0n }], bh);
+    return buildTx(
+      kp,
+      [
+        {
+          programId: program,
+          keys: [{ pubkey: kp.publicKey, signer: true, writable: true }],
+          data: new Uint8Array([1]),
+        },
+      ],
+      bh,
+    );
   }
   send(tx: Uint8Array): string {
     const sig = txSignature(tx);
@@ -309,13 +323,17 @@ class Chain {
     if (url.startsWith("https://pumpportal.fun")) {
       if (body.action === "collectCreatorFee") {
         if (this.creatorFees === 0n) return new Response("no fees to claim", { status: 400 });
-        const tx = await this.foreignTx(this.dev, () => {
-          const f = this.creatorFees;
-          this.creatorFees = 0n;
-          this.claimed += f;
-          this.add(this.dev.publicKey, f);
-          return { keys: [], deltas: new Map([[this.dev.publicKey, f]]), kind: "claim" };
-        });
+        const tx = await this.foreignTx(
+          this.dev,
+          () => {
+            const f = this.creatorFees;
+            this.creatorFees = 0n;
+            this.claimed += f;
+            this.add(this.dev.publicKey, f);
+            return { keys: [], deltas: new Map([[this.dev.publicKey, f]]), kind: "claim" };
+          },
+          PUMP,
+        );
         return new Response(tx as Uint8Array<ArrayBuffer>);
       }
       return new Response("not simulated", { status: 500 });
