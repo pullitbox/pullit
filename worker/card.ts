@@ -139,7 +139,7 @@ export function drawCard(d: CardData, sprite: ReturnType<typeof spriteRects>): I
   const coin = `of $${d.symbol}`;
   let ck = 7;
   while (ck > 3 && textW(coin, ck) > maxW) ck--;
-  const coinTxt = textW(coin, ck) > maxW ? coin.slice(0, Math.floor(maxW / (6 * ck)) - 1) + "…" : coin;
+  const coinTxt = textW(coin, ck) > maxW ? [...coin].slice(0, Math.floor(maxW / (6 * ck)) - 1).join("") + "…" : coin;
 
   const blocks = [21, 73, 7 * ak, 7 * ck, 21];
   const gaps = [16, 22, 30, 26];
@@ -164,10 +164,12 @@ export function drawCard(d: CardData, sprite: ReturnType<typeof spriteRects>): I
   y += 7 * ck + gaps[3]!;
 
   let x = left;
+  const of = `1 of ${d.eligible.toLocaleString("en-US")}`;
+  const tail = textW(`winner ${d.winner}`, 3) + 27 + textW(`${of} in the draw`, 3) <= maxW ? " in the draw" : "";
   x += im.text("winner ", x, y, 3, MUTED) + 3;
   x += im.text(d.winner, x, y, 3, TEXT) + 3 + 24;
-  x += im.text(`1 of ${d.eligible.toLocaleString("en-US")}`, x, y, 3, TEXT) + 3;
-  im.text(" in the draw", x, y, 3, MUTED);
+  x += im.text(of, x, y, 3, TEXT) + 3;
+  if (tail) im.text(tail, x, y, 3, MUTED);
 
   // the pink strip
   im.rect(0, 544, W, H - 544, PINK);

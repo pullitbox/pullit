@@ -67,7 +67,22 @@ async function run(env: Env) {
   const state = ((await env.STATE.get("state", "json")) as State | null) ?? newState();
   const bot = new Bot(env, state);
   // the sealed box is saved (and visible on the site) before the draw block exists
-  bot.checkpoint = () => env.STATE.put("state", JSON.stringify(state));
+  // a tick that lost the lock must never write: its state is older than the one that took over
+  const mine = async () => (await env.STATE.get("lock")) === token;
+  // kv allows about one write per second per key: retry instead of losing the state
+  const put = async (k: string, v: string) => {
+    for (let i = 0; ; i++)
+      try {
+        return await env.STATE.put(k, v);
+      } catch (e) {
+        if (i >= 2) throw e;
+        await new Promise((r) => setTimeout(r, 1100));
+      }
+  };
+  bot.checkpoint = async () => {
+    if (!(await mine())) throw new Error("lost the lock, not saving");
+    await put("state", JSON.stringify(state));
+  };
   // before any payment: stop if another tick has taken the lock
   bot.guard = async () => {
     if ((await env.STATE.get("lock")) !== token) throw new Error("lost the lock, another tick is running");
@@ -85,8 +100,10 @@ async function run(env: Env) {
     }
     for (const b of state.outbox ?? []) await env.STATE.put(`box:${b.boxId}`, JSON.stringify(b.rows));
     delete state.outbox;
-    await env.STATE.put("state", JSON.stringify(state));
-    if ((await env.STATE.get("lock")) === token) await env.STATE.delete("lock");
+    if (await mine()) {
+      await put("state", JSON.stringify(state));
+      await env.STATE.delete("lock");
+    } else console.log("lost the lock during the tick, state not written");
   }
 }
 
@@ -231,9 +248,9 @@ function boxPage(d: CardData, origin: string): string {
     `<meta property="og:url" content="${origin}/box/${d.boxId}">`,
     `<meta name="twitter:card" content="summary_large_image">`,
     `<meta name="twitter:image" content="${img}">`,
-    `<script>if(!location.hash)history.replaceState(null,"","/#box-${d.boxId}")</script>`,
+    `<script>if(!location.hash)history.replaceState(null,"","/"+location.search+"#box-${d.boxId}")</script>`,
   ].join("\n");
-  return HTML.replace(/<meta property="og:title"[^>]*>\n<meta property="og:description"[^>]*>/, tags);
+  return HTML.replace(/<meta property="og:title"[^>]*>\n<meta property="og:description"[^>]*>/, () => tags);
 }
 
 /** Holder leaderboards: biggest winners, longest in the draw, longest without a win. */

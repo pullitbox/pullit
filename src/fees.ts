@@ -2,7 +2,7 @@
 // then split them on chain: BOX share to the box wallet, the rest to the team wallet.
 // Also decides when the Final Box should run (fees dried up).
 
-import { buildTransferTx, fromB64, signSerializedTx, type Keypair, type Rpc } from "./solana.ts";
+import { buildTransferTx, fromB64, signSerializedTx, txSignature, type Keypair, type Rpc } from "./solana.ts";
 
 export const FEES = {
   boxSharePct: 80, // the rest (20%) goes to the team wallet
@@ -45,34 +45,57 @@ export async function claimPumpCreatorFees(rpc: Rpc, dev: Keypair): Promise<stri
   return rpc.sendAndConfirm(signed);
 }
 
-export interface SplitResult {
+export interface Split {
+  tx: Uint8Array;
+  sig: string;
   totalLamports: bigint;
   boxLamports: bigint;
   teamLamports: bigint;
-  sig: string;
-  kept: boolean; // the team share stayed in the dev wallet
+  kept: boolean; // the team share stays in the dev wallet
 }
 
-/** Moves everything above the gas reserve out of the dev wallet: box share + team share. */
-export async function splitFees(
+/**
+ * How much SOL a claim tx brought into `wallet` (its balance change plus the tx fee it paid),
+ * or null while the tx is not visible yet. Only this counts as fees: SOL that reaches the dev wallet
+ * any other way (the dev's own money, a top-up, a sale) is never split.
+ */
+export async function claimedBy(rpc: Rpc, sig: string, wallet: string): Promise<bigint | null> {
+  const t = await rpc.call<{
+    meta: { err: unknown; fee: number; preBalances: number[]; postBalances: number[] };
+    transaction: { message: { accountKeys: (string | { pubkey: string })[] } };
+  } | null>("getTransaction", [sig, { encoding: "json", maxSupportedTransactionVersion: 0, commitment: "confirmed" }]);
+  if (!t) return null;
+  if (t.meta.err) return 0n;
+  const keys = t.transaction.message.accountKeys.map((k) => (typeof k === "string" ? k : k.pubkey));
+  const i = keys.indexOf(wallet);
+  if (i < 0) return 0n;
+  const delta = BigInt(t.meta.postBalances[i]! - t.meta.preBalances[i]!) + (i === 0 ? BigInt(t.meta.fee) : 0n);
+  return delta > 0n ? delta : 0n;
+}
+
+/**
+ * Builds (does not send) the transfer of the box share of `amount` claimed fees. When the team
+ * wallet is the dev wallet itself (or unset) the team share simply stays where it is.
+ */
+export async function buildSplit(
   rpc: Rpc,
   dev: Keypair,
   boxWallet: string,
   teamWallet: string,
-  floor = 0n, // SOL that was in the dev wallet before any fees (and the dev share kept so far): never split
-): Promise<SplitResult | null> {
+  amount: bigint,
+): Promise<Split | null> {
+  if (amount < FEES.minSplitLamports) return null;
   const bal = await rpc.balance(dev.publicKey);
-  const keepBase = floor > FEES.keepInDevLamports ? floor : FEES.keepInDevLamports;
-  const available = bal - keepBase - 10_000n; // minus tx fee
-  if (available < FEES.minSplitLamports) return null;
-  const box = (available * BigInt(FEES.boxSharePct)) / 100n;
-  const team = available - box;
-  // when the team wallet is the dev wallet itself (or unset), the team share simply stays where it is
-  const keep = !teamWallet || teamWallet === dev.publicKey;
+  const room = bal - FEES.keepInDevLamports - 10_000n; // the dev wallet keeps its gas
+  const total = amount < room ? amount : room;
+  if (total < FEES.minSplitLamports) return null;
+  const box = (total * BigInt(FEES.boxSharePct)) / 100n;
+  const team = total - box;
+  const kept = !teamWallet || teamWallet === dev.publicKey;
   const { blockhash } = await rpc.latestBlockhash();
   const tx = await buildTransferTx(
     dev,
-    keep
+    kept
       ? [{ to: boxWallet, lamports: box }]
       : [
           { to: boxWallet, lamports: box },
@@ -80,8 +103,7 @@ export async function splitFees(
         ],
     blockhash,
   );
-  const sig = await rpc.sendAndConfirm(tx);
-  return { totalLamports: available, boxLamports: box, teamLamports: team, sig, kept: keep };
+  return { tx, sig: txSignature(tx), totalLamports: total, boxLamports: box, teamLamports: team, kept };
 }
 
 /** True when the coin has been live long enough and fees over the window are below the floor. */

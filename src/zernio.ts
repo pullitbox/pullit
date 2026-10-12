@@ -45,7 +45,11 @@ export async function zernioPost(
 ): Promise<string> {
   if (/https?:\/\//i.test(text)) throw new Error("post contains a link; links cost more on X, put it in a reply");
   // x counts every link as 23 characters
-  const xLen = (t: string) => [...t.replace(/https?:\/\/\S+/g, "x".repeat(23))].length;
+  // x counts every link as 23 and most characters outside basic latin (emoji, cjk, "…") as 2
+  const light = (c: number) =>
+    c <= 4351 || (c >= 8192 && c <= 8205) || (c >= 8208 && c <= 8223) || (c >= 8242 && c <= 8247);
+  const xLen = (t: string) =>
+    [...t.replace(/https?:\/\/\S+/g, "x".repeat(23))].reduce((a, ch) => a + (light(ch.codePointAt(0)!) ? 1 : 2), 0);
   for (const t of [text, ...replies]) if (xLen(t) > 280) throw new Error(`post too long: ${xLen(t)}`);
   const platform: Record<string, unknown> = { platform: "twitter", accountId };
   if (replies.length)

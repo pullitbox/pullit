@@ -10,7 +10,7 @@ import { HOT } from "./config.ts";
 import { say, remember } from "./voice.ts";
 import { TEASERS, TEASE_TOPICS } from "./teasers.ts";
 import { packBox, quip, similar, fillQuip, type BoxPlan } from "./agent.ts";
-import { claimPumpCreatorFees, splitFees, shouldRunFinalBox, FEES, type FeeLedgerEntry } from "./fees.ts";
+import { buildSplit, claimedBy, claimPumpCreatorFees, shouldRunFinalBox, FEES, type FeeLedgerEntry } from "./fees.ts";
 import {
   blockhashAt,
   draw,
@@ -76,6 +76,7 @@ export interface BoxRecord {
     coin?: { sig: string; amount: string; inSol?: boolean };
     tries?: number;
     burnBuy?: { sig: string; amount: string };
+    burnInflight?: { sig: string; at: number }; // buyback signed, not confirmed
     burn?: boolean;
   };
   posts: string[];
@@ -94,7 +95,9 @@ export interface State {
   lastHoldersAt: number;
   lastClaimAt: number;
   misses?: Record<string, number>; // wallet -> boxes in a row it was in the draw and did not win
-  devFloor?: string; // dev wallet SOL that is not fees: what was there at launch plus the dev share kept since
+  pendingFees?: string; // claimed fees not split yet (lamports)
+  claimSigs?: string[]; // claim txs whose amount is not counted yet
+  splitInflight?: { sig: string; at: number; total: string; box: string; team: string }; // a split sent, not confirmed
   lastClaimOkAt?: number; // last time a claim went through (even with no fees), for the final box rule
   feeLedger: FeeLedgerEntry[];
   excluded: string[]; // pools, curves, our own wallets
@@ -839,35 +842,106 @@ export class Bot {
       return;
     }
     if (!this.dev) return;
-    // first real claim: whatever the dev wallet holds now is the dev's own SOL, not fees
-    const devBal = await this.rpc.balance(this.dev.publicKey);
-    if (this.state.devFloor === undefined) {
-      this.state.devFloor = devBal.toString();
-      this.log(`dev floor set: ${sol(devBal)} SOL is never split`);
-    } else if (devBal < BigInt(this.state.devFloor)) this.state.devFloor = devBal.toString(); // the dev took some out
+    const st = this.state;
+    // a split sent earlier whose fate was unknown: count it once it landed, never send it twice
+    if (st.splitInflight) {
+      const s = await this.rpc.signatureStatus(st.splitInflight.sig);
+      if (s === "unknown" && Date.now() - st.splitInflight.at < 120_000) return;
+      if (s === "landed") await this.splitDone(st.splitInflight);
+      else this.log(`split ${st.splitInflight.sig} did not land, the fees stay pending`);
+      st.splitInflight = undefined;
+    }
     try {
       const sig = await claimPumpCreatorFees(this.rpc, this.dev);
-      if (sig) this.log(`claimed creator fees ${sig}`);
-      this.state.lastClaimOkAt = Date.now();
+      if (sig) {
+        st.claimSigs = [...(st.claimSigs ?? []), sig];
+        this.log(`claimed creator fees ${sig}`);
+      }
+      st.lastClaimOkAt = Date.now();
     } catch (e) {
       this.log(`claim failed: ${(e as Error).message}`);
     }
-    const floor = BigInt(this.state.devFloor ?? "0");
-    const split = await splitFees(this.rpc, this.dev, this.box.publicKey, this.env.TEAM_WALLET, floor);
-    if (split) {
-      if (split.kept) this.state.devFloor = (floor + split.teamLamports).toString(); // the dev share is not split again
-      this.state.feeLedger.push({ at: Date.now(), lamports: split.totalLamports.toString(), splitSig: split.sig });
-      const v = this.addToVault(split.boxLamports);
-      this.log(
-        `split ${sol(split.totalLamports)} SOL: box ${sol(split.boxLamports)} (vault ${sol(v)}), team ${sol(split.teamLamports)}`,
-      );
-      await this.line(
-        "fee",
-        `claimed ${sol(split.totalLamports)} sol of trading fees. ${sol(split.boxLamports - v)} went in the box, ${sol(v)} into the vault`,
-        [sol(split.totalLamports)],
-        say.fee(sol(split.totalLamports), sol(split.boxLamports - v), sol(v)),
-      );
+    // only what the claims brought in is split, never other SOL in the dev wallet
+    const waiting: string[] = [];
+    for (const sig of st.claimSigs ?? []) {
+      const got = await claimedBy(this.rpc, sig, this.dev.publicKey).catch(() => null);
+      if (got === null) waiting.push(sig);
+      else if (got > 0n) st.pendingFees = (BigInt(st.pendingFees ?? "0") + got).toString();
     }
+    st.claimSigs = waiting.slice(-20);
+    const split = await buildSplit(
+      this.rpc,
+      this.dev,
+      this.box.publicKey,
+      this.env.TEAM_WALLET,
+      BigInt(st.pendingFees ?? "0"),
+    );
+    if (!split) return;
+    const inflight = {
+      sig: split.sig,
+      at: Date.now(),
+      total: split.totalLamports.toString(),
+      box: split.boxLamports.toString(),
+      team: split.teamLamports.toString(),
+    };
+    st.splitInflight = inflight;
+    await this.checkpoint?.(); // saved before it is sent, so a retry checks it instead of sending again
+    try {
+      await this.rpc.sendAndConfirm(split.tx);
+    } catch (e) {
+      this.log(`split not confirmed yet, checking next tick: ${(e as Error).message}`);
+      return;
+    }
+    await this.splitDone(inflight);
+    st.splitInflight = undefined;
+  }
+
+  /**
+   * A tx signed by the box since `sinceMs` that touches the winner (or the winner's account of the prize
+   * coin): proof the prize already went out. Throws when the chain cannot be asked, so nothing is paid blind.
+   */
+  async paidOnChain(winner: string, mint: string, sinceMs: number): Promise<string | null> {
+    const where = [winner];
+    if (mint !== MINTS.SOL) {
+      const acc = await this.rpc.tokenAccount(winner, mint);
+      if (acc) where.push(acc.address);
+    }
+    for (const addr of where) {
+      const sigs = await this.rpc.call<{ signature: string; blockTime: number | null; err: unknown }[]>(
+        "getSignaturesForAddress",
+        [addr, { limit: 20, commitment: "confirmed" }],
+      );
+      for (const x of sigs) {
+        if (x.blockTime && x.blockTime * 1000 < sinceMs - 60_000) break;
+        if (x.err) continue;
+        const t = await this.rpc.call<{
+          transaction: { message: { accountKeys: (string | { pubkey: string })[] } };
+        } | null>("getTransaction", [
+          x.signature,
+          { encoding: "json", maxSupportedTransactionVersion: 0, commitment: "confirmed" },
+        ]);
+        const k = t?.transaction.message.accountKeys[0];
+        if ((typeof k === "string" ? k : k?.pubkey) === this.box.publicKey) return x.signature;
+      }
+    }
+    return null;
+  }
+
+  /** Books a split that landed: fees leave the pending pile, the box share goes into the box and the vault. */
+  async splitDone(s: NonNullable<State["splitInflight"]>) {
+    const total = BigInt(s.total);
+    const box = BigInt(s.box);
+    const pending = BigInt(this.state.pendingFees ?? "0") - total;
+    this.state.pendingFees = (pending > 0n ? pending : 0n).toString();
+    this.state.feeLedger.push({ at: Date.now(), lamports: s.total, splitSig: s.sig });
+    const v = this.addToVault(box);
+    this.log(`split ${sol(total)} SOL: box ${sol(box)} (vault ${sol(v)}), team ${sol(BigInt(s.team))}`);
+    await this.line(
+      "fee",
+      `claimed ${sol(total)} sol of trading fees. ${sol(box - v)} went in the box, ${sol(v)} into the vault`,
+      [sol(total)],
+      say.fee(sol(total), sol(box - v), sol(v)),
+    );
   }
 
   async openBox(final: boolean) {
@@ -1035,6 +1109,8 @@ export class Bot {
     if (this.dry || this.state.history.length > 0 || this.state.phase !== "filling") return;
     const acc = await this.rpc.tokenAccount(this.box.publicKey, this.env.MINT!);
     const amount = acc?.amount ?? 0n;
+    // once a slice is burned the reserve is fixed: re-recording it would forget the burns and burn again
+    if (this.state.reserve?.burns.length) return;
     if (amount > 0n && amount.toString() !== this.state.reserve?.initial) {
       this.state.reserve = { initial: amount.toString(), left: amount.toString(), burns: [] };
       this.log(`launch reserve recorded: ${amount} raw $PULLIT in the box`);
@@ -1134,6 +1210,20 @@ export class Bot {
         paid.inflight = undefined;
         await save();
       }
+      // last check on chain: did the box already pay this winner since the box was sealed (a tick that lost track)?
+      if (!paid.coin) {
+        const inSolNext = (paid.tries ?? 0) >= 5;
+        const dup = await this.paidOnChain(
+          d.winner,
+          inSolNext ? MINTS.SOL : prizeMint(d.tier, p.plan),
+          Date.parse(p.at),
+        );
+        if (dup) {
+          paid.coin = { sig: dup, amount: "?" };
+          this.log(`box #${p.boxId}: found a payout to ${short(d.winner)} on chain (${dup}), not paying again`);
+          await save();
+        }
+      }
       if (!paid.coin) {
         await this.guard?.();
         // a coin that can no longer be bought should not block the box forever: after 5 tries, pay in SOL
@@ -1168,16 +1258,32 @@ export class Bot {
     if (burnTotal > 0n && !paid.burn) {
       if (this.dry) paid.burnBuy = { sig: "dry-run", amount: "0" };
       else if (!paid.burnBuy) {
+        // a buyback signed on an earlier tick: wait for it or drop it, never buy twice
+        if (paid.burnInflight) {
+          const st = await this.rpc.signatureStatus(paid.burnInflight.sig);
+          if (st === "landed") paid.burnBuy = { sig: paid.burnInflight.sig, amount: "?" };
+          if (st !== "unknown" || Date.now() - paid.burnInflight.at >= 120_000) paid.burnInflight = undefined;
+          await save();
+        }
+      }
+      if (!this.dry && !paid.burnBuy && !paid.burnInflight) {
         try {
           await this.guard?.();
+          const signed = async (sig: string) => {
+            paid.burnInflight = { sig, at: Date.now() };
+            await save();
+          };
           let r: { sig: string; outAmount: string };
           try {
-            r = await buyInto(this.env.JUP_API_KEY, this.box, this.env.MINT!, burnTotal, this.box.publicKey);
+            r = await buyInto(this.env.JUP_API_KEY, this.box, this.env.MINT!, burnTotal, this.box.publicKey, signed);
           } catch (e) {
+            // a jupiter buy that was already sent may still land: then no second buy
+            if (paid.burnInflight) throw e;
             // no jupiter route yet (bonding curve, fresh pool): buy straight from pump
             this.log(`buyback via jupiter failed, trying pumpportal: ${(e as Error).message}`);
-            r = await buyViaPumpPortal(this.rpc, this.box, this.env.MINT!, burnTotal);
+            r = await buyViaPumpPortal(this.rpc, this.box, this.env.MINT!, burnTotal, signed);
           }
+          paid.burnInflight = undefined;
           paid.burnBuy = { sig: r.sig, amount: r.outAmount };
           await save();
         } catch (e) {
@@ -1185,6 +1291,8 @@ export class Bot {
           this.log(`buyback failed, the SOL stays in the box: ${(e as Error).message}`);
         }
       }
+      // a buyback that was sent but not confirmed: check it next tick before finishing the box
+      if (!this.dry && !paid.burnBuy && paid.burnInflight) return;
       if (paid.burnBuy) {
         let burnSig = "dry-run";
         if (!this.dry) {
@@ -1240,7 +1348,7 @@ export class Bot {
         short(d.winner),
       )) || winPlain; // a win always gets its post, even if every joke was used
     // the box page unfurls as the winner card; it links the tx, the burn and the seal check
-    const proof = `${p.plan.reveal ? p.plan.reveal.slice(0, 160) + "\n\n" : ""}https://pullit.fun/box/${p.boxId}`;
+    const proof = `${p.plan.reveal ? [...p.plan.reveal].slice(0, 120).join("") + "\n\n" : ""}https://pullit.fun/box/${p.boxId}`;
     const resultPost = winText;
     // on x only the wins worth a post: epic, secret, milestone and the final box (x posts are capped per day)
     if (d.tier === "epic" || d.tier === "secret" || p.milestone || p.final)
