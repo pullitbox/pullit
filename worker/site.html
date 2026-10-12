@@ -123,6 +123,12 @@ footer{font-size:11px;color:var(--dim);margin-top:22px}
 .how{margin:12px 0 0;font-size:12px;color:var(--muted)}
 .how b{color:var(--text);font-weight:400}
 .how button{background:none;border:0;padding:0;color:var(--pink);cursor:pointer;font-size:12px;text-decoration:underline;text-underline-offset:3px}
+/* vault, burns and the draw: one quiet row of numbers under the card */
+.meta{display:flex;flex-wrap:wrap;gap:6px 18px;margin:8px 0 0;font-size:12px;color:var(--muted)}
+.meta b{color:var(--text);font-weight:400}
+.meta button{background:none;border:0;padding:0;font:inherit;color:inherit;cursor:pointer}
+.meta button b{color:var(--gold);text-decoration:underline dotted;text-underline-offset:3px}
+.meta .bn b{color:#ff9a4d}
 .odds.frenzy span{animation:blink 1.4s steps(2) infinite}
 .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
 .stats .vt{background:var(--bg);border:0;padding:10px 8px;text-align:left;cursor:pointer;color:var(--gold);min-width:0}
@@ -245,6 +251,7 @@ html:has(dialog[open]),body:has(dialog[open]){overflow:hidden}
       </div>
     </section>
     <p class="how">hold <b id="entry">$20</b>+ for 7 min and you're in · <button type="button" data-open="meSheet">check eligibility</button></p>
+    <p class="meta"><button type="button" data-open="vaultSheet">vault <b id="mVault">0 sol</b></button><span class="bn">burned <b id="mBurn">0 sol</b></span><span>in the draw <b id="mIn">0</b></span></p>
     <div class="oddsh">next box odds</div>
     <div class="odds" id="oddsRow"></div>
     <div class="mini">
@@ -432,6 +439,9 @@ function render() {
   setText('vault', fmt(sol(s.vaultLamports), 2) + ' sol');
   setText('vaultBig', fmt(sol(s.vaultLamports), 3) + ' sol');
   setText('vaultTile', fmt(sol(s.vaultLamports), 2));
+  setText('mVault', fmt(sol(s.vaultLamports), 2) + ' sol');
+  setText('mBurn', fmt(sol(s.burned?.lamports || '0'), 2) + ' sol');
+  setText('mIn', p.eligible != null ? Number(p.eligible).toLocaleString('en-US') : '0');
   const rv = p.reserve;
   $('resv').hidden = !rv;
   if (rv) $('resvPct').textContent = String(Math.round((Number(rv.left) / Number(rv.initial)) * 100));
