@@ -31,7 +31,7 @@ import { BOOST, frenzyLevel, oddsAt, newMilestones, usdShort, volume1h } from ".
 import { findXAccount, zernioPost } from "./zernio.ts";
 
 export const LOOP = {
-  claimEveryMin: 10,
+  claimEveryMin: 1,
   holdersEveryMin: 5,
   topHoldersToInspect: 40, // pools and curves are always among the biggest holders
   vaultPct: 10, // of everything that goes into the box, this share is set aside in the vault
