@@ -10,7 +10,7 @@
   "vars": {
     "TEAM_WALLET": "BQF2WHxY7ZmWdBPMatYdQZ9UygJuCtRmmRrkQQg3qD59",
     "MINT": "",
-    "PUBLIC": "",
+    "PUBLIC": "1",
     "DRY_RUN": "",
   },
 }

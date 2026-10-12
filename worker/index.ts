@@ -204,9 +204,19 @@ async function walletStatus(env: Env, addr: string) {
   return { status: "out", ifBuy: whatIf(0, 1), minUsd: entry, at: snap?.at };
 }
 
+/**
+ * The state the public may see: only once the real coin is set and the bot has started on it
+ * (mintSeen), so boxes from a test run never show up on the site. The preview key sees everything.
+ */
+async function liveState(env: Env, preview: boolean): Promise<State | null> {
+  const s = (await env.STATE.get("state", "json")) as State | null;
+  if (preview) return s;
+  return s && env.MINT && s.mintSeen === env.MINT ? s : null;
+}
+
 /** One opened box with everything needed to recompute the draw. */
-async function boxDetail(env: Env, id: number) {
-  const state = (await env.STATE.get("state", "json")) as State | null;
+async function boxDetail(env: Env, id: number, preview: boolean) {
+  const state = await liveState(env, preview);
   const rec = state?.history.find((b) => b.boxId === id);
   if (!rec) return null;
   const rows = (await env.STATE.get(`box:${id}`, "json")) as { owner: string; tickets: number }[] | null;
@@ -220,8 +230,8 @@ const solStr = (l: string | bigint | undefined, d = 2) => {
 };
 
 /** What the share card of a box shows, or null while the box is not opened. */
-async function cardData(env: Env, id: number): Promise<CardData | null> {
-  const state = (await env.STATE.get("state", "json")) as State | null;
+async function cardData(env: Env, id: number, preview: boolean): Promise<CardData | null> {
+  const state = await liveState(env, preview);
   const b = state?.history.find((x) => x.boxId === id);
   if (!b?.draw || !b.prize) return null;
   return {
@@ -254,9 +264,9 @@ function boxPage(d: CardData, origin: string): string {
 }
 
 /** Holder leaderboards: biggest winners, longest in the draw, longest without a win. */
-async function top(env: Env) {
-  const state = (await env.STATE.get("state", "json")) as State | null;
-  const snap = (await env.STATE.get("tickets", "json")) as Snap | null;
+async function top(env: Env, preview: boolean) {
+  const state = await liveState(env, preview);
+  const snap = state ? ((await env.STATE.get("tickets", "json")) as Snap | null) : null;
   const excluded = new Set(state?.excluded ?? []);
   const won = new Map<string, { lamports: bigint; wins: number; best: string }>();
   const rank = ["common", "rare", "epic", "secret"];
@@ -308,17 +318,20 @@ export default {
           (await env.STATE.get("state", "json")) as State | null,
           env.REPO_URL,
           env.DRY_RUN === "1",
-          !!env.MINT || preview,
+          !!(await liveState(env, preview)),
         ),
       );
     if (url.pathname === "/api/wallet") {
       const a = url.searchParams.get("a") ?? "";
-      return ADDR.test(a) ? json(await walletStatus(env, a)) : json({ error: "not a solana address" }, 400);
+      if (!ADDR.test(a)) return json({ error: "not a solana address" }, 400);
+      // before the real coin runs there are no holders to check against
+      if (!(await liveState(env, preview))) return json({ status: "out", minUsd: 20 });
+      return json(await walletStatus(env, a));
     }
-    if (url.pathname === "/api/top") return json(await top(env));
+    if (url.pathname === "/api/top") return json(await top(env, preview));
     const bm = url.pathname.match(/^\/box\/(\d+)\/?$/);
     if (bm) {
-      const d = await cardData(env, Number(bm[1]));
+      const d = await cardData(env, Number(bm[1]), preview);
       if (!d) return Response.redirect(`${url.origin}/`, 302);
       return new Response(boxPage(d, url.origin), {
         headers: { "content-type": "text/html; charset=utf-8", "cache-control": "public, max-age=300" },
@@ -326,7 +339,7 @@ export default {
     }
     const cm = url.pathname.match(/^\/card\/(\d+)\.png$/);
     if (cm) {
-      const d = await cardData(env, Number(cm[1]));
+      const d = await cardData(env, Number(cm[1]), preview);
       if (!d) return new Response("not found", { status: 404 });
       return new Response(await renderCard(d, BOXSVG), {
         // an opened box never changes, so its card can be cached for good
@@ -334,7 +347,7 @@ export default {
       });
     }
     if (url.pathname === "/api/box") {
-      const d = await boxDetail(env, Number(url.searchParams.get("id")));
+      const d = await boxDetail(env, Number(url.searchParams.get("id")), preview);
       return d ? json(d) : json({ error: "no such box" }, 404);
     }
     if (url.pathname === "/" || url.pathname === "/index.html")
