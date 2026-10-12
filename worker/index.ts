@@ -331,15 +331,21 @@ export default {
     }
     if (url.pathname === "/api/selftest")
       return preview ? json(await selftest(env)) : new Response("not found", { status: 404 });
-    if (url.pathname === "/api/state")
-      return json(
-        publicState(
-          (await env.STATE.get("state", "json")) as State | null,
-          env.REPO_URL,
-          env.DRY_RUN === "1",
-          !!(await liveState(env, preview)),
-        ),
+    if (url.pathname === "/api/state") {
+      const live = !!(await liveState(env, preview));
+      const st = publicState(
+        (await env.STATE.get("state", "json")) as State | null,
+        env.REPO_URL,
+        env.DRY_RUN === "1",
+        live,
       );
+      // tweets pinned by hand with `npm run tweet -- <link>`, shown on the site next to the bot's own posts
+      const pins = live ? ((await env.STATE.get("xpins", "json")) as string[] | null) : null;
+      return json({
+        ...st,
+        pins: (pins ?? []).filter((u) => /^https:\/\/(x|twitter)\.com\/\w+\/status\/\d+$/.test(u)).slice(0, 6),
+      });
+    }
     if (url.pathname === "/api/wallet") {
       const a = url.searchParams.get("a") ?? "";
       if (!ADDR.test(a)) return json({ error: "not a solana address" }, 400);

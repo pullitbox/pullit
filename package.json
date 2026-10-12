@@ -36,6 +36,7 @@
     "secrets": "node --experimental-strip-types --no-warnings --env-file-if-exists=.env scripts/dev/secrets.ts",
     "sim": "node --experimental-strip-types --no-warnings scripts/dev/sim.ts",
     "site": "node --experimental-strip-types --no-warnings scripts/build-site.ts",
+    "tweet": "node --experimental-strip-types --no-warnings scripts/dev/tweet.ts",
     "test": "node --experimental-strip-types --no-warnings --test test/*.test.ts",
     "testbox": "node --experimental-strip-types --no-warnings --env-file-if-exists=.env scripts/dev/testbox.ts",
     "typecheck": "tsc -p .",
