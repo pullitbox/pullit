@@ -17,8 +17,8 @@ export const AGENT = {
 export const TIERS = [
   { key: "common", pct: 50, boxPct: 50, vaultPct: 0, asset: "fresh runner" },
   { key: "rare", pct: 30, boxPct: 75, vaultPct: 0, asset: "meta runner" },
-  { key: "epic", pct: 15, boxPct: 100, vaultPct: 0, asset: "meta runner" },
-  { key: "secret", pct: 5, boxPct: 100, vaultPct: 25, asset: "meta runner" },
+  { key: "epic", pct: 19, boxPct: 100, vaultPct: 0, asset: "meta runner" },
+  { key: "secret", pct: 1, boxPct: 100, vaultPct: 100, asset: "meta runner" }, // the only way the vault opens
 ] as const;
 export type Tier = (typeof TIERS)[number]["key"];
 

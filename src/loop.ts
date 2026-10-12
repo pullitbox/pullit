@@ -70,7 +70,7 @@ export interface BoxRecord {
   odds?: number[]; // common/rare/epic/secret %, locked when the box was sealed (frenzy)
   frenzy?: number; // frenzy level when sealed
   milestone?: number; // market cap in USD this box celebrates: epic or better, plus vault
-  bond?: boolean; // the bond box: the whole vault, epic or better
+  bond?: boolean; // the bond box: epic or better
   burnLamports?: string; // part of the box spent on buyback and burn
   burn?: { buySig: string; burnSig: string; amount: string; lamports: string; fromVault?: string };
   // progress, so a retry never pays twice: signed (inflight), landed (coin), buyback bought, burn done
@@ -137,7 +137,7 @@ export interface State {
   nextTeaseAt?: number; // before launch: when the next teaser goes out on x
   xPostedAt?: number[]; // times of the x posts of the last 24 hours, for the daily cap
   dexPaid?: { posted?: boolean; checkedAt?: number };
-  bond?: { at?: number; queued?: boolean; checkedAt?: number }; // migration to pumpswap: the next box gets the whole vault // the one "dex paid" post, once dexscreener confirms it
+  bond?: { at?: number; queued?: boolean; checkedAt?: number }; // migration to pumpswap: the next box is epic or better // the one "dex paid" post, once dexscreener confirms it
   recapPosted?: boolean; // the first-hour recap went out
   teaseUsed?: number[]; // hand-written teasers already posted this round
   teaseTopics?: string[]; // topics of the last pre-launch posts, oldest first
@@ -522,12 +522,12 @@ export class Bot {
       const cap = usdShort(top);
       await this.line(
         "boost",
-        `$PULLIT just crossed ${cap} market cap. the next box is a milestone box: epic or better guaranteed, plus ${BOOST.milestoneVaultPct}% of the vault, and ${BOOST.milestoneBurnVaultPct}% of the vault gets bought back and burned`,
+        `$PULLIT just crossed ${cap} market cap. the next box is a milestone box: epic or better guaranteed`,
         [cap],
-        `${cap} cap. next box is a milestone box: epic or better plus ${BOOST.milestoneVaultPct}% of the vault`,
+        `${cap} cap. next box is a milestone box: epic or better`,
       );
       const text = await this.xLine(
-        `$PULLIT just crossed ${cap} market cap. the next box is a milestone box: epic or better guaranteed for whoever pulls it, plus ${BOOST.milestoneVaultPct}% of the vault. and ${BOOST.milestoneBurnVaultPct}% of the vault buys $PULLIT and burns it. write the post`,
+        `$PULLIT just crossed ${cap} market cap. the next box is a milestone box: epic or better guaranteed for whoever pulls it. write the post`,
         [cap],
         `$PULLIT at ${cap}. next box is a milestone box. epic or better, plus a chunk of the vault`,
       );
@@ -1245,7 +1245,7 @@ export class Bot {
       bank,
       vault,
       !!p.final,
-      p.bond ? 100 : p.milestone ? BOOST.milestoneVaultPct : 0, // the bond box empties the vault
+      p.milestone ? BOOST.milestoneVaultPct : 0, // the vault opens only on a secret pull
     );
     const lamports = fromBank + fromVault;
     // a milestone box also burns a slice of what is left in the vault, on top of the usual 10% of the box
@@ -1396,11 +1396,7 @@ export class Bot {
     const extra = fromVault > 0n ? ` (${sol(fromVault)} from the vault)` : "";
     const both = `${sol(lamports)} sol of $${symbol}`;
     const tx = prize.sig;
-    const ms = p.bond
-      ? " the bond box, the whole vault."
-      : p.milestone
-        ? ` milestone box for ${usdShort(p.milestone)} cap.`
-        : "";
+    const ms = p.bond ? " the bond box." : p.milestone ? ` milestone box for ${usdShort(p.milestone)} cap.` : "";
     const winPlain = `box #${p.boxId} opened. ${short(d.winner)} pulled ${d.tier}: ${both}${extra}. block ${d.slot} decided it`;
     const winText =
       (await this.xLine(
@@ -1628,12 +1624,12 @@ who you are, only for context: a pink pixel gift box on solana, not live yet. tr
     this.log(`bonded: the next box is the bond box (vault ${vault} sol)`);
     await this.line(
       "box",
-      `$PULLIT just bonded. the next box is the bond box: the whole vault, ${vault} sol, goes into it, and whoever pulls it gets epic or better`,
+      `$PULLIT just bonded. the next box is the bond box: whoever pulls it gets epic or better. the vault (${vault} sol) still only opens on a secret pull`,
       [vault],
-      `bonded. next box gets the whole vault, ${vault} sol. epic or better guaranteed`,
+      `bonded. next box is epic or better guaranteed`,
     );
     await this.post(
-      `$PULLIT bonded.\n\nthe next box is the bond box: the whole vault (${vault} sol) goes in, epic or better guaranteed.\nhold $${this.entry()}+ to be in the draw.`,
+      `$PULLIT bonded.\n\nthe next box is the bond box: epic or better guaranteed.\nhold $${this.entry()}+ to be in the draw.`,
       ["pullit.fun"],
       false,
       "always",

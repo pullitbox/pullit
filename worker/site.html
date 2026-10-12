@@ -310,9 +310,9 @@ html:has(dialog[open]),body:has(dialog[open]){overflow:hidden}
   <h2 class="px">rules<button class="x" type="button" data-close aria-label="close">x</button></h2>
   <dl class="rg">
     <dt>the box</dt><dd>trading fees fill it. the agent picks the coins. a future solana block picks the holder and the tier</dd>
-    <dt>odds</dt><dd class="odds" id="oddsLine"><b class="t-common">common 50</b><b class="t-rare">rare 30</b><b class="t-epic">epic 15</b><b class="t-secret">secret 5</b></dd>
+    <dt>odds</dt><dd class="odds" id="oddsLine"><b class="t-common">common 50</b><b class="t-rare">rare 30</b><b class="t-epic">epic 19</b><b class="t-secret">secret 1</b></dd>
     <dt>get in</dt><dd>hold the entry for 7 min. bigger bag, more tickets</dd>
-    <dt>vault</dt><dd>10% of every box is set aside. <a href="#" data-open="vaultSheet">now <span id="vault">0 sol</span></a>. milestone boxes open it</dd>
+    <dt>vault</dt><dd>10% of every box is set aside. <a href="#" data-open="vaultSheet">now <span id="vault">0 sol</span></a>. only a secret pull opens it</dd>
     <dt>burn</dt><dd>10% of every box buys $pullit and burns it</dd>
     <dt>fees</dt><dd>80% to the box, 20% to the dev</dd>
   </dl>
@@ -333,7 +333,7 @@ html:has(dialog[open]),body:has(dialog[open]){overflow:hidden}
     <dt>what</dt><dd>10% of everything that goes into a box is set aside here. it sits in the box wallet, on chain</dd>
     <dt>why</dt><dd>so some pulls are way bigger than the box. one lucky holder walks off with a chunk</dd>
     <dt>grows</dt><dd>every box adds to it. it only goes down when something opens it</dd>
-    <dt>opens</dt><dd>milestone boxes give 20% to the winner and burn another 10%: bought back and gone. the rest goes to the bond box: when $PULLIT bonds, the whole vault goes into one box, epic or better</dd>
+    <dt>opens</dt><dd>only a secret pull, 1% per box. whoever hits it takes the whole vault on top of the box</dd>
   </dl>
 </div></dialog>
 
@@ -350,7 +350,7 @@ html:has(dialog[open]),body:has(dialog[open]){overflow:hidden}
 <script>
 const Q = /[?&]preview=/.test(location.search) ? location.search : '';
 const $ = (id) => document.getElementById(id);
-const TIERS = [{ key: 'common', pct: 50 }, { key: 'rare', pct: 30 }, { key: 'epic', pct: 15 }, { key: 'secret', pct: 5 }];
+const TIERS = [{ key: 'common', pct: 50 }, { key: 'rare', pct: 30 }, { key: 'epic', pct: 19 }, { key: 'secret', pct: 1 }];
 const COLOR = { common: '#c9c2d6', rare: '#8ec5ff', epic: '#cfa8ff', secret: '#ffc94d' };
 const TAG = { fee: '#7be0c3', scan: '#9a8f99', pick: '#8ec5ff', box: '#ff8dc0', draw: '#ffc94d', win: '#ff8dc0', sent: '#9a8f99', info: '#9a8f99', roast: '#ff6b6b', hold: '#7be0c3', x: '#f4eef2', boost: '#ffc94d', burn: '#ff9a4d' };
 const MSG = { boost: 'gd', burn: 'or', x: 'hi', pick: 'hi', box: 'pk', win: 'pk', draw: 'gd', roast: 'rd', hold: 'mt' };
@@ -429,7 +429,7 @@ function render() {
   } else {
     setText('kick', `box #${id} is filling`);
     setText('big', down(have) + ' sol');
-    setText('sline', p.bondBox ? `bond box: the whole vault, epic or better` : p.milestoneBox ? `milestone box: epic or better` : "box agent picks the coin you'll get");
+    setText('sline', p.bondBox ? `bond box: epic or better` : p.milestoneBox ? `milestone box: epic or better` : "box agent picks the coin you'll get");
     $('fill').style.width = Math.round(pct * 100) + '%';
     setText('bl1', need ? `opens at ${fmt(need, 2)} sol` : 'opens when full');
     setText('bl2', Math.round(pct * 100) + '%');
@@ -438,7 +438,7 @@ function render() {
     if (fresh) say(last.posts?.[last.posts.length - 1] || `${short(last.draw.winner)} pulled ${last.draw.tier}. next box is filling`);
     else say(n < 30 ? 'im mostly air right now. trades fill me' : n < 80 ? `${n}% full. i can feel it` : `${n}%. almost. dont leave`);
   }
-  const badge = won || !mint || pk ? '' : p.bondBox ? 'bond box · whole vault' : p.milestoneBox ? `milestone box · ${capShort(p.milestoneBox)} cap` : p.frenzy ? `frenzy ${p.frenzy}/3 · better odds` : '';
+  const badge = won || !mint || pk ? '' : p.bondBox ? 'bond box · epic or better' : p.milestoneBox ? `milestone box · ${capShort(p.milestoneBox)} cap` : p.frenzy ? `frenzy ${p.frenzy}/3 · better odds` : '';
   $('badge').hidden = !badge; setText('badge', badge);
 
   // numbers

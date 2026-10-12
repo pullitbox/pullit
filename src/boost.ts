@@ -8,18 +8,18 @@ export const BOOST = {
   burnPct: 10, // of every box, spent on $PULLIT that is burned right away
   // frenzy: more volume in the last hour, better odds for the next box. odds are common/rare/epic/secret
   frenzy: [
-    { minVolume1h: 0, odds: [50, 30, 15, 5] },
-    { minVolume1h: 20_000, odds: [45, 30, 18, 7] },
-    { minVolume1h: 60_000, odds: [40, 30, 21, 9] },
-    { minVolume1h: 150_000, odds: [35, 30, 24, 11] },
+    { minVolume1h: 0, odds: [50, 30, 19, 1] },
+    { minVolume1h: 20_000, odds: [45, 30, 24, 1] },
+    { minVolume1h: 60_000, odds: [40, 30, 29, 1] },
+    { minVolume1h: 150_000, odds: [35, 30, 34, 1] },
   ],
   // the first box after the market cap crosses one of these is a milestone box: epic or better, plus vault
   milestonesUsd: [50_000, 100_000, 250_000, 500_000, 1_000_000, 2_500_000, 5_000_000, 10_000_000],
-  milestoneVaultPct: 20, // to the winner of a milestone box
+  milestoneVaultPct: 0, // to the winner of a milestone box
   // the launch reserve (bought at launch into the box) loses this share of its original size at each of these caps
   reserveBurnPct: 10,
   reserveBurnAtUsd: [50_000, 125_000, 200_000, 350_000],
-  milestoneBurnVaultPct: 10, // of what is left in the vault, bought back and burned on a milestone box
+  milestoneBurnVaultPct: 0, // of what is left in the vault, bought back and burned on a milestone box
 };
 
 export type Odds = [number, number, number, number];

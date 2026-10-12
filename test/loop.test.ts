@@ -123,7 +123,7 @@ test("the log never says the same thing twice", async () => {
   assert.ok(lines.length >= 3 && lines.length <= 7);
 });
 
-test("a dry box opens with locked odds, a milestone vault cut, a box burn and a vault burn", async () => {
+test("a dry milestone box opens with locked odds and a box burn, the vault only on secret", async () => {
   const b = new Bot(
     { HELIUS_API_KEY: "x", JUP_API_KEY: "x", BOX_SECRET: "x", TEAM_WALLET: "T", DRY_RUN: "1" },
     newState(),
@@ -163,13 +163,13 @@ test("a dry box opens with locked odds, a milestone vault cut, a box burn and a 
   const r = b.state.history[0];
   assert.ok(r.draw && ["epic", "secret"].includes(r.draw.tier)); // milestone box
   const fromVault = BigInt(r.prize!.fromVault);
-  assert.equal(fromVault, r.draw!.tier === "secret" ? 450_000_000n : 200_000_000n);
+  assert.equal(fromVault, r.draw!.tier === "secret" ? 1_000_000_000n : 0n);
   // prize = the whole box minus the burn, plus the vault cut
   assert.equal(r.prize!.lamports, (900_000_000n + fromVault).toString());
-  // milestone: 10% of what is left in the vault is burned too, on top of 10% of the box
-  const vaultBurn = ((1_000_000_000n - fromVault) * 10n) / 100n;
+  // milestones no longer burn from the vault: only 10% of the box
+  const vaultBurn = 0n;
   assert.equal(r.burn!.lamports, (100_000_000n + vaultBurn).toString());
-  assert.equal(r.burn!.fromVault, vaultBurn.toString());
+  assert.equal(r.burn!.fromVault, undefined);
   assert.equal(b.state.burned!.lamports, (100_000_000n + vaultBurn).toString());
   assert.equal(b.state.vaultLamports, (1_000_000_000n - fromVault - vaultBurn).toString());
   assert.ok(b.state.feed.some((f) => f.tag === "burn"));

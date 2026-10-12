@@ -5,13 +5,13 @@ import type { BoxPlan } from "../src/agent.ts";
 
 const plan = { common: { mint: "C1", symbol: "C" }, rare: { mint: "R1", symbol: "R" } } as BoxPlan;
 
-test("tiers take their share of the box, secret also a quarter of the vault", () => {
+test("tiers take their share of the box, only secret opens the vault, all of it", () => {
   const bank = 1_000_000_000n,
     vault = 400_000_000n;
   assert.deepEqual(prizeSplit("common", bank, vault), { fromBank: 500_000_000n, fromVault: 0n });
   assert.deepEqual(prizeSplit("rare", bank, vault), { fromBank: 750_000_000n, fromVault: 0n });
   assert.deepEqual(prizeSplit("epic", bank, vault), { fromBank: bank, fromVault: 0n });
-  assert.deepEqual(prizeSplit("secret", bank, vault), { fromBank: bank, fromVault: 100_000_000n });
+  assert.deepEqual(prizeSplit("secret", bank, vault), { fromBank: bank, fromVault: vault });
 });
 
 test("the final box empties everything whatever the tier", () => {
@@ -30,9 +30,9 @@ test("seal is stable and changes with the contents", async () => {
   assert.match(a, /^[0-9a-f]{64}$/);
 });
 
-test("a milestone box also takes its cut of the vault", () => {
-  assert.deepEqual(prizeSplit("epic", 1000n, 400n, false, 20), { fromBank: 1000n, fromVault: 80n });
-  assert.deepEqual(prizeSplit("secret", 1000n, 400n, false, 20), { fromBank: 1000n, fromVault: 180n });
+test("a milestone box does not open the vault, a secret pull still takes all of it", () => {
+  assert.deepEqual(prizeSplit("epic", 1000n, 400n, false, 0), { fromBank: 1000n, fromVault: 0n });
+  assert.deepEqual(prizeSplit("secret", 1000n, 400n, false, 0), { fromBank: 1000n, fromVault: 400n });
 });
 
 test("the bot cannot sell: every swap in the code starts from SOL", async () => {

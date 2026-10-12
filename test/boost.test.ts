@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { BOOST, frenzyLevel, newMilestones, oddsAt, usdShort } from "../src/boost.ts";
 import { rollTier } from "../src/agent.ts";
 
-test("every frenzy level has odds that add up to 100 and only get better", () => {
+test("every frenzy level has odds that add up to 100, epic gets better, secret stays at 1", () => {
   for (const f of BOOST.frenzy)
     assert.equal(
       f.odds.reduce((a, b) => a + b, 0),
@@ -11,7 +11,7 @@ test("every frenzy level has odds that add up to 100 and only get better", () =>
     );
   for (let i = 1; i < BOOST.frenzy.length; i++) {
     assert.ok(BOOST.frenzy[i].odds[2] > BOOST.frenzy[i - 1].odds[2]);
-    assert.ok(BOOST.frenzy[i].odds[3] > BOOST.frenzy[i - 1].odds[3]);
+    assert.equal(BOOST.frenzy[i].odds[3], 1);
   }
 });
 
