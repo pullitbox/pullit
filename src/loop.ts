@@ -1775,10 +1775,15 @@ who you are, only for context: a pink pixel gift box on solana, not live yet. tr
     }
     // the clock ran out: the last buyer who still holds takes the pot
     const pot = BigInt(g.clockPot);
-    if (g.clock && now > g.clock.endsAt && pot >= GAMES.minClockPotLamports) {
-      for (const c of g.clock.last) if (await this.stillHolds(c)) return this.gamesPay("clock", c, pot);
-      this.feed("win", `the clock ran out but every last buyer already sold. the pot (${sol(pot)} sol) rolls over`);
-      g.clock = undefined;
+    if (g.clock && now > g.clock.endsAt) {
+      if (pot < GAMES.minClockPotLamports) {
+        // too small to pay: the round ends and the pot keeps growing for the next one
+        g.clock = undefined;
+      } else {
+        for (const c of g.clock.last) if (await this.stillHolds(c)) return this.gamesPay("clock", c, pot);
+        this.feed("win", `the clock ran out but every last buyer already sold. the pot (${sol(pot)} sol) rolls over`);
+        g.clock = undefined;
+      }
     }
     // lucky buys: rolled once they held long enough, a few per tick
     const due = g.queue.filter((b) => now - b.at >= GAMES.holdMinutes * 60_000).slice(0, 5);
