@@ -334,9 +334,9 @@ html:has(dialog[open]),body:has(dialog[open]){overflow:hidden}
     <p class="how">hold <b id="entry">$20</b>+ for 7 min and you're in · <button type="button" data-open="meSheet">check eligibility</button></p>
     <p class="meta"><span class="bn">burned <b id="mBurn">0 sol</b></span><span>in the draw <b id="mIn">0</b></span></p>
     <section class="race" id="race" hidden>
-      <div class="rh"><span class="k">bond race <button type="button" class="rq" data-open="rules" aria-label="how the bond race works">?</button></span><b id="bPot">0 sol</b></div>
+      <div class="rh"><span class="k">to bond <button type="button" class="rq" data-open="rules" aria-label="what happens at the bond">?</button></span><b id="cBig">0%</b></div>
       <div class="cbar" id="cBar"></div>
-      <div class="rl"><span id="bLine">last $50+ buy before the bond takes it</span><span class="pc" id="cPct">0%</span></div>
+      <div class="rl"><span id="bLine">next: the bond box, epic or better</span><span class="pc" id="bPot"></span></div>
     </section>
     <div class="hints" id="hints" hidden></div>
     <div class="oddsh">next box odds</div>
@@ -415,7 +415,7 @@ html:has(dialog[open]),body:has(dialog[open]){overflow:hidden}
     <dt>vault</dt><dd>no longer filled, every lamport goes into the box. <a href="#" data-open="vaultSheet">now <span id="vault">0 sol</span></a>. a secret pull or the final box opens it</dd>
     <dt>burn</dt><dd>10% of every box buys $pullit and burns it</dd>
     <dt>fees</dt><dd>until $pullit bonds: 75% to the box, 25% to the dev (under $20k cap: 80% to the box, 20% to the dev). after the bond 70% to the box, 30% to the dev</dd>
-    <dt>bond race</dt><dd>5% of every box goes to the bond pot until $pullit bonds. the last $50+ buy before the bond takes it, paid 7 min after the bond if they still hold</dd>
+    <dt>to bond</dt><dd>how far the pump.fun curve is. at 100% $pullit bonds and the next box is the bond box: epic or better</dd>
     <dt>the clock</dt><dd>every $50+ buy resets a 3 min timer. when it hits zero the last buyer takes the clock pot, if they still hold what they bought</dd>
     <dt>lucky buys</dt><dd>every $50+ buy is rolled on a later block: 1 in 15 takes half the lucky pot, paid after 7 min if you still hold</dd>
   </dl>
@@ -594,16 +594,16 @@ function render() {
   // the bond race and the curve
   const G = s.games;
   const cp = p.curvePct, bonded = cp === 100 || !!G?.bondDone;
-  $('race').hidden = cp == null && !(G && Number(G.bondPot) > 0);
+  $('race').hidden = cp == null;
   if (!$('race').hidden) {
     const n = Math.floor((cp || 0) / 5), bar = $('cBar');
     if (bar.children.length !== 20) bar.replaceChildren(...Array.from({ length: 20 }, () => el('i')));
     [...bar.children].forEach((c, i) => { c.className = i < n ? 'on' : i === n && !bonded ? 'edge' : ''; });
     $('race').classList.toggle('done', bonded);
-    setText('bPot', fmt(sol(G?.bondPot), 3) + ' sol');
-    setText('cPct', bonded ? 'bonded' : cp == null ? '' : fmt(cp, 1) + '% to bond');
-    setText('bLine', bonded ? (G?.bondDone ? 'bond race is over' : 'bonded. the last buyer is paid after 7 min if they still hold')
-      : G?.bondLeader ? `last $50+ buy: ${short(G.bondLeader)}` : 'last $50+ buy before the bond takes it');
+    const pot = sol(G?.bondPot);
+    setText('cBig', bonded ? 'bonded' : cp == null ? '' : fmt(cp, 1) + '%');
+    setText('bPot', pot > 0 ? 'bond pot ' + fmt(pot, 3) + ' sol' : '');
+    setText('bLine', bonded ? 'bonded. the bond box is next: epic or better' : 'next: the bond box, epic or better');
   }
 
   // what more volume would do

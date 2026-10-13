@@ -690,6 +690,8 @@ export class Bot {
     // SOL the dev sent to the box wallet for the bond race: set aside in the pot, once
     const seed = BigInt(Math.round(Number(this.env.BOND_SEED_SOL || 0) * 1e9));
     const g = this.gamesState();
+    // the race is off and nobody seeded it: whatever the pot caught goes back into the box
+    if (GAMES.bondPct === 0 && !g.bondSeed && BigInt(g.bondPot ?? "0") > 0n) g.bondPot = "0";
     if (seed > 0n && !g.bondSeed) {
       g.bondSeed = seed.toString();
       g.bondPot = (BigInt(g.bondPot ?? "0") + seed).toString();
@@ -1943,7 +1945,7 @@ who you are, only for context: a pink pixel gift box on solana, not live yet. tr
       `bonded. next box is epic or better guaranteed`,
     );
     await this.post(
-      `$PULLIT bonded.\n\nthe next box is the bond box: epic or better guaranteed.\nthe last $50+ buy before the bond takes the bond pot (${sol(BigInt(this.gamesState().bondPot ?? "0"))} sol) in 7 min, if they still hold.\nhold $${this.entry()}+ to be in the draw.`,
+      `$PULLIT bonded.\n\nthe next box is the bond box: epic or better guaranteed.\n${BigInt(this.gamesState().bondPot ?? "0") > 0n ? `the last $50+ buy before the bond takes the bond pot (${sol(BigInt(this.gamesState().bondPot ?? "0"))} sol) in 7 min, if they still hold.\n` : ""}hold $${this.entry()}+ to be in the draw.`,
       ["pullit.fun"],
       false,
       "always",

@@ -280,15 +280,16 @@ test("vote boost: the next 5 boxes are 0.3 sol", async () => {
   assert.equal(VOTE_BOX_LAMPORTS, 300_000_000n);
 });
 
-test("bond race: the pot fills only before the bond, then the last $50+ buyer who still holds takes it", async () => {
+test("bond race: a seeded pot goes to the last $50+ buyer who still holds takes it", async () => {
   const b = new Bot(
     { HELIUS_API_KEY: "x", JUP_API_KEY: "x", BOX_SECRET: "x", TEAM_WALLET: "T", MINT: "M" },
     newState(),
   );
   const add = (l: bigint) => (b as unknown as { addToPots(l: bigint): bigint }).addToPots(l);
-  // before the bond: 20% clock + 10% lucky + 5% bond race
-  assert.equal(add(1_000_000_000n), 350_000_000n);
-  assert.equal(b.gamesState().bondPot, "50000000");
+  // the race is fed only by a dev seed now: boxes give it nothing
+  assert.equal(add(1_000_000_000n), 300_000_000n);
+  assert.equal(b.gamesState().bondPot, "0");
+  b.gamesState().bondPot = "50000000"; // as if seeded
   const now = Date.now();
   b.state.bond = { at: now - 8 * 60_000 };
   // after the bond nothing more goes in
