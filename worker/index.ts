@@ -169,7 +169,17 @@ async function run(env: Env, claimOnly = false) {
     // a closed community vote is carried out once, by the minute tick
     if (!claimOnly && !state.votes?.[VOTE.id]) {
       const won = await voteResult(env.STATE);
-      if (won) await bot.settleVote(VOTE.id, won, VOTE.usd, VOTE.boxes);
+      // under the hold cap nothing moves: the money stays in the dev wallet until the cap is back above it
+      const cap = state.market?.mcap ?? 0;
+      const hold = won !== "keep" && cap > 0 && cap < VOTE.holdBelowUsd;
+      if (won && hold && !state.voteHeld) {
+        state.voteHeld = true;
+        bot.feed(
+          "info",
+          `the vote closed: ${won}. the cap is under $${VOTE.holdBelowUsd / 1000}k, so the $${VOTE.usd} stays in the dev wallet until it is back above`,
+        );
+      }
+      if (won && !hold) await bot.settleVote(VOTE.id, won, VOTE.usd, VOTE.boxes);
     }
     if (claimOnly) await bot.claimTick();
     else await bot.tick();
@@ -459,6 +469,7 @@ export default {
       const res = json({
         ...(await voteState(env.STATE, req)),
         done: did(VOTE.id),
+        held: !st?.votes?.[VOTE.id] && Date.now() >= VOTE.endsAt && (st?.market?.mcap ?? 0) < VOTE.holdBelowUsd,
         past: (await pastVotes(env.STATE)).map((p) => ({ ...p, done: did(p.id) })),
       });
       res.headers.set("cache-control", "no-store");

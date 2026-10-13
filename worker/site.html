@@ -163,6 +163,7 @@ h3.h .hb{display:flex;gap:14px}
 .vnext b{color:var(--pink);font-size:15px}.vnext a{color:var(--pink)}
 .vlabel{font-size:11px;color:var(--muted);text-transform:lowercase;margin-bottom:-4px}
 .vlabel:empty{display:none}
+.vrule{margin:0;font-size:11px;color:var(--muted);line-height:1.45}.vrule:empty{display:none}
 .vpast{display:flex;flex-direction:column;gap:12px;border-top:2px solid var(--line);padding-top:12px}
 .vpast:empty{display:none}
 .vpast .pq{font-size:12px;color:var(--text);line-height:1.4}
@@ -392,6 +393,7 @@ html:has(dialog[open]),body:has(dialog[open]){overflow:hidden}
   <div class="vq" id="vq">loading the vote…</div>
   <div class="vopts" id="vopts"></div>
   <div class="vmeta"><span id="vtotal"></span><span id="vends"></span></div>
+  <p class="vrule" id="vrule"></p>
   <div class="vdone" id="vdone" hidden></div>
   <div class="vpast" id="vpast"></div>
 </div></dialog>
@@ -720,6 +722,9 @@ function drawVote() {
     box.appendChild(b);
   }
   setText('vtotal', total + (total === 1 ? ' vote' : ' votes') + (V.minVotes && !closed ? ` · needs ${V.minVotes}` : ''));
+  const hk = V.holdBelowUsd ? '$' + V.holdBelowUsd / 1000 + 'k' : '';
+  setText('vrule', V.held ? `on hold: the cap is under ${hk}. the result is carried out once it is back above ${hk}, until then the money stays in the dev wallet`
+    : hk && !V.done ? `if the cap is under ${hk} when the vote closes, nothing moves until it is back above ${hk}` : '');
   const left = V.endsAt - Date.now();
   setText('vends', closed ? 'closed' : left > 3600e3 ? 'ends in ' + Math.round(left / 3600e3) + 'h' : 'ends in ' + Math.max(1, Math.round(left / 60e3)) + 'm');
   const d = V.done;

@@ -7,6 +7,7 @@ export const VOTE = {
   usd: 300, // what the winning option gets, from the dev wallet
   boxes: 10, // "boxes" spreads it over this many boxes
   minVotes: 25, // fewer votes than this and "keep" wins
+  holdBelowUsd: 10_000, // closed while the market cap is under this: the result waits until it is back above
   question: "$300 of trading fees landed in the dev wallet by mistake. where should it go?",
   options: [
     { key: "boxes", label: "into the next 10 boxes", note: "+$30 in each" },
