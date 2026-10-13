@@ -158,6 +158,7 @@ export interface State {
     cursor?: string; // newest tx of the mint already read
     clockPot: string;
     luckyPot: string;
+    readAt?: number; // last read of new buys (helius history costs credits)
     bondPot?: string; // the bond race: grows until the bond, then the last $50+ curve buyer who still holds takes it
     bondLast?: Buy[]; // the last $50+ buyers on the curve, newest first
     bondDone?: boolean; // the bond race was paid out (or rolled into the box)
@@ -288,6 +289,7 @@ export function newState(now = Date.now()): State {
 export interface Env {
   MINT?: string;
   HELIUS_API_KEY: string;
+  RPC_URL?: string; // optional plain solana rpc for balances, claims and payouts; helius stays for holders and history
   JUP_API_KEY: string;
   OPENROUTER_API_KEY?: string;
   OPENROUTER_MODEL?: string;
@@ -375,7 +377,7 @@ export class Bot {
   constructor(env: Env, state: State) {
     this.env = env;
     this.state = state;
-    this.rpc = new Rpc(`https://mainnet.helius-rpc.com/?api-key=${env.HELIUS_API_KEY}`);
+    this.rpc = new Rpc(env.RPC_URL || `https://mainnet.helius-rpc.com/?api-key=${env.HELIUS_API_KEY}`);
     this.dry = env.DRY_RUN === "1";
   }
 
@@ -565,9 +567,10 @@ export class Bot {
     const cache = (this.state.redCache ??= {});
     const due = rows.filter((r) => {
       const c = cache[r.owner];
-      return !c || Math.abs(r.amount - c.amount) > c.amount * 0.005 || now - c.at > 30 * 60_000;
+      return !c || Math.abs(r.amount - c.amount) > c.amount * 0.05 || now - c.at > 6 * 3_600_000;
     });
-    for (const r of due.slice(0, 20)) {
+    // history reads are the most expensive helius calls: a few per snapshot is enough
+    for (const r of due.slice(0, 3)) {
       try {
         cache[r.owner] = {
           at: now,
@@ -2056,7 +2059,10 @@ who you are, only for context: a pink pixel gift box on solana, not live yet. tr
       await this.gamesResolve(now);
       if (g.paying) return; // still not sure where that payment is: nothing else moves
     }
-    if (this.state.priceUsd) {
+    // read every 2 min, but every pass while the clock is about to run out, so its last buyer is right
+    const clockEnding = !!g.clock && now > g.clock.endsAt - 30_000;
+    if (this.state.priceUsd && (clockEnding || now - (g.readAt ?? 0) >= GAMES.readEveryMs)) {
+      g.readAt = now;
       try {
         const own = [this.box.publicKey, this.env.TEAM_WALLET, this.dev?.publicKey, ...(this.state.excluded ?? [])];
         const r = await fetchNewBuys(

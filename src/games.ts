@@ -20,6 +20,7 @@ export const GAMES = {
   minClockPotLamports: 10_000_000n, // the clock only pays out once the pot is worth it
   rollDelaySlots: 10, // the lucky roll uses a block this far after the buy
   queueMax: 60,
+  readEveryMs: 120_000, // new buys are read at most this often (each read costs helius credits)
 };
 
 export interface Buy {

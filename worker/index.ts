@@ -29,7 +29,7 @@ async function selftest(env: Env) {
   );
   await step("helius_rpc", async () => {
     const kp = await keypairFromSecret(env.BOX_SECRET);
-    const rpc = new Rpc(`https://mainnet.helius-rpc.com/?api-key=${env.HELIUS_API_KEY}`);
+    const rpc = new Rpc(env.RPC_URL || `https://mainnet.helius-rpc.com/?api-key=${env.HELIUS_API_KEY}`);
     return `box ${(Number(await rpc.balance(kp.publicKey)) / 1e9).toFixed(4)} SOL`;
   });
   await step(
