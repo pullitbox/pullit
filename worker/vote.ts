@@ -62,3 +62,10 @@ export async function castVote(kv: KVNamespace, req: Request) {
   if (!(await mine(kv, h))) await kv.put(`${prefix()}${choice}:${h}`, String(Date.now()));
   return voteState(kv, req);
 }
+
+/** The winning option once the vote has closed (a tie or no votes goes to the boxes), else null. */
+export async function voteResult(kv: KVNamespace): Promise<string | null> {
+  if (Date.now() < VOTE.endsAt) return null;
+  const c = await counts(kv);
+  return (c.buyback ?? 0) > (c.boxes ?? 0) ? "buyback" : "boxes";
+}

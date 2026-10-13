@@ -178,6 +178,13 @@ export interface State {
   xFeed?: { at: string; text: string; url?: string }[]; // the latest posts on x, shown on the site
   xPostedAt?: number[]; // times of the x posts of the last 24 hours, for the daily cap
   dexPaid?: { posted?: boolean; checkedAt?: number };
+  /** community votes the bot carried out: what won, what it did, the transactions */
+  votes?: Record<
+    string,
+    { choice: string; status: "started" | "done" | "failed"; at: number; sigs?: string[]; note?: string }
+  >;
+  /** after a vote for boxes: the next `left` boxes are VOTE_BOX_SOL and pay out exactly that */
+  voteBoost?: { left: number };
   bond?: { at?: number; queued?: boolean; checkedAt?: number }; // migration to pumpswap: the next box is epic or better // the one "dex paid" post, once dexscreener confirms it
   recapPosted?: boolean; // the first-hour recap went out
   teaseUsed?: number[]; // hand-written teasers already posted this round
@@ -290,6 +297,8 @@ export function criteria(c: Candidate | undefined, kind: "fresh" | "meta"): stri
 /** The sizes a box can have, in SOL. The first box is always 0.15 so the launch sees one open fast. */
 export const BOX_SIZES = [0.3, 0.5, 0.75, 1, 1.5, 2, 2.75, 3.5, 4];
 export const FIRST_BOX = 0.15;
+/** Box size while a community vote's extra SOL is being paid out over the next boxes. */
+export const VOTE_BOX_LAMPORTS = 300_000_000n;
 /** While set, every box is this size no matter the volume. null turns the volume sizing back on. */
 export const FIXED_BOX: number | null = 0.15;
 const FILL_MINUTES = 25; // a box should fill in about this long at the current volume
@@ -1081,7 +1090,8 @@ export class Bot {
       vault = available;
       this.state.vaultLamports = vault.toString();
     }
-    const threshold = boxSize(this.state.history.length, this.state.boxTarget);
+    const boost = !final && (this.state.voteBoost?.left ?? 0) > 0;
+    const threshold = boost ? VOTE_BOX_LAMPORTS : boxSize(this.state.history.length, this.state.boxTarget);
     // one open never takes more than a few box sizes: SOL that lands in the box wallet by mistake
     // (or any other surprise) goes out slowly over many boxes, never in one pull
     const capMax = this.env.MAX_BOX_SOL ? BigInt(Math.round(Number(this.env.MAX_BOX_SOL) * 1e9)) : 0n;
@@ -1092,6 +1102,8 @@ export class Bot {
     let budget = available - vault - pots; // the box itself; the vault and the game pots are set aside
     if (budget < 0n) budget = 0n;
     if (!final && budget > cap) budget = cap;
+    // the 5 voted boxes pay exactly their size, so the extra SOL spreads over all five
+    if (boost && budget > threshold) budget = threshold;
     if (this.state.pub) {
       this.state.pub.boxLamports = budget.toString();
       this.state.pub.thresholdLamports = threshold.toString();
@@ -1105,6 +1117,7 @@ export class Bot {
       await this.milestone(budget, threshold);
       return;
     }
+    if (boost) this.state.voteBoost!.left--;
     if (available <= 0n) {
       this.state.phase = "done";
       this.log("final box: bank empty, done");
@@ -1706,6 +1719,74 @@ who you are, only for context: a pink pixel gift box on solana, not live yet. tr
   }
 
   // the extra passes between cron ticks: claim, split and open the box when it is full
+  /**
+   * Carries out a finished community vote with $usd from the dev wallet: "boxes" sends it to the box
+   * wallet and makes the next 5 boxes 0.3 SOL, "buyback" buys $PULLIT and burns exactly what it bought.
+   * Runs once per vote id; a crash after "started" never repeats the payment.
+   */
+  async settleVote(id: string, choice: string, usd: number) {
+    if (this.state.votes?.[id] || !this.dev || !this.env.MINT || this.dry) return;
+    this.state.votes = { ...this.state.votes, [id]: { choice, status: "started", at: Date.now() } };
+    await this.checkpoint?.();
+    const v = this.state.votes[id];
+    try {
+      const px = (await fetchToken(this.env.JUP_API_KEY, MINTS.SOL))?.usdPrice;
+      if (!px || px < 20 || px > 2000) throw new Error(`bad sol price ${px}`);
+      const lamports = BigInt(Math.round((usd / px) * 1e9));
+      const bal = await this.rpc.balance(this.dev.publicKey);
+      if (bal < lamports + 20_000_000n) throw new Error(`dev wallet has ${sol(bal)} sol, needs ${sol(lamports)}`);
+      await this.guard?.();
+      if (choice === "boxes") {
+        const sig = await sendSol(this.rpc, this.dev, this.box.publicKey, lamports);
+        v.sigs = [sig];
+        this.state.voteBoost = { left: 5 };
+        v.note = `${sol(lamports)} sol into the box wallet, next 5 boxes are 0.3 sol`;
+        this.feed(
+          "info",
+          `the vote is in: boxes. $${usd} (${sol(lamports)} sol) from the dev wallet just went into the box. the next 5 boxes are 0.3 sol each`,
+          sig,
+        );
+        await this.post(
+          `the vote is in: boxes.\n\n$${usd} from the dev wallet just went into the box. the next 5 boxes are 0.3 sol each.\n\nhttps://solscan.io/tx/${sig}`,
+          [],
+          false,
+          "always",
+        );
+      } else {
+        const mint = this.env.MINT;
+        const before = (await this.rpc.tokenAccount(this.dev.publicKey, mint))?.amount ?? 0n;
+        let buy: string;
+        try {
+          buy = (await buyInto(this.env.JUP_API_KEY, this.dev, mint, lamports, this.dev.publicKey)).sig;
+        } catch {
+          buy = (await buyViaPumpPortal(this.rpc, this.dev, mint, lamports)).sig;
+        }
+        v.sigs = [buy];
+        await this.checkpoint?.();
+        // burns only what this buy added, never the rest of the dev wallet
+        const b = await burnAll(this.rpc, this.dev, mint, before);
+        if (!b) throw new Error(`bought (${buy}) but nothing new to burn yet`);
+        v.sigs.push(b.sig);
+        const tokens = Math.round(Number(b.amount) / 1e6).toLocaleString("en-US");
+        v.note = `bought and burned ${tokens} $PULLIT for ${sol(lamports)} sol`;
+        this.feed("info", `the vote is in: buyback. $${usd} bought ${tokens} $pullit and burned all of it`, b.sig);
+        await this.post(
+          `the vote is in: buyback.\n\n$${usd} from the dev wallet bought ${tokens} $pullit and burned all of it.\n\nbuy https://solscan.io/tx/${buy}\nburn https://solscan.io/tx/${b.sig}`,
+          [],
+          false,
+          "always",
+        );
+      }
+      v.status = "done";
+      this.log(`vote ${id} (${choice}) done: ${v.note}`);
+    } catch (e) {
+      v.status = "failed";
+      v.note = (e as Error).message;
+      this.log(`vote ${id} (${choice}) failed: ${v.note}`);
+    }
+    await this.checkpoint?.();
+  }
+
   async claimTick(now = Date.now()) {
     if (!this.env.MINT || this.state.mintSeen !== this.env.MINT) return;
     if (this.state.phase === "done") return;

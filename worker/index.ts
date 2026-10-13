@@ -10,7 +10,7 @@ import { keypairFromSecret, Rpc } from "../src/solana.ts";
 import { fetchToken } from "../src/jupiter.ts";
 import { HOLDERS } from "../src/holders.ts";
 import { findXAccount } from "../src/zernio.ts";
-import { voteState, castVote } from "./vote.ts";
+import { voteState, castVote, voteResult, VOTE } from "./vote.ts";
 import type { ExecutionContext, KVNamespace, ScheduledEvent } from "./cloudflare.ts";
 
 /** Checks every dependency from inside Cloudflare without moving money or posting. */
@@ -166,6 +166,11 @@ async function run(env: Env, claimOnly = false) {
   };
   try {
     await bot.init();
+    // a closed community vote is carried out once, by the minute tick
+    if (!claimOnly && !state.votes?.[VOTE.id]) {
+      const won = await voteResult(env.STATE);
+      if (won) await bot.settleVote(VOTE.id, won, 100);
+    }
     if (claimOnly) await bot.claimTick();
     else await bot.tick();
   } catch (e) {
