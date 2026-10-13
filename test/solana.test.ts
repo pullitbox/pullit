@@ -122,11 +122,11 @@ test("split: only claimed fees are split, capped by what the dev wallet holds", 
   // 5 SOL of the dev's own money, nothing claimed: nothing moves
   bal = 5_000_000_000n;
   assert.equal(await buildSplit(rpc, dev, box, dev.publicKey, 0n), null);
-  // 1 SOL claimed: 0.8 to the box, the dev share stays, the dev's 5 SOL are not touched
+  // 1 SOL claimed: 0.7 to the box, the dev share stays, the dev's 5 SOL are not touched
   const r = await buildSplit(rpc, dev, box, dev.publicKey, 1_000_000_000n);
   assert.ok(r && r.kept);
   assert.equal(r.totalLamports, 1_000_000_000n);
-  assert.equal(r.boxLamports, 800_000_000n);
+  assert.equal(r.boxLamports, 700_000_000n);
   assert.equal(r.sig.length > 40, true);
   // the dev took almost everything out: the split is capped by what is left above the gas reserve
   bal = 100_000_000n;
