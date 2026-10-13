@@ -12,9 +12,9 @@ export const HOLDERS = {
   bagCapPctOfSupply: 1,
   // ...and no wallet may hold more than this share of all tickets
   maxTicketSharePct: 10,
-  // a fresh buy gets no extra tickets: timing the draw should not pay (kept at 0 on purpose)
-  buyBoostPct: 0,
-  buyBoostMinutes: 15,
+  // a fresh buy counts extra for an hour (the 7 min hold still applies, and a sell resets the multiplier)
+  buyBoostPct: 25,
+  buyBoostMinutes: 60,
   // any sell puts the hold multiplier back to 1x (you stay in the draw)
   sellResetsHold: true,
   // holders whose bag is worth less than the SOL they put in get this many times the tickets

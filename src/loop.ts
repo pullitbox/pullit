@@ -11,6 +11,7 @@ import {
   type BagMemo,
   type HolderState,
   type TicketRow,
+  HOLDERS,
 } from "./holders.ts";
 import { fetchToken, fetchUniverse, type JupToken } from "./jupiter.ts";
 import { hotCandidates, scan, type Candidate } from "./scanner.ts";
@@ -84,6 +85,7 @@ export interface BoxRecord {
   frenzy?: number; // frenzy level when sealed
   milestone?: number; // market cap in USD this box celebrates: epic or better, plus vault
   bond?: boolean; // the bond box: epic or better
+  dip?: boolean; // the dip box: epic or better
   burnLamports?: string; // part of the box spent on buyback and burn
   burn?: { buySig: string; burnSig: string; amount: string; lamports: string; fromVault?: string };
   // progress, so a retry never pays twice: signed (inflight), landed (coin), buyback bought, burn done
@@ -193,6 +195,8 @@ export interface State {
   >;
   /** after a vote for boxes: the next `left` boxes are `lamports` (VOTE_BOX_LAMPORTS if unset) and pay out exactly that */
   voteBoost?: { left: number; lamports?: string };
+  /** the dip box: queued when the price fell BOOST.dip.dropPct in an hour, at most once per cooldown */
+  dip?: { queued?: boolean; lastAt?: number };
   /** the vault paid out over the next boxes: each takes `per` on top of its size */
   vaultDrip?: { id: string; left: number; per: string };
   bond?: { at?: number; queued?: boolean; checkedAt?: number };
@@ -229,6 +233,8 @@ export interface State {
     entryUsd?: number; // bag needed to be in the draw for this box
     milestoneBox?: number; // the box that is filling is a milestone box for this market cap
     bondBox?: boolean; // the box that is filling is the bond box
+    dipBox?: boolean; // the box that is filling is a dip box
+    buyBoostPct?: number; // extra tickets for a buy in the last hour
     vaultSlice?: string; // lamports from the vault on top of the box that is filling
     vaultDripLeft?: number; // boxes left that take a slice of the vault
     curvePct?: number; // bonding curve progress, 0-100, until the bond
@@ -623,6 +629,7 @@ export class Bot {
     const mcap = token.mcap ?? (token.usdPrice ?? 0) * (token.circSupply ?? token.totalSupply ?? 1e9);
     const vol = volume1h(token);
     this.state.market = { mcap, volume1h: vol, at: new Date().toISOString() };
+    await this.dipWatch(token.stats1h?.priceChange ?? null);
     if (token.graduatedPool && !this.state.graduated) {
       this.state.graduated = token.graduatedPool;
       this.log(`jupiter: graduated to ${token.graduatedPool}`);
@@ -693,6 +700,26 @@ export class Bot {
       boxNext,
       boxNextVol,
     };
+  }
+
+  /** A drop of BOOST.dip.dropPct or more in the last hour queues a dip box: the next box is epic or better. */
+  async dipWatch(change1h: number | null, now = Date.now()) {
+    if (change1h == null || change1h > -BOOST.dip.dropPct) return;
+    const d = (this.state.dip ??= {});
+    if (d.queued || (d.lastAt && now - d.lastAt < BOOST.dip.cooldownMin * 60_000)) return;
+    d.queued = true;
+    d.lastAt = now;
+    const pct = Math.round(-change1h);
+    this.feed(
+      "boost",
+      `-${pct}% in an hour. dip box: the next box is epic or better. buy the dip, hold $${this.entry()}+`,
+    );
+    await this.post(
+      `$PULLIT is down ${pct}% in the last hour.\n\nso the next box is a dip box: epic or better, guaranteed.\nbuy the dip, hold $${this.entry()}+ for 7 min to be in the draw.`,
+      ["pullit.fun"],
+      false,
+      true,
+    );
   }
 
   /** Once per VAULT_DRIP id: what is in the vault is split over the next boxes. */
@@ -1268,6 +1295,8 @@ export class Bot {
       this.state.pub.entryUsd = this.entry();
       this.state.pub.milestoneBox = this.state.milestoneQueue?.[0];
       this.state.pub.bondBox = !!this.state.bond?.queued || undefined;
+      this.state.pub.dipBox = !!this.state.dip?.queued || undefined;
+      this.state.pub.buyBoostPct = HOLDERS.buyBoostPct || undefined;
       this.state.pub.vaultSlice = slice > 0n ? slice.toString() : undefined;
       this.state.pub.vaultDripLeft = slice > 0n ? this.state.vaultDrip!.left : undefined;
       this.state.pub.updatedAt = new Date().toISOString();
@@ -1315,6 +1344,9 @@ export class Bot {
     if (bond) this.state.bond!.queued = false;
     const milestone = final || bond ? undefined : this.state.milestoneQueue?.[0];
     if (milestone) this.state.milestoneQueue = this.state.milestoneQueue!.slice(1);
+    // a dip box waits behind the bond box and any milestone
+    const dip = !final && !bond && !milestone && !!this.state.dip?.queued;
+    if (dip) this.state.dip!.queued = false;
     const burnLamports = final ? 0n : (budget * BigInt(BOOST.burnPct)) / 100n;
     this.state.pending = {
       boxId,
@@ -1323,6 +1355,7 @@ export class Bot {
       frenzy,
       milestone,
       ...(bond ? { bond: true } : {}),
+      ...(dip ? { dip: true } : {}),
       burnLamports: burnLamports.toString(),
       budgetLamports: budget.toString(),
       seal,
@@ -1517,7 +1550,7 @@ export class Bot {
       const tip = await this.rpc.call<number>("getSlot", [{ commitment: "confirmed" }]);
       if (tip < p.targetSlot + 2) return; // block not there yet, next tick
       const bh = await blockhashAt(this.rpc, p.targetSlot);
-      p.draw = await draw(p.rows, p.boxId, bh.slot, bh.blockhash, p.odds, !!p.milestone || !!p.bond);
+      p.draw = await draw(p.rows, p.boxId, bh.slot, bh.blockhash, p.odds, !!p.milestone || !!p.bond || !!p.dip);
       await save();
     }
     const d = p.draw;
@@ -1685,7 +1718,13 @@ export class Bot {
     const extra = fromVault > 0n ? ` (${sol(fromVault)} from the vault)` : "";
     const both = `${sol(lamports)} sol of $${symbol}`;
     const tx = prize.sig;
-    const ms = p.bond ? " the bond box." : p.milestone ? ` milestone box for ${usdShort(p.milestone)} cap.` : "";
+    const ms = p.bond
+      ? " the bond box."
+      : p.dip
+        ? " the dip box."
+        : p.milestone
+          ? ` milestone box for ${usdShort(p.milestone)} cap.`
+          : "";
     const winPlain = `box #${p.boxId} opened. ${short(d.winner)} pulled ${d.tier}: ${both}${extra}. block ${d.slot} decided it`;
     const winText =
       (await this.xLine(
@@ -1698,7 +1737,7 @@ export class Bot {
     const proof = `${p.plan.reveal ? [...p.plan.reveal].slice(0, 120).join("") + "\n\n" : ""}https://pullit.fun/box/${p.boxId}`;
     const resultPost = winText;
     // on x only the wins worth a post: epic, secret, milestone and the final box (x posts are capped per day)
-    if (d.tier === "epic" || d.tier === "secret" || p.milestone || p.bond || p.final)
+    if (d.tier === "epic" || d.tier === "secret" || p.milestone || p.bond || p.dip || p.final)
       await this.post(winText, [proof], false, true);
     await this.line(
       "win",
