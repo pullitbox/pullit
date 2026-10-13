@@ -159,9 +159,16 @@ h3.h .hb{display:flex;gap:14px}
 .hints{display:flex;flex-direction:column;gap:3px;margin:8px 0 0;font-size:11px;color:var(--muted)}
 .hints span b{color:var(--text);font-weight:400}
 .hints span i{font-style:normal;color:var(--mint)}
-.feedlink{display:flex;justify-content:space-between;align-items:center;border:2px solid var(--line);background:var(--panel);padding:10px 12px;font-size:12px;color:var(--muted)}
-.feedlink:hover{border-color:var(--pink);color:var(--text)}
-.feedlink b{font:400 13px 'Silkscreen',monospace;color:var(--text)}
+.vnext{border:2px solid var(--pink);background:rgba(255,141,192,.08);padding:10px 12px;display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)}
+.vnext b{color:var(--pink);font-size:15px}.vnext a{color:var(--pink)}
+.vlabel{font-size:11px;color:var(--muted);text-transform:lowercase;margin-bottom:-4px}
+.vlabel:empty{display:none}
+.vdone{font-size:12px;color:var(--muted);border-top:2px solid var(--line);padding-top:10px}
+.vdone b{color:var(--mint);font-weight:400}.vdone a{color:var(--pink);margin-left:6px}
+.votec.past{border-color:var(--line);color:var(--muted)}
+.xhead{display:flex;align-items:center;gap:12px}.xhead a{font:12px 'Space Mono',monospace;color:var(--muted)}.xhead a:hover{color:var(--pink)}
+.xscroll{max-height:70vh;overflow:auto;margin-right:-8px;padding-right:8px;display:flex;flex-direction:column;gap:8px}
+.xscroll .xf li:hover{border-color:var(--pink)}
 .xs{margin-top:22px}
 .xp .xf{margin-bottom:8px}
 .xm{display:grid;gap:6px;margin-top:10px}
@@ -303,7 +310,7 @@ html:has(dialog[open]),body:has(dialog[open]){overflow:hidden}
   <nav>
     <span class="cabuy"><button class="chip" id="ca" type="button" title="copy contract address">ca <b id="caText">soon</b> ⧉</button><a class="buyc px" id="buy" href="https://x.com/Pullitbox" target="_blank" rel="noopener">buy</a></span>
     <button class="chip votec px" type="button" data-open="voteSheet" id="voteBtn">vote</button>
-    <a class="chip dk" href="/feed">feed</a>
+    <button class="chip dk" type="button" data-open="xSheet">feed</button>
     <a class="chip dk" href="https://x.com/Pullitbox" target="_blank" rel="noopener">x</a>
     <button class="chip dk" type="button" data-open="rules">rules</button>
     <a class="chip dk" href="https://github.com/syanovee/pullit" target="_blank" rel="noopener">github</a>
@@ -351,12 +358,12 @@ html:has(dialog[open]),body:has(dialog[open]){overflow:hidden}
       <button type="button" data-open="rules"><span class="k">lucky buys</span><span class="v"><b class="px" id="lkPot">0 sol</b></span></button>
     </section>
     <div class="mini">
-      <h3 class="h">live <a class="muted" href="/feed">feed →</a></h3>
+      <h3 class="h">live <span class="hb"><button type="button" data-open="logSheet">full log →</button><button type="button" data-open="xSheet">on x →</button></span></h3>
       <ol class="log" id="miniLog"><li><span class="t"></span><span></span><span class="m">waiting for the box</span></li></ol>
     </div>
   </div>
 </main>
-<div class="foot"><button type="button" data-open="rules">rules</button><a href="/feed">feed</a><a href="https://github.com/syanovee/pullit" target="_blank" rel="noopener">github</a><a href="https://x.com/Pullitbox" target="_blank" rel="noopener">x</a></div>
+<div class="foot"><button type="button" data-open="rules">rules</button><button type="button" data-open="xSheet">feed</button><a href="https://github.com/syanovee/pullit" target="_blank" rel="noopener">github</a><a href="https://x.com/Pullitbox" target="_blank" rel="noopener">x</a></div>
 <footer><span id="holdersLine"></span><span id="resv" hidden> · reserve <b id="resvPct">100</b>% left</span><span id="journalWrap" hidden></span></footer>
 </div>
 <div class="tick" id="tick"><div class="run" id="tickRun"><span>nothing opened yet. the first box opens soon</span></div></div>
@@ -372,10 +379,18 @@ html:has(dialog[open]),body:has(dialog[open]){overflow:hidden}
 </div></dialog>
 
 <dialog id="voteSheet" class="small"><div class="sheet">
-  <h2 class="px">community vote<button class="x" type="button" data-close aria-label="close">x</button></h2>
+  <h2 class="px" id="vTitle">community vote<button class="x" type="button" data-close aria-label="close">x</button></h2>
+  <div class="vnext" id="vnext" hidden><b class="px">next vote soon</b><span>the box posts every new vote on x first. <a href="https://x.com/Pullitbox" target="_blank" rel="noopener">follow →</a></span></div>
+  <div class="vlabel" id="vlabel"></div>
   <div class="vq" id="vq">loading the vote…</div>
   <div class="vopts" id="vopts"></div>
   <div class="vmeta"><span id="vtotal"></span><span id="vends"></span></div>
+  <div class="vdone" id="vdone" hidden></div>
+</div></dialog>
+
+<dialog id="xSheet"><div class="sheet">
+  <h2 class="px">on x<span class="xhead"><a href="https://x.com/Pullitbox" target="_blank" rel="noopener">@Pullitbox ↗</a><button class="x" type="button" data-close aria-label="close">x</button></span></h2>
+  <div class="xscroll"><div id="xPins"></div><ol class="xf" id="xFeed"><li class="empty">the box posts every big pull here</li></ol></div>
 </div></dialog>
 
 <dialog id="logSheet"><div class="sheet">
@@ -611,6 +626,30 @@ function render() {
     clock();
   }
 
+  // pinned tweets, shown like the bot's own posts
+  const P = (s.pins || []).filter((p) => p.text);
+  const pkey = P.map((p) => p.url).join();
+  if (pkey !== render.pkey) {
+    render.pkey = pkey;
+    $('xPins').replaceChildren(...P.map((p) => el('ol', { className: 'xf' }, el('li', {}, el('a', { href: p.url, target: '_blank', rel: 'noopener' },
+      el('span', { className: 'tx', textContent: p.text }),
+      ...(p.media && p.media.length ? [el('span', { className: 'xm' + (p.media.length > 1 ? ' two' : '') }, ...p.media.slice(0, 2).map((m) => m.type === 'video'
+        ? Object.assign(el('video', { src: m.src, poster: m.poster || '', muted: true, loop: true, playsInline: true, autoplay: true, preload: 'metadata' }), { onclick: (e) => e.preventDefault() })
+        : el('img', { src: m.src, alt: '', loading: 'lazy' })))] : []),
+      el('time', { textContent: (p.at ? p.at.toLowerCase() + ' · ' : '') + 'pinned · open on x ↗' }))))));
+    for (const v of $('xPins').querySelectorAll('video')) { v.muted = true; v.play?.().catch(() => {}); }
+    if (P.length && !(s.x || []).length) $('xFeed').replaceChildren();
+  }
+
+  // the latest posts on x
+  const X = s.x || [];
+  const xkey = X.length ? X[0].at + X.length : '';
+  if (X.length && xkey !== render.xkey) {
+    render.xkey = xkey;
+    $('xFeed').replaceChildren(...X.map((p) => el('li', {}, el('a', { href: p.url || 'https://x.com/Pullitbox', target: '_blank', rel: 'noopener' },
+      p.text.length > 220 ? p.text.slice(0, 217) + '…' : p.text, el('time', { textContent: ago(p.at) + ' · open on x ↗' })))));
+  }
+
   // journal
   const J = s.journal || [];
   $('journalWrap').hidden = !J.length;
@@ -653,23 +692,35 @@ function render() {
 let V = null;
 function drawVote() {
   if (!V) return;
+  const closed = !V.open;
+  $('vTitle').firstChild.textContent = closed ? 'votes' : 'community vote';
+  $('vnext').hidden = !closed;
+  setText('vlabel', closed ? 'past · closed ' + new Date(V.endsAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).toLowerCase() : 'live now');
   setText('vq', V.question);
   const total = Object.values(V.counts).reduce((a, b) => a + b, 0);
+  const best = Object.entries(V.counts).sort((a, b) => b[1] - a[1])[0]?.[0];
   const box = $('vopts'); box.innerHTML = '';
   for (const o of V.options) {
-    const n = V.counts[o.key] || 0, pc = total ? Math.round((n / total) * 100) : 0, show = !!V.mine || !V.open;
-    const b = el('button', { className: 'vopt' + (V.mine === o.key ? ' mine' : ''), type: 'button' });
-    b.disabled = !!V.mine || !V.open;
+    const n = V.counts[o.key] || 0, pc = total ? Math.round((n / total) * 100) : 0, show = !!V.mine || closed;
+    const won = closed && (V.done ? V.done.choice === o.key : best === o.key);
+    const b = el('button', { className: 'vopt' + (V.mine === o.key || won ? ' mine' : ''), type: 'button' });
+    b.disabled = !!V.mine || closed;
     const bar = el('span', { className: 'bar' }); bar.style.width = show ? pc + '%' : '0';
     const row = el('span', { className: 'row' }, el('b', { textContent: o.label }), el('span', { className: 'pc px', textContent: show ? pc + '%' : '' }));
-    b.append(bar, row, el('span', { className: 'nt', textContent: (V.mine === o.key ? 'your vote · ' : '') + o.note }));
+    b.append(bar, row, el('span', { className: 'nt', textContent: (won ? 'won · ' : V.mine === o.key ? 'your vote · ' : '') + o.note }));
     b.onclick = () => castVote(o.key);
     box.appendChild(b);
   }
   setText('vtotal', total + (total === 1 ? ' vote' : ' votes'));
   const left = V.endsAt - Date.now();
-  setText('vends', !V.open ? 'closed' : left > 3600e3 ? 'ends in ' + Math.round(left / 3600e3) + 'h' : 'ends in ' + Math.max(1, Math.round(left / 60e3)) + 'm');
+  setText('vends', closed ? 'closed' : left > 3600e3 ? 'ends in ' + Math.round(left / 3600e3) + 'h' : 'ends in ' + Math.max(1, Math.round(left / 60e3)) + 'm');
+  const d = V.done;
+  $('vdone').hidden = !closed || !d;
+  if (d) $('vdone').replaceChildren(el('b', { textContent: d.status === 'done' ? 'done: ' : d.status === 'failed' ? 'failed: ' : 'in progress: ' }), d.note || d.choice,
+    ...(d.sigs || []).slice(0, 3).map((x, i) => el('a', { href: 'https://solscan.io/tx/' + x, target: '_blank', rel: 'noopener', textContent: 'tx' + (d.sigs.length > 1 ? ' ' + (i + 1) : '') + ' ↗' })));
   $('voteBtn').classList.toggle('live', V.open && !V.mine);
+  $('voteBtn').classList.toggle('past', closed);
+  $('voteBtn').textContent = closed ? 'votes' : 'vote';
 }
 async function loadVote() { try { V = await api('/api/vote'); drawVote(); } catch { setText('vq', 'cant reach the vote. try again in a bit'); } }
 async function castVote(choice) {
@@ -787,7 +838,7 @@ async function loadTop() {
   fill('topHold', t.holders || [], (r, i) => row(i, r.wallet, `${heldTxt(r.heldMinutes)} · ${r.multiplier}x`), 'nobody yet');
   fill('topUnlucky', t.unlucky || [], (r, i) => row(i, r.wallet, `${r.boxes} ${r.boxes === 1 ? 'box' : 'boxes'} in a row`), 'nobody yet');
 }
-function route() { const m = location.hash.match(/^#box-(\d+)$/); if (m) openBox(Number(m[1])); }
+function route() { if (location.hash === '#feed') { $('xSheet').showModal(); history.replaceState(null, '', location.pathname + location.search); return; } const m = location.hash.match(/^#box-(\d+)$/); if (m) openBox(Number(m[1])); }
 window.addEventListener('hashchange', route); route();
 </script>
 </body>

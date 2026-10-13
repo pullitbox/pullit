@@ -4,7 +4,7 @@
 // Vars (wrangler.jsonc): TEAM_WALLET, MINT, PUBLIC ("1" = site open to everyone), DRY_RUN.
 
 import { Bot, newState, type Env as BotEnv, type State } from "../src/loop.ts";
-import { HTML, SOON, FEED, BOXSVG } from "./site.ts";
+import { HTML, SOON, BOXSVG } from "./site.ts";
 import { renderCard, type CardData } from "./card.ts";
 import { keypairFromSecret, Rpc } from "../src/solana.ts";
 import { fetchToken } from "../src/jupiter.ts";
@@ -418,10 +418,9 @@ export default {
         });
       return new Response("not found", { status: 404 });
     }
+    // the feed is a sheet on the main page
     if (url.pathname === "/feed" || url.pathname === "/feed/")
-      return new Response(FEED, {
-        headers: { "content-type": "text/html; charset=utf-8", "cache-control": "public, max-age=60" },
-      });
+      return Response.redirect(new URL("/#feed" + url.search, url).toString(), 302);
     if (url.pathname === "/api/selftest")
       return preview ? json(await selftest(env)) : new Response("not found", { status: 404 });
     if (url.pathname === "/api/state") {
@@ -451,7 +450,13 @@ export default {
         res.headers.set("cache-control", "no-store");
         return res;
       }
-      const res = json(await voteState(env.STATE, req));
+      // a closed vote also shows what the bot did with the result
+      const st = (await env.STATE.get("state", "json")) as State | null;
+      const done = st?.votes?.[VOTE.id];
+      const res = json({
+        ...(await voteState(env.STATE, req)),
+        done: done && { choice: done.choice, status: done.status, sigs: done.sigs, note: done.note },
+      });
       res.headers.set("cache-control", "no-store");
       return res;
     }
