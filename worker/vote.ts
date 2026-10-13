@@ -6,10 +6,12 @@ export const VOTE = {
   id: "v2",
   usd: 300, // what the winning option gets, from the dev wallet
   boxes: 10, // "boxes" spreads it over this many boxes
+  minVotes: 25, // fewer votes than this and "keep" wins
   question: "$300 of trading fees landed in the dev wallet by mistake. where should it go?",
   options: [
     { key: "boxes", label: "into the next 10 boxes", note: "+$30 in each" },
     { key: "buyback", label: "buy back $pullit and burn it", note: "one market buy, then burned" },
+    { key: "keep", label: "the dev keeps it as a gift", note: "also wins if under 25 votes" },
   ],
   endsAt: Date.parse("2026-10-13T22:00:00Z"),
 };
@@ -81,11 +83,17 @@ export async function castVote(kv: KVNamespace, req: Request) {
   return voteState(kv, req);
 }
 
-/** The winning option once the vote has closed (a tie or no votes goes to the boxes), else null. */
+/** The winning option once the vote has closed, else null. Under minVotes votes "keep" wins; a tie goes to the boxes. */
 export async function voteResult(kv: KVNamespace): Promise<string | null> {
   if (Date.now() < VOTE.endsAt) return null;
-  const c = await counts(kv);
-  return (c.buyback ?? 0) > (c.boxes ?? 0) ? "buyback" : "boxes";
+  return winner(await counts(kv));
+}
+
+export function winner(c: Record<string, number>, min = VOTE.minVotes): string {
+  const total = Object.values(c).reduce((a, b) => a + b, 0);
+  if (total < min) return "keep";
+  const order = ["boxes", "buyback", "keep"]; // ties: earlier wins
+  return order.reduce((best, k) => ((c[k] ?? 0) > (c[best] ?? 0) ? k : best), "boxes");
 }
 
 /** The finished votes with their final counts, newest first. */

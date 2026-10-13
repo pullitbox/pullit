@@ -29,8 +29,17 @@ test("vote: one vote per visitor, counted by choice", { skip: Date.now() >= VOTE
   await castVote(k as never, req("1.1.1.1", { choice: "buyback" })); // second try is ignored
   await castVote(k as never, req("2.2.2.2", { choice: "buyback" }));
   const s = await voteState(k as never, req("1.1.1.1"));
-  assert.deepEqual(s.counts, { boxes: 1, buyback: 1 });
+  assert.deepEqual(s.counts, { boxes: 1, buyback: 1, keep: 0 });
   assert.equal(s.mine, "boxes");
   const bad = await castVote(k as never, req("3.3.3.3", { choice: "rug" }));
   assert.ok("error" in bad);
+});
+
+test("vote: under the minimum the dev keeps it, else the most votes win, ties go to the boxes", async () => {
+  const { winner } = await import("../worker/vote.ts");
+  assert.equal(winner({ boxes: 10, buyback: 12, keep: 0 }, 25), "keep");
+  assert.equal(winner({ boxes: 14, buyback: 12, keep: 0 }, 25), "boxes");
+  assert.equal(winner({ boxes: 10, buyback: 16, keep: 0 }, 25), "buyback");
+  assert.equal(winner({ boxes: 5, buyback: 5, keep: 20 }, 25), "keep");
+  assert.equal(winner({ boxes: 13, buyback: 13, keep: 0 }, 25), "boxes");
 });

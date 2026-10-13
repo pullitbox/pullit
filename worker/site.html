@@ -706,7 +706,7 @@ function drawVote() {
   setText('vlabel', closed ? 'past · closed ' + new Date(V.endsAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).toLowerCase() : 'live now');
   setText('vq', V.question);
   const total = Object.values(V.counts).reduce((a, b) => a + b, 0);
-  const best = Object.entries(V.counts).sort((a, b) => b[1] - a[1])[0]?.[0];
+  const best = V.minVotes && total < V.minVotes ? 'keep' : Object.entries(V.counts).sort((a, b) => b[1] - a[1])[0]?.[0];
   const box = $('vopts'); box.innerHTML = '';
   for (const o of V.options) {
     const n = V.counts[o.key] || 0, pc = total ? Math.round((n / total) * 100) : 0, show = !!V.mine || closed;
@@ -719,7 +719,7 @@ function drawVote() {
     b.onclick = () => castVote(o.key);
     box.appendChild(b);
   }
-  setText('vtotal', total + (total === 1 ? ' vote' : ' votes'));
+  setText('vtotal', total + (total === 1 ? ' vote' : ' votes') + (V.minVotes && !closed ? ` · needs ${V.minVotes}` : ''));
   const left = V.endsAt - Date.now();
   setText('vends', closed ? 'closed' : left > 3600e3 ? 'ends in ' + Math.round(left / 3600e3) + 'h' : 'ends in ' + Math.max(1, Math.round(left / 60e3)) + 'm');
   const d = V.done;

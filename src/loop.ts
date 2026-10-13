@@ -1864,7 +1864,17 @@ who you are, only for context: a pink pixel gift box on solana, not live yet. tr
       if (bal < lamports + 20_000_000n && bal - 30_000_000n >= (lamports * 8n) / 10n) lamports = bal - 30_000_000n;
       if (bal < lamports + 20_000_000n) throw new Error(`dev wallet has ${sol(bal)} sol, needs ${sol(lamports)}`);
       await this.guard?.();
-      if (choice === "boxes") {
+      if (choice === "keep") {
+        // nothing moves: the dev keeps it, as voted (or because too few voted)
+        v.note = `the dev keeps $${usd}`;
+        this.feed("info", `the vote is in: the dev keeps the $${usd}. it stays in the dev wallet`);
+        await this.post(
+          `the vote is in: the dev keeps the $${usd} as a gift.\n\nthanks for voting.`,
+          [],
+          false,
+          "always",
+        );
+      } else if (choice === "boxes") {
         const sig = await sendSol(this.rpc, this.dev, this.box.publicKey, lamports);
         v.sigs = [sig];
         // each of the next boxes: its normal first size plus an equal slice of the vote money
