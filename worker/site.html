@@ -343,6 +343,7 @@ html:has(dialog[open]),body:has(dialog[open]){overflow:hidden}
       </div>
     </section>
     <p class="how">hold <b id="entry">$20</b>+ for 7 min and you're in · <button type="button" data-open="meSheet">check eligibility</button></p>
+    <p class="how fresh" id="rush" hidden><b id="rushTxt"></b></p>
     <p class="how fresh" id="fresh" hidden>bought in the last hour? <b id="freshPct">+25%</b> tickets</p>
     <p class="meta"><span class="bn">burned <b id="mBurn">0 sol</b></span><span>in the draw <b id="mIn">0</b></span></p>
     <section class="race" id="race" hidden>
@@ -398,6 +399,7 @@ html:has(dialog[open]),body:has(dialog[open]){overflow:hidden}
   <div class="vrule" id="vrule" hidden><b class="px" id="vruleT"></b><span id="vruleS"></span><span class="vcap" id="vcap"></span></div>
   <div class="vopts" id="vopts"></div>
   <div class="vmeta"><span id="vtotal"></span><span id="vends"></span></div>
+  <div class="vrule" id="vwhy" hidden><b class="px" id="vwhyT"></b><span id="vwhyS"></span></div>
   <div class="vdone" id="vdone" hidden></div>
   <div class="vpast" id="vpast"></div>
 </div></dialog>
@@ -512,6 +514,9 @@ function render() {
   const last = hist[0];
   const entry = '$' + (p.entryUsd || 20);
   setText('entry', entry); setText('entry2', entry);
+  { const r = p.rush, n = Date.now(); $('rush').hidden = !r;
+    if (r) setText('rushTxt', n < r.from ? r.x + 'x rush starts in ' + Math.max(1, Math.ceil((r.from - n) / 60000)) + ' min. buy in it, ' + r.x + 'x tickets for 24h'
+      : r.x + 'x tickets for anyone who buys in the next ' + Math.max(1, Math.ceil((r.to - n) / 60000)) + ' min. lasts 24h, a sell ends it'); }
   $('fresh').hidden = !p.buyBoostPct; if (p.buyBoostPct) setText('freshPct', '+' + p.buyBoostPct + '%');
 
   // the card
@@ -742,7 +747,18 @@ function drawVote() {
   }
   const left = V.endsAt - Date.now();
   setText('vends', closed ? 'closed' : left > 3600e3 ? 'ends in ' + Math.round(left / 3600e3) + 'h' : 'ends in ' + Math.max(1, Math.round(left / 60e3)) + 'm');
-  const d = V.done;
+  const d = V.done, wonKey = d ? d.choice : best, top = Object.entries(V.counts).sort((a, b) => b[1] - a[1])[0];
+  $('vwhy').hidden = !closed || !wonKey;
+  if (closed && wonKey) {
+    const lab = (k) => (V.options.find((o) => o.key === k) || {}).label || k;
+    const few = V.minVotes && total < V.minVotes;
+    setText('vwhyT', 'won: ' + lab(wonKey));
+    setText('vwhyS', wonKey === 'keep' && few
+      ? `why: only ${total} votes came in and it needed ${V.minVotes}${kk && S && S.pub && S.pub.mcap < V.keepBelowUsd ? `, and the cap was under ${kk}` : ''}. under that the dev keeps it, as the rules said. most votes went to "${lab(top[0])}" (${top[1]}), thanks to everyone who voted`
+      : wonKey === 'keep' && top && top[0] !== 'keep'
+        ? `why: the cap was under ${kk} when the vote closed, so the dev keeps it, as the rule said. most votes went to "${lab(top[0])}" (${top[1]})`
+        : `why: most votes (${(V.counts[wonKey] || 0)} of ${total})`);
+  }
   $('vdone').hidden = !closed || !d;
   if (d) $('vdone').replaceChildren(el('b', { textContent: d.status === 'done' ? 'done: ' : d.status === 'failed' ? 'failed: ' : 'in progress: ' }), d.note || d.choice,
     ...(d.sigs || []).slice(0, 3).map((x, i) => el('a', { href: 'https://solscan.io/tx/' + x, target: '_blank', rel: 'noopener', textContent: 'tx' + (d.sigs.length > 1 ? ' ' + (i + 1) : '') + ' ↗' })));

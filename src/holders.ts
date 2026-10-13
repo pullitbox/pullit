@@ -31,7 +31,12 @@ export function entryUsd(boxSol: number): number {
 }
 
 /** Between snapshots: owner -> [amount at the last snapshot, time of the last buy (ms)]. */
-export type BagMemo = Record<string, [number, number]>;
+export type BagMemo = Record<string, [number, number, number?]>; // amount, last buy, rush buy (0 or time)
+
+/** A rush: buys inside [from, to] get x times the tickets for `hours`, until they sell. */
+export type Rush = { from: number; to: number; x: number; hours: number };
+/** Holder snapshots run every few minutes, so a buy near the end of a rush is seen a bit late. */
+export const RUSH_GRACE_MS = 5 * 60_000;
 
 export interface HolderBalance {
   owner: string;
@@ -174,6 +179,7 @@ export function computeTickets(
     minUsd?: number; // entry for the box being filled (entryUsd); the hold timer only needs HOLDERS.minHoldUsd
     memo?: BagMemo; // without it, buys and sells are not tracked
     red?: Set<string>; // wallets in the red, they get HOLDERS.redMultiplier
+    rush?: Rush; // buys in this window get rush.x tickets instead of the fresh buy boost
   },
 ): TicketSnapshot {
   const now = opts.now ?? Date.now();
@@ -201,21 +207,29 @@ export function computeTickets(
     let since = prev[b.owner] ?? now;
     const last = opts.memo?.[b.owner];
     let lastBuy = last?.[1] ?? 0;
+    let rushAt = last?.[2] ?? 0;
     if (opts.memo) {
       // half a percent of slack, so dust moves do not count as a buy or a sell
-      if (!last || b.amount > last[0] * 1.005) lastBuy = now;
-      else if (b.amount < last[0] * 0.995 && HOLDERS.sellResetsHold && now - since >= minHold * 60_000) {
-        since = now - minHold * 60_000; // still in the draw, back to 1x
-        sold.push(b.owner);
+      if (!last || b.amount > last[0] * 1.005) {
+        lastBuy = now;
+        const r = opts.rush;
+        if (r && now >= r.from && now <= r.to + RUSH_GRACE_MS) rushAt = now;
+      } else if (b.amount < last[0] * 0.995) {
+        rushAt = 0; // any sell ends the rush bonus
+        if (HOLDERS.sellResetsHold && now - since >= minHold * 60_000) {
+          since = now - minHold * 60_000; // still in the draw, back to 1x
+          sold.push(b.owner);
+        }
       }
-      memo[b.owner] = [b.amount, lastBuy];
+      memo[b.owner] = rushAt ? [b.amount, lastBuy, rushAt] : [b.amount, lastBuy];
     }
     state[b.owner] = since;
     const heldMinutes = (now - since) / 60_000;
     if (heldMinutes < minHold) continue;
     if (usd < (opts.minUsd ?? HOLDERS.minHoldUsd)) continue; // timer keeps running, but this box needs a bigger bag
     const multiplier = holdMultiplier(heldMinutes);
-    const boosted = now - lastBuy < HOLDERS.buyBoostMinutes * 60_000;
+    const rushed = !!opts.rush && rushAt > 0 && now - rushAt < opts.rush.hours * 3_600_000;
+    const boosted = rushed || now - lastBuy < HOLDERS.buyBoostMinutes * 60_000;
     const red = !!opts.red?.has(b.owner);
     pre.push({
       owner: b.owner,
@@ -228,7 +242,7 @@ export function computeTickets(
       raw:
         Math.min(b.amount, bagCap) *
         multiplier *
-        (boosted ? 1 + HOLDERS.buyBoostPct / 100 : 1) *
+        (rushed ? opts.rush!.x : boosted ? 1 + HOLDERS.buyBoostPct / 100 : 1) *
         (red ? HOLDERS.redMultiplier : 1),
     });
   }

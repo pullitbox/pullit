@@ -12,6 +12,7 @@ import {
   type HolderState,
   type TicketRow,
   HOLDERS,
+  type Rush,
 } from "./holders.ts";
 import { fetchToken, fetchUniverse, type JupToken } from "./jupiter.ts";
 import { hotCandidates, scan, type Candidate } from "./scanner.ts";
@@ -236,6 +237,7 @@ export interface State {
     bondBox?: boolean; // the box that is filling is the bond box
     epicLeft?: number; // boxes left in the epic run, the one filling included
     buyBoostPct?: number; // extra tickets for a buy in the last hour
+    rush?: { from: number; to: number; x: number }; // a rush window: buys inside it get x tickets
     vaultSlice?: string; // lamports from the vault on top of the box that is filling
     vaultDripLeft?: number; // boxes left that take a slice of the vault
     curvePct?: number; // bonding curve progress, 0-100, until the bond
@@ -305,6 +307,7 @@ export interface Env {
   X_PRELAUNCH?: string; // "1": before launch the box posts teasers on x by itself (test boxes are never posted)
   X_PRELAUNCH_EVERY_MIN?: string; // minutes between teasers, default 480
   X_MAX_PER_DAY?: string; // most posts on x in any 24 hours, default 3
+  RUSH_AT?: string; // ISO time: buys in the next RUSH.minutes get RUSH.x tickets for RUSH.hours (until they sell)
   BUILD_COMMITS?: string; // set by `npm run deploy`: base64 JSON of recent commits, for the journal
 }
 
@@ -333,6 +336,8 @@ export const FIRST_BOX = 0.15;
 /** Box size while a community vote's extra SOL is being paid out over the next boxes. */
 export const VOTE_BOX_LAMPORTS = 300_000_000n;
 /** Opens the vault once per id: what is in it is split evenly over the next `boxes` boxes. */
+/** A rush: buys in a short window get x times the tickets for a while (set with RUSH_AT). */
+export const RUSH = { minutes: 15, x: 3, hours: 24 };
 export const VAULT_DRIP = { id: "d1", boxes: 3 };
 /** Once per id: the next `boxes` boxes are epic or better. */
 export const EPIC_RUN = { id: "e1", boxes: 3 };
@@ -586,6 +591,13 @@ export class Bot {
     for (const k of Object.keys(cache)) if (!live.has(k) && now - cache[k].at > 6 * 3_600_000) delete cache[k];
   }
 
+  /** The rush window from RUSH_AT, if one is set. */
+  rush(): Rush | undefined {
+    const from = Date.parse(this.env.RUSH_AT ?? "");
+    if (!Number.isFinite(from)) return undefined;
+    return { from, to: from + RUSH.minutes * 60_000, x: RUSH.x, hours: RUSH.hours };
+  }
+
   async tickets() {
     const mint = this.env.MINT!;
     const token = await fetchToken(this.env.JUP_API_KEY, mint);
@@ -602,6 +614,7 @@ export class Bot {
       memo: this.state.bagMemo ?? {},
       minUsd: this.entry(),
       red,
+      rush: this.rush(),
     });
     this.state.bagMemo = snap.memo;
     await this.react(balances, token.totalSupply ?? 1e9, snap.state);
@@ -1295,6 +1308,8 @@ export class Bot {
       this.state.pub.bondBox = !!this.state.bond?.queued || undefined;
       this.state.pub.epicLeft = this.state.epicRun?.left || undefined;
       this.state.pub.buyBoostPct = HOLDERS.buyBoostPct || undefined;
+      const rush = this.rush();
+      this.state.pub.rush = rush && Date.now() < rush.to ? { from: rush.from, to: rush.to, x: rush.x } : undefined;
       this.state.pub.vaultSlice = slice > 0n ? slice.toString() : undefined;
       this.state.pub.vaultDripLeft = slice > 0n ? this.state.vaultDrip!.left : undefined;
       this.state.pub.updatedAt = new Date().toISOString();

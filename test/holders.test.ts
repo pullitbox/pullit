@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { computeTickets, entryUsd, holdMultiplier, pickWinner, HOLDERS } from "../src/holders.ts";
+import { computeTickets, entryUsd, holdMultiplier, pickWinner, HOLDERS, type BagMemo } from "../src/holders.ts";
 
 const NOW = Date.parse("2026-10-07T12:00:00Z");
 const minAgo = (m: number) => NOW - m * 60_000;
@@ -60,7 +60,7 @@ test("winner pick is deterministic and weighted", async () => {
 test("a fresh buy gets +25% tickets, a sell puts the hold back to 1x", () => {
   const T0 = 1_800_000_000_000;
   const H = 3_600_000;
-  const opts = (now: number, memo: Record<string, [number, number]>) => ({
+  const opts = (now: number, memo: BagMemo) => ({
     priceUsd: 0.001,
     totalSupply: 1e12,
     exclude: [],
@@ -128,4 +128,56 @@ test("holders in the red get the red multiplier on their tickets", () => {
   const b = snap.rows.find((r) => r.owner === "B".repeat(44))!;
   assert.ok(b.red && !a.red);
   assert.ok(Math.abs(b.tickets / a.tickets - HOLDERS.redMultiplier) < 1e-9);
+});
+
+test("a rush: buys inside the window get x tickets until they sell", () => {
+  const T0 = Date.parse("2026-10-13T20:00:00Z");
+  const M = 60_000;
+  const rush = { from: T0 + 60 * M, to: T0 + 75 * M, x: 3, hours: 24 };
+  const o = (now: number, memo: BagMemo) => ({ priceUsd: 0.001, totalSupply: 1e12, exclude: [], now, memo, rush });
+  // A and B hold before the rush, A adds inside it, C is new inside it, D buys after it
+  let s = computeTickets(
+    [
+      { owner: "A", amount: 100_000 },
+      { owner: "B", amount: 100_000 },
+    ],
+    {},
+    o(T0, {}),
+  );
+  s = computeTickets(
+    [
+      { owner: "A", amount: 120_000 },
+      { owner: "B", amount: 100_000 },
+      { owner: "C", amount: 100_000 },
+    ],
+    s.state,
+    o(T0 + 70 * M, s.memo),
+  );
+  s = computeTickets(
+    [
+      { owner: "A", amount: 120_000 },
+      { owner: "B", amount: 100_000 },
+      { owner: "C", amount: 100_000 },
+      { owner: "D", amount: 100_000 },
+    ],
+    s.state,
+    o(T0 + 90 * M, s.memo),
+  );
+  assert.ok(s.memo.A[2] && s.memo.C[2]);
+  assert.ok(!s.memo.B[2] && !s.memo.D[2]);
+  // three hours later A and C still have it, B never did; then C sells and loses it
+  const later = computeTickets(
+    [
+      { owner: "A", amount: 120_000 },
+      { owner: "B", amount: 100_000 },
+      { owner: "C", amount: 90_000 },
+    ],
+    s.state,
+    o(T0 + 4 * 60 * M, s.memo),
+  );
+  const row = (k: string) => later.rows.find((r) => r.owner === k)!;
+  assert.equal(row("A").boosted, true);
+  assert.equal(row("B").boosted, false);
+  assert.equal(row("C").boosted, false);
+  assert.ok(!later.memo.C[2]);
 });
