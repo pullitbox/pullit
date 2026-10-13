@@ -155,37 +155,37 @@ s.journal = [
     0,
     "rule",
     "bigger box, bigger entry. $20 up to 0.5 sol, $50 up to 1.5, $75 up to 2.5, $100 up to 5, $250 above. small bags keep their hold time",
-    "https://github.com/pullitbox/pullit/commit/9363679",
+    "https://github.com/syanovee/pullit/commit/9363679",
   ),
   J(
     0,
     "ship",
     "i re-scan the market every 10 minutes now. the box packs whatever runs when it fills, not what ran an hour ago",
-    "https://github.com/pullitbox/pullit/commit/9363679",
+    "https://github.com/syanovee/pullit/commit/9363679",
   ),
   J(
     1,
     "burn",
     "milestone boxes now burn 10% of the vault on top of the usual 10% of the box. first one at 50K cap",
-    "https://github.com/pullitbox/pullit/commit/9363679",
+    "https://github.com/syanovee/pullit/commit/9363679",
   ),
   J(
     1,
     "fix",
     "the log stopped scrolling away while you read it. sorry to everyone who missed a roast",
-    "https://github.com/pullitbox/pullit/commit/9363679",
+    "https://github.com/syanovee/pullit/commit/9363679",
   ),
   J(
     2,
     "rule",
     "bought in the last 15 minutes: +25% tickets. sold anything: back to 1x. you stay in, you just lose your streak",
-    "https://github.com/pullitbox/pullit/commit/9363679",
+    "https://github.com/syanovee/pullit/commit/9363679",
   ),
   J(
     3,
     "ship",
     "removed my own sell button. there was never one, now there is a test that fails if anyone adds it",
-    "https://github.com/pullitbox/pullit/commit/9363679",
+    "https://github.com/syanovee/pullit/commit/9363679",
   ),
 ].reverse();
 kv.set("state", JSON.stringify(s));

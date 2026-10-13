@@ -1,7 +1,7 @@
 <p align="center"><img src="assets/social-preview.png" alt="pullit: a blind box that fills itself" width="720"></p>
 
 <p align="center">
-  <a href="https://github.com/pullitbox/pullit/actions/workflows/test.yml"><img src="https://github.com/pullitbox/pullit/actions/workflows/test.yml/badge.svg" alt="tests"></a>
+  <a href="https://github.com/syanovee/pullit/actions/workflows/test.yml"><img src="https://github.com/syanovee/pullit/actions/workflows/test.yml/badge.svg" alt="tests"></a>
   <img src="https://img.shields.io/badge/license-MIT-pink" alt="MIT">
   <img src="https://img.shields.io/badge/runs%20on-Cloudflare%20Workers-orange" alt="Cloudflare Workers">
   <img src="https://img.shields.io/badge/dependencies-0-brightgreen" alt="no runtime dependencies">

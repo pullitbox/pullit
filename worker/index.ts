@@ -51,7 +51,7 @@ async function selftest(env: Env) {
 interface Env extends BotEnv {
   STATE: KVNamespace;
   PREVIEW_KEY?: string;
-  REPO_URL?: string; // e.g. https://github.com/pullitbox/pullit, set once the repo is public
+  REPO_URL?: string; // e.g. https://github.com/syanovee/pullit, set once the repo is public
   PUBLIC?: string;
 }
 
