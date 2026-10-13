@@ -23,7 +23,7 @@ The bot can only buy. It buys the prize for the winner and buys $PULLIT to burn 
 
 ## How it works
 
-1. **Fees fill the box.** Every 15 seconds the bot claims the creator fees of $PULLIT. Until $PULLIT bonds, 75% goes to the box wallet and 25% stays in the dev wallet; while the market cap is under $10K, 20% goes to the box and 80% stays in the dev wallet; under $20K, 80% goes to the box and 20% stays in the dev wallet. After the bond, 70% goes to the box and 30% stays in the dev wallet (agent costs, servers, building). A small part of the box share is set aside in the vault.
+1. **Fees fill the box.** Every 15 seconds the bot claims the creator fees of $PULLIT. Until $PULLIT bonds, 75% goes to the box wallet and 25% stays in the dev wallet; while the market cap is under $10K, 20% goes to the box and 80% stays in the dev wallet; under $20K, 80% goes to the box and 20% stays in the dev wallet. After the bond, 100% goes to the box and nothing stays in the dev wallet. A small part of the box share is set aside in the vault.
 2. **The AI packs it.** When the box is full, the agent scans the market, throws out anything that looks unsafe, and picks two coins: a fresh runner and a runner of the meta. It writes a joke about its picks on the site log, never the names.
 3. **The box is sealed.** The bot publishes a seal: `sha256(common mint | rare mint | salt)`. The contents cannot change after that without the seal breaking.
 4. **A future block decides.** The bot commits to a slot about 20 seconds ahead. When that block exists, its hash picks the winner (weighted by tickets) and the tier.
@@ -74,7 +74,7 @@ The bot holds the keys of the dev wallet (to claim fees) and the box wallet (to 
 
 It can:
 
-- claim creator fees and send them to the box: 75% until the bond (20% under $10K cap, 80% under $20K), 70% after (the other 30% stays in the dev wallet)
+- claim creator fees and send them to the box: 75% until the bond (20% under $10K cap, 80% under $20K), 100% after the bond
 - swap box SOL into the prize coin and send it to the winner
 - buy $PULLIT with box SOL and burn it
 - post on x
