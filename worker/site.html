@@ -89,7 +89,7 @@ nav{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-
 
 
 .right{display:flex;flex-direction:column;gap:18px;margin-top:18px}
-.mini{margin-top:16px}
+.mini{margin-top:0}
 .stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:2px;background:var(--line);border:2px solid var(--line)}
 .stats div{background:var(--bg);padding:10px 8px;min-width:0}
 .stats .k{font-family:'Space Mono',ui-monospace,monospace;font-size:11px;color:var(--muted);display:block}
@@ -125,10 +125,13 @@ h3.h .hb{display:flex;gap:14px}
 .foot a,.foot button{flex:1;text-align:center;border:2px solid var(--line);background:none;padding:9px 0;font-size:12px;color:var(--muted);cursor:pointer}
 .foot a:hover,.foot button:hover{border-color:var(--pink);color:var(--text)}
 .empty{color:var(--muted);font-size:12px}
-.games{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0}
-.games>div{border:2px solid var(--line);background:var(--panel);padding:12px;display:flex;flex-direction:column;gap:6px;font-size:12px;line-height:1.45}
+.games{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0}
+.games>button{border:2px solid var(--line);background:var(--panel);padding:8px 10px;display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:2px 8px;font-size:12px;line-height:1.3;cursor:pointer;text-align:left;min-width:0}
+.games>button:hover{border-color:var(--gold)}
+.games .k{white-space:nowrap}
+.games b.px{font-size:16px;color:var(--gold);font-weight:400;white-space:nowrap}
+.games .v{white-space:nowrap;color:var(--muted);font-size:11px}
 .games .k{color:var(--muted);font-size:11px}
-.games b.px{font-size:28px;color:var(--gold);font-weight:400}
 .games .dim{color:var(--muted)}
 .clkbox{position:relative;overflow:hidden}
 .clkbox.hot{border-color:#ff5f6d}
@@ -138,7 +141,27 @@ h3.h .hb{display:flex;gap:14px}
 .toast.on{transform:none}
 .games .wins{display:flex;flex-direction:column;gap:2px;font-size:11px;color:var(--muted)}
 .games .wins a{color:inherit;text-decoration:none}.games .wins b{color:var(--gold);font-weight:400}
-@media (max-width:700px){.games{grid-template-columns:1fr}}
+/* the bond race: curve progress and the pot for the last buy before the bond */
+.race{margin:14px 0 0;border:2px solid var(--gold);background:linear-gradient(180deg,#1a1408,var(--panel));padding:10px 12px;box-shadow:4px 4px 0 #4a3a10}
+.race .rh{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.race .rh .k{font:400 13px 'Silkscreen',monospace;color:var(--gold)}
+.race .rh b{font:400 18px 'Silkscreen',monospace;color:var(--gold);white-space:nowrap}
+.cbar{position:relative;height:16px;margin:8px 0 6px;background:#0e0b06;border:2px solid #4a3a10;display:grid;grid-template-columns:repeat(20,1fr);gap:2px;padding:2px}
+.cbar i{background:#2a2210}
+.cbar i.on{background:var(--gold)}
+.cbar i.edge{animation:blink 1s steps(2) infinite}
+.race .rq{background:none;border:1px solid #4a3a10;color:var(--gold);font:11px 'Space Mono',monospace;width:18px;height:18px;padding:0;margin-left:4px;cursor:pointer;vertical-align:1px}
+.race .rl{display:flex;justify-content:space-between;gap:10px;font-size:11px;color:var(--muted)}
+.race .rl b{color:var(--text);font-weight:400}
+.race .rl .pc{color:var(--gold);white-space:nowrap}
+.race.done{border-color:var(--line);box-shadow:none;background:var(--panel)}
+/* what more volume would do: two quiet lines */
+.hints{display:flex;flex-direction:column;gap:3px;margin:8px 0 0;font-size:11px;color:var(--muted)}
+.hints span b{color:var(--text);font-weight:400}
+.hints span i{font-style:normal;color:var(--mint)}
+.feedlink{display:flex;justify-content:space-between;align-items:center;border:2px solid var(--line);background:var(--panel);padding:10px 12px;font-size:12px;color:var(--muted)}
+.feedlink:hover{border-color:var(--pink);color:var(--text)}
+.feedlink b{font:400 13px 'Silkscreen',monospace;color:var(--text)}
 .xs{margin-top:22px}
 .xp .xf{margin-bottom:8px}
 .xm{display:grid;gap:6px;margin-top:10px}
@@ -280,6 +303,7 @@ html:has(dialog[open]),body:has(dialog[open]){overflow:hidden}
   <nav>
     <span class="cabuy"><button class="chip" id="ca" type="button" title="copy contract address">ca <b id="caText">soon</b> ⧉</button><a class="buyc px" id="buy" href="https://x.com/Pullitbox" target="_blank" rel="noopener">buy</a></span>
     <button class="chip votec px" type="button" data-open="voteSheet" id="voteBtn">vote</button>
+    <a class="chip dk" href="/feed">feed</a>
     <a class="chip dk" href="https://x.com/Pullitbox" target="_blank" rel="noopener">x</a>
     <button class="chip dk" type="button" data-open="rules">rules</button>
     <a class="chip dk" href="https://github.com/syanovee/pullit" target="_blank" rel="noopener">github</a>
@@ -302,16 +326,14 @@ html:has(dialog[open]),body:has(dialog[open]){overflow:hidden}
     </section>
     <p class="how">hold <b id="entry">$20</b>+ for 7 min and you're in · <button type="button" data-open="meSheet">check eligibility</button></p>
     <p class="meta"><span class="bn">burned <b id="mBurn">0 sol</b></span><span>in the draw <b id="mIn">0</b></span></p>
-    <section class="games" id="games" hidden>
-      <div class="clkbox" id="clkBox"><span class="k">the clock</span><div class="toast" id="clkToast"></div><b class="px" id="clkTime">--:--</b><span>every $50+ buy resets it to 3:00. the last buyer when it hits zero takes <b id="clkPot">0 sol</b> (pays from 0.01 sol)</span><span class="dim" id="clkLast"></span><span class="wins" id="clkWins"></span></div>
-      <div><span class="k">lucky buys</span><b class="px" id="lkPot">0 sol</b><span>every $50+ buy: 1 in 15 takes half this pot, paid if you still hold 7 min later</span><span class="wins" id="lkWins"></span></div>
+    <section class="race" id="race" hidden>
+      <div class="rh"><span class="k">bond race <button type="button" class="rq" data-open="rules" aria-label="how the bond race works">?</button></span><b id="bPot">0 sol</b></div>
+      <div class="cbar" id="cBar"></div>
+      <div class="rl"><span id="bLine">last $50+ buy before the bond takes it</span><span class="pc" id="cPct">0%</span></div>
     </section>
+    <div class="hints" id="hints" hidden></div>
     <div class="oddsh">next box odds</div>
     <div class="odds" id="oddsRow"></div>
-    <div class="mini">
-      <h3 class="h">live <button type="button" data-open="logSheet">full log →</button></h3>
-      <ol class="log" id="miniLog"><li><span class="t"></span><span></span><span class="m">waiting for the box</span></li></ol>
-    </div>
   </div>
   <div class="right">
     <div class="stats">
@@ -324,14 +346,17 @@ html:has(dialog[open]),body:has(dialog[open]){overflow:hidden}
       <h3 class="h">opened <span class="hb"><button type="button" data-open="topSheet">top holders →</button><button type="button" data-open="allSheet" id="allBtn" hidden>all →</button></span></h3>
       <div class="cards" id="cards"><span class="empty">nothing opened yet</span></div>
     </div>
-    <div class="xs">
-      <h3 class="h">on x <span class="hb"><a href="https://x.com/Pullitbox" target="_blank" rel="noopener">follow →</a></span></h3>
-      <div class="xp" id="xPins"></div>
-      <ol class="xf" id="xFeed"><li class="empty">the box posts every big pull here</li></ol>
+    <section class="games" id="games" hidden>
+      <button type="button" class="clkbox" id="clkBox" data-open="rules"><span class="k">the clock <b class="px" id="clkTime">--:--</b></span><span class="v" id="clkPot">0 sol</span></button>
+      <button type="button" data-open="rules"><span class="k">lucky buys</span><span class="v"><b class="px" id="lkPot">0 sol</b></span></button>
+    </section>
+    <div class="mini">
+      <h3 class="h">live <a class="muted" href="/feed">feed →</a></h3>
+      <ol class="log" id="miniLog"><li><span class="t"></span><span></span><span class="m">waiting for the box</span></li></ol>
     </div>
   </div>
 </main>
-<div class="foot"><button type="button" data-open="rules">rules</button><a href="https://github.com/syanovee/pullit" target="_blank" rel="noopener">github</a><a href="https://x.com/Pullitbox" target="_blank" rel="noopener">x</a></div>
+<div class="foot"><button type="button" data-open="rules">rules</button><a href="/feed">feed</a><a href="https://github.com/syanovee/pullit" target="_blank" rel="noopener">github</a><a href="https://x.com/Pullitbox" target="_blank" rel="noopener">x</a></div>
 <footer><span id="holdersLine"></span><span id="resv" hidden> · reserve <b id="resvPct">100</b>% left</span><span id="journalWrap" hidden></span></footer>
 </div>
 <div class="tick" id="tick"><div class="run" id="tickRun"><span>nothing opened yet. the first box opens soon</span></div></div>
@@ -375,6 +400,7 @@ html:has(dialog[open]),body:has(dialog[open]){overflow:hidden}
     <dt>vault</dt><dd>no longer filled, every lamport goes into the box. <a href="#" data-open="vaultSheet">now <span id="vault">0 sol</span></a>. a secret pull or the final box opens it</dd>
     <dt>burn</dt><dd>10% of every box buys $pullit and burns it</dd>
     <dt>fees</dt><dd>until $pullit bonds: 75% to the box, 25% to the dev (under $20k cap: 80% to the box, 20% to the dev). after the bond 70% to the box, 30% to the dev</dd>
+    <dt>bond race</dt><dd>5% of every box goes to the bond pot until $pullit bonds. the last $50+ buy before the bond takes it, paid 7 min after the bond if they still hold</dd>
     <dt>the clock</dt><dd>every $50+ buy resets a 3 min timer. when it hits zero the last buyer takes the clock pot, if they still hold what they bought</dd>
     <dt>lucky buys</dt><dd>every $50+ buy is rolled on a later block: 1 in 15 takes half the lucky pot, paid after 7 min if you still hold</dd>
   </dl>
@@ -550,52 +576,39 @@ function render() {
     }
   }
 
-  // the clock and lucky buys
+  // the bond race and the curve
   const G = s.games;
+  const cp = p.curvePct, bonded = cp === 100 || !!G?.bondDone;
+  $('race').hidden = cp == null && !(G && Number(G.bondPot) > 0);
+  if (!$('race').hidden) {
+    const n = Math.floor((cp || 0) / 5), bar = $('cBar');
+    if (bar.children.length !== 20) bar.replaceChildren(...Array.from({ length: 20 }, () => el('i')));
+    [...bar.children].forEach((c, i) => { c.className = i < n ? 'on' : i === n && !bonded ? 'edge' : ''; });
+    $('race').classList.toggle('done', bonded);
+    setText('bPot', fmt(sol(G?.bondPot), 3) + ' sol');
+    setText('cPct', bonded ? 'bonded' : cp == null ? '' : fmt(cp, 1) + '% to bond');
+    setText('bLine', bonded ? (G?.bondDone ? 'bond race is over' : 'bonded. the last buyer is paid after 7 min if they still hold')
+      : G?.bondLeader ? `last $50+ buy: ${short(G.bondLeader)}` : 'last $50+ buy before the bond takes it');
+  }
+
+  // what more volume would do
+  const h = p.hints;
+  const usd = (n) => '$' + (n >= 1e6 ? fmt(n / 1e6, 1) + 'M' : Math.max(1, Math.round(n / 1e3)) + 'K');
+  const hl = [];
+  if (h && h.boxNext && h.boxNextVol && h.boxNextVol > h.vol1h) hl.push(el('span', {}, el('i', { textContent: '▲ ' }), el('b', { textContent: '+' + usd(h.boxNextVol - h.vol1h) }), ` an hour → ${h.boxNext} sol boxes`));
+  if (h && h.frenzyNextAt && h.frenzyNextAt > h.vol1h) hl.push(el('span', {}, el('i', { textContent: '▲ ' }), el('b', { textContent: '+' + usd(h.frenzyNextAt - h.vol1h) }), ` an hour → epic ${h.frenzyNextEpic}%`));
+  if (h) hl.unshift(el('span', {}, `traded this hour `, el('b', { textContent: usd(h.vol1h) }), ` · next box ${h.boxNow} sol`));
+  const hk = hl.map((x) => x.textContent).join('|');
+  if (hk !== render.hk) { render.hk = hk; $('hints').replaceChildren(...hl); }
+  $('hints').hidden = !h;
+
+  // the clock and lucky buys, one line each
   $('games').hidden = !G;
   if (G) {
     render.clockEnds = G.endsAt;
-    setText('clkPot', fmt(sol(G.clockPot), 3) + ' sol');
+    setText('clkPot', fmt(sol(G.clockPot), 3) + ' sol pot');
     setText('lkPot', fmt(sol(G.luckyPot), 3) + ' sol');
-    setText('clkLast', G.lastBuyer ? 'last buyer ' + short(G.lastBuyer) : 'waiting for the first buy');
-    // a new $50+ buy: show who reset the clock
-    const R = G.recent || [];
-    if (R[0] && render.lastBuy !== undefined && R[0].sig !== render.lastBuy) {
-      const t = $('clkToast');
-      t.textContent = `${short(R[0].buyer)} reset the clock · $${R[0].usd} buy`;
-      t.classList.add('on'); clearTimeout(render.toastT); render.toastT = setTimeout(() => t.classList.remove('on'), 4500);
-    }
-    render.lastBuy = R[0]?.sig || null;
-    const W = G.wins || [];
-    const win = (k) => W.filter((w) => w.kind === k).slice(0, 2).map((w) => el('a', { href: 'https://solscan.io/tx/' + w.sig, target: '_blank', rel: 'noopener' },
-      short(w.to) + ' took ', el('b', { textContent: fmt(sol(w.lamports), 3) + ' sol' }), ' · ' + ago(w.at)));
-    $('clkWins').replaceChildren(...win('clock'));
-    $('lkWins').replaceChildren(...win('lucky'));
     clock();
-  }
-
-  // pinned tweets, shown like the bot's own posts
-  const P = (s.pins || []).filter((p) => p.text);
-  const pkey = P.map((p) => p.url).join();
-  if (pkey !== render.pkey) {
-    render.pkey = pkey;
-    $('xPins').replaceChildren(...P.map((p) => el('ol', { className: 'xf' }, el('li', {}, el('a', { href: p.url, target: '_blank', rel: 'noopener' },
-      el('span', { className: 'tx', textContent: p.text }),
-      ...(p.media && p.media.length ? [el('span', { className: 'xm' + (p.media.length > 1 ? ' two' : '') }, ...p.media.slice(0, 2).map((m) => m.type === 'video'
-        ? Object.assign(el('video', { src: m.src, poster: m.poster || '', muted: true, loop: true, playsInline: true, autoplay: true, preload: 'metadata' }), { onclick: (e) => e.preventDefault() })
-        : el('img', { src: m.src, alt: '', loading: 'lazy' })))] : []),
-      el('time', { textContent: (p.at ? p.at.toLowerCase() + ' · ' : '') + 'pinned · open on x ↗' }))))));
-    for (const v of $('xPins').querySelectorAll('video')) { v.muted = true; v.play?.().catch(() => {}); }
-    if (P.length && !(s.x || []).length) $('xFeed').replaceChildren();
-  }
-
-  // the latest posts on x
-  const X = s.x || [];
-  const xkey = X.length ? X[0].at + X.length : '';
-  if (X.length && xkey !== render.xkey) {
-    render.xkey = xkey;
-    $('xFeed').replaceChildren(...X.slice(0, 4).map((p) => el('li', {}, el('a', { href: p.url || 'https://x.com/Pullitbox', target: '_blank', rel: 'noopener' },
-      p.text.length > 220 ? p.text.slice(0, 217) + '…' : p.text, el('time', { textContent: ago(p.at) + ' · open on x ↗' })))));
   }
 
   // journal
@@ -626,7 +639,7 @@ function render() {
     }));
     if (!feed.length) box.replaceChildren(el('li', {}, el('span', { className: 't' }), el('span', {}), el('span', { className: 'm', textContent: 'quiet so far. the box talks here once fees come in' })));
     if (atBottom) box.scrollTop = box.scrollHeight;
-    const mini = feed.slice(0, 4);
+    const mini = feed.slice(0, 3);
     if (mini.length) $('miniLog').replaceChildren(...mini.map((f) => el('li', {}, el('span', { className: 't', textContent: hhmm(f.at) }),
       el('span', { className: 'tag', textContent: f.tag, style: `color:${TAG[f.tag] || '#9a8f99'};border-color:${TAG[f.tag] || '#9a8f99'}` }),
       el('span', { className: 'm ' + (MSG[f.tag] || ''), textContent: f.m, title: f.m }))));

@@ -4,7 +4,7 @@
 // Vars (wrangler.jsonc): TEAM_WALLET, MINT, PUBLIC ("1" = site open to everyone), DRY_RUN.
 
 import { Bot, newState, type Env as BotEnv, type State } from "../src/loop.ts";
-import { HTML, SOON, BOXSVG } from "./site.ts";
+import { HTML, SOON, FEED, BOXSVG } from "./site.ts";
 import { renderCard, type CardData } from "./card.ts";
 import { keypairFromSecret, Rpc } from "../src/solana.ts";
 import { fetchToken } from "../src/jupiter.ts";
@@ -225,6 +225,9 @@ function publicState(s: State | null, repo?: string, dryRun = false, live = true
     games: s.games && {
       clockPot: s.games.clockPot,
       luckyPot: s.games.luckyPot,
+      bondPot: s.games.bondPot ?? "0",
+      bondLeader: s.bond?.at ? undefined : s.games.bondLast?.[0]?.buyer,
+      bondDone: s.games.bondDone || undefined,
       endsAt: s.games.clock?.endsAt,
       lastBuyer: s.games.clock?.last[0]?.buyer,
       wins: s.games.wins.slice(-6).reverse(),
@@ -415,6 +418,10 @@ export default {
         });
       return new Response("not found", { status: 404 });
     }
+    if (url.pathname === "/feed" || url.pathname === "/feed/")
+      return new Response(FEED, {
+        headers: { "content-type": "text/html; charset=utf-8", "cache-control": "public, max-age=60" },
+      });
     if (url.pathname === "/api/selftest")
       return preview ? json(await selftest(env)) : new Response("not found", { status: 404 });
     if (url.pathname === "/api/state") {

@@ -8,6 +8,7 @@
 export const GAMES = {
   clockPct: 20, // of what goes into the box, this share feeds the clock pot
   luckyPct: 10, // and this share the lucky pot
+  bondPct: 5, // before the bond, this share feeds the bond race pot: the last $50+ buy before the bond takes it
   clockMinutes: 3,
   minBuyUsd: 50,
   luckyOdds: 15, // 1 in this many qualifying buys

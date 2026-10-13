@@ -47,6 +47,7 @@ Each opened box has its own page, `pullit.fun/box/<n>`. Shared on X or Telegram 
 ## Boosts
 
 - **Frenzy.** The more $PULLIT trades in an hour, the better the odds of the next box. Four levels, from epic 19.5% up to epic 34.5%. Secret is always 0.5%. The odds are locked into the box when it is sealed, so they are part of the public record.
+- **Bond race.** Until $PULLIT bonds, 5% of every box goes into the bond pot. The last $50+ buy before the bond takes it, paid 7 minutes after the bond if that wallet still holds. The site shows how far the bonding curve is, and the bot posts at 50%, 75% and 90%.
 - **Milestones.** The first box after the market cap crosses 50K, 100K, 250K, 500K, 1M, 2.5M, 5M or 10M is epic or better.
 - **Bond box.** When $PULLIT bonds and moves to PumpSwap, whoever pulls the next box gets epic or better.
 - **In the red.** A holder whose bag is worth less than the SOL they put in (buys minus sells, from their onchain history) gets 3x tickets until they are back up.

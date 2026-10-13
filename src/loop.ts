@@ -59,6 +59,9 @@ export const LOOP = {
 };
 
 const SYSTEM_PROGRAM = "11111111111111111111111111111111";
+const PUMP_PROGRAM = "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P";
+/** pump.fun curve: 1B supply, 793.1M sold on the curve, the rest goes to the pool at the bond */
+const CURVE = { supply: 1_000_000_000, sellable: 793_100_000, decimals: 6, marks: [50, 75, 90] };
 
 export interface BoxRecord {
   boxId: number;
@@ -152,12 +155,15 @@ export interface State {
     cursor?: string; // newest tx of the mint already read
     clockPot: string;
     luckyPot: string;
+    bondPot?: string; // the bond race: grows until the bond, then the last $50+ curve buyer who still holds takes it
+    bondLast?: Buy[]; // the last $50+ buyers on the curve, newest first
+    bondDone?: boolean; // the bond race was paid out (or rolled into the box)
     clock?: { endsAt: number; last: Buy[] }; // last qualifying buyers, newest first
     queue: Buy[]; // buys waiting for their lucky roll
     recent?: Buy[]; // the last qualifying buys, shown live on the site
     luckyLast: Record<string, number>; // last lucky win per wallet
     paying?: {
-      kind: "clock" | "lucky";
+      kind: "clock" | "lucky" | "bond";
       to: string;
       lamports: string;
       at: number;
@@ -166,7 +172,7 @@ export interface State {
       sig?: string;
     };
     wins: {
-      kind: "clock" | "lucky";
+      kind: "clock" | "lucky" | "bond";
       to: string;
       lamports: string;
       at: string;
@@ -185,7 +191,9 @@ export interface State {
   >;
   /** after a vote for boxes: the next `left` boxes are VOTE_BOX_SOL and pay out exactly that */
   voteBoost?: { left: number };
-  bond?: { at?: number; queued?: boolean; checkedAt?: number }; // migration to pumpswap: the next box is epic or better // the one "dex paid" post, once dexscreener confirms it
+  bond?: { at?: number; queued?: boolean; checkedAt?: number };
+  /** the pump bonding curve: its owner account, how far it is (0-100) and the bond-progress posts already made */
+  curve?: { owner?: string; pct?: number; at?: number; marks?: number[]; lookedAt?: number }; // migration to pumpswap: the next box is epic or better // the one "dex paid" post, once dexscreener confirms it
   recapPosted?: boolean; // the first-hour recap went out
   teaseUsed?: number[]; // hand-written teasers already posted this round
   teaseTopics?: string[]; // topics of the last pre-launch posts, oldest first
@@ -217,6 +225,15 @@ export interface State {
     entryUsd?: number; // bag needed to be in the draw for this box
     milestoneBox?: number; // the box that is filling is a milestone box for this market cap
     bondBox?: boolean; // the box that is filling is the bond box
+    curvePct?: number; // bonding curve progress, 0-100, until the bond
+    hints?: {
+      vol1h: number; // usd traded in the last hour
+      frenzyNextAt?: number; // usd per hour for the next frenzy level
+      frenzyNextEpic?: number; // epic % at that level
+      boxNow: number; // sol, the next box at this pace
+      boxNext?: number; // sol, the size after that
+      boxNextVol?: number; // usd per hour that would get it, at the current fee rate
+    };
     reserve?: { initial: string; left: string }; // launch reserve, raw $PULLIT
     burned?: { lamports: string; tokens: string };
   };
@@ -639,6 +656,77 @@ export class Bot {
       this.state.pub.odds = o;
       this.state.pub.mcap = Math.round(mcap);
       this.state.pub.nextMilestone = BOOST.milestonesUsd.find((m) => !(this.state.milestonesHit ?? []).includes(m));
+      this.state.pub.hints = this.hints(vol, level);
+    }
+  }
+
+  /** What the next frenzy level and the next box size would take, for the site. */
+  hints(vol: number, level: number, now = Date.now()): NonNullable<NonNullable<State["pub"]>["hints"]> {
+    const nb = nextBoxSize(this.state.feeLedger, now, this.boxPct());
+    const boxNow = Number(nb.lamports) / 1e9;
+    const i = BOX_SIZES.indexOf(boxNow);
+    const boxNext = i >= 0 && i < BOX_SIZES.length - 1 ? BOX_SIZES[i + 1] : undefined;
+    const perHour = Number(nb.perHour) / 1e9; // box share of the fees, sol per hour
+    // the volume that would bring in enough fees for the next size, at the fee rate of the last hour
+    const boxNextVol =
+      boxNext && perHour > 0 && vol > 0 ? Math.round((vol * (boxNext / (FILL_MINUTES / 60))) / perHour) : undefined;
+    const nf = BOOST.frenzy[level + 1];
+    return {
+      vol1h: Math.round(vol),
+      frenzyNextAt: nf?.minVolume1h,
+      frenzyNextEpic: nf?.odds[2],
+      boxNow,
+      boxNext,
+      boxNextVol,
+    };
+  }
+
+  /** Bonding curve progress, read from the curve's own $PULLIT balance. Posts at 50, 75 and 90%. */
+  async curveTick(now = Date.now()) {
+    const c = (this.state.curve ??= {});
+    if (this.dry || !this.env.MINT || this.state.bond?.at) return;
+    if (c.at && now - c.at < 60_000) return;
+    c.at = now;
+    try {
+      if (!c.owner) {
+        // the curve is one of the program-owned holders the holder snapshot already set aside
+        if (c.lookedAt && now - c.lookedAt < 10 * 60_000) return;
+        c.lookedAt = now;
+        const ex = this.state.excluded.slice(0, 100);
+        if (!ex.length) return;
+        const res = await this.rpc.call<{ value: ({ owner: string } | null)[] }>("getMultipleAccounts", [
+          ex,
+          { encoding: "base64", dataSlice: { offset: 0, length: 0 } },
+        ]);
+        const i = res.value.findIndex((a) => a?.owner === PUMP_PROGRAM);
+        if (i < 0) return;
+        c.owner = ex[i];
+        this.log(`bonding curve found: ${c.owner}`);
+      }
+      const acc = await this.rpc.tokenAccount(c.owner, this.env.MINT);
+      const left = acc ? Number(acc.amount) / 10 ** CURVE.decimals : 0;
+      const pct = Math.max(0, Math.min(100, ((CURVE.supply - left) / CURVE.sellable) * 100));
+      c.pct = Math.round(pct * 10) / 10;
+      if (this.state.pub) this.state.pub.curvePct = c.pct;
+      const pot = sol(BigInt(this.gamesState().bondPot ?? "0"));
+      for (const m of CURVE.marks) {
+        if (pct < m || (c.marks ?? []).includes(m)) continue;
+        c.marks = [...(c.marks ?? []), m];
+        await this.line(
+          "boost",
+          `the bonding curve of $PULLIT is ${m}% done. at 100% it bonds: the next box is the bond box (epic or better) and the last $50+ buy before the bond takes the bond pot, ${pot} sol now`,
+          [`${m}%`],
+          `curve ${m}%. last $50+ buy before the bond takes ${pot} sol`,
+        );
+        await this.post(
+          `$PULLIT bonding curve: ${m}%\n\nthe last $50+ buy before the bond takes the bond pot (${pot} sol now).\nthen the bond box: epic or better.`,
+          ["pullit.fun"],
+          false,
+          m >= 90 ? "always" : true,
+        );
+      }
+    } catch (e) {
+      this.log(`curve read failed: ${(e as Error).message}`);
     }
   }
 
@@ -698,7 +786,10 @@ export class Bot {
     const l = (boxLamports * BigInt(GAMES.luckyPct)) / 100n;
     g.clockPot = (BigInt(g.clockPot) + c).toString();
     g.luckyPot = (BigInt(g.luckyPot) + l).toString();
-    return c + l;
+    // the bond race pot fills only until the bond
+    const b = this.state.bond?.at ? 0n : (boxLamports * BigInt(GAMES.bondPct)) / 100n;
+    g.bondPot = (BigInt(g.bondPot ?? "0") + b).toString();
+    return c + l + b;
   }
 
   gamesState() {
@@ -747,7 +838,7 @@ export class Bot {
     const total = this.state.feeLedger
       .filter((e) => now - e.at < 3_600_000)
       .reduce((a, e) => a + BigInt(e.lamports), 0n);
-    return (total * 80n * BigInt(100 - LOOP.vaultPct)) / 10_000n;
+    return (total * BigInt(this.boxPct()) * BigInt(100 - LOOP.vaultPct)) / 10_000n;
   }
 
   /** Minutes until the current box is full at the last hour's pace, "?" if nothing came in. */
@@ -1107,7 +1198,7 @@ export class Bot {
     let cap = threshold * BigInt(LOOP.boxCapX);
     if (capMax > 0n && capMax < cap) cap = capMax;
     const g = this.gamesState();
-    const pots = BigInt(g.clockPot) + BigInt(g.luckyPot);
+    const pots = BigInt(g.clockPot) + BigInt(g.luckyPot) + BigInt(g.bondPot ?? "0");
     let budget = available - vault - pots; // the box itself; the vault and the game pots are set aside
     if (budget < 0n) budget = 0n;
     if (!final && budget > cap) budget = cap;
@@ -1812,17 +1903,21 @@ who you are, only for context: a pink pixel gift box on solana, not live yet. tr
   async bondWatch(now = Date.now()) {
     const b = (this.state.bond ??= {});
     if (b.at || this.dry || !this.env.MINT) return;
-    if (b.checkedAt && now - b.checkedAt < 60_000) return;
-    b.checkedAt = now;
-    try {
-      const r = await fetch(`https://api.dexscreener.com/tokens/v1/solana/${this.env.MINT}`);
-      const pairs = (await r.json()) as { dexId?: string }[];
-      if (!Array.isArray(pairs) || !pairs.some((p) => p.dexId === "pumpswap")) return;
-    } catch {
-      return;
+    const full = (this.state.curve?.pct ?? 0) >= 100;
+    if (!full) {
+      if (b.checkedAt && now - b.checkedAt < 60_000) return;
+      b.checkedAt = now;
+      try {
+        const r = await fetch(`https://api.dexscreener.com/tokens/v1/solana/${this.env.MINT}`);
+        const pairs = (await r.json()) as { dexId?: string }[];
+        if (!Array.isArray(pairs) || !pairs.some((p) => p.dexId === "pumpswap")) return;
+      } catch {
+        return;
+      }
     }
     b.at = now;
     b.queued = true;
+    if (this.state.pub) this.state.pub.curvePct = 100;
     const vault = sol(BigInt(this.state.vaultLamports ?? "0"));
     this.log(`bonded: the next box is the bond box (vault ${vault} sol)`);
     await this.line(
@@ -1832,7 +1927,7 @@ who you are, only for context: a pink pixel gift box on solana, not live yet. tr
       `bonded. next box is epic or better guaranteed`,
     );
     await this.post(
-      `$PULLIT bonded.\n\nthe next box is the bond box: epic or better guaranteed.\nhold $${this.entry()}+ to be in the draw.`,
+      `$PULLIT bonded.\n\nthe next box is the bond box: epic or better guaranteed.\nthe last $50+ buy before the bond takes the bond pot (${sol(BigInt(this.gamesState().bondPot ?? "0"))} sol) in 7 min, if they still hold.\nhold $${this.entry()}+ to be in the draw.`,
       ["pullit.fun"],
       false,
       "always",
@@ -1864,9 +1959,29 @@ who you are, only for context: a pink pixel gift box on solana, not live yet. tr
           g.clock = { endsAt: b.at + GAMES.clockMinutes * 60_000, last };
           g.queue = [...g.queue, b].slice(-GAMES.queueMax);
           g.recent = [...(g.recent ?? []), b].slice(-8);
+          // the bond race: only buys on the curve count, so only until the bond
+          if (!this.state.bond?.at)
+            g.bondLast = [b, ...(g.bondLast ?? []).filter((x) => x.buyer !== b.buyer)].slice(0, 5);
         }
       } catch (e) {
         this.log(`buys read failed: ${(e as Error).message}`);
+      }
+    }
+    // the bond race: once bonded and 7 minutes passed, the last $50+ curve buyer who still holds takes the pot
+    const bondAt = this.state.bond?.at;
+    if (bondAt && !g.bondDone && now - bondAt >= GAMES.holdMinutes * 60_000) {
+      const bpot = BigInt(g.bondPot ?? "0");
+      if (bpot <= 0n) g.bondDone = true;
+      else {
+        for (const c of (g.bondLast ?? []).filter((x) => x.at <= bondAt + 60_000))
+          if (await this.stillHolds(c)) return this.gamesPay("bond", c, bpot);
+        // nobody held: the pot goes back into the box
+        g.bondPot = "0";
+        g.bondDone = true;
+        this.feed(
+          "win",
+          `bonded, but every last buyer before the bond already sold. the bond pot (${sol(bpot)} sol) goes into the box`,
+        );
       }
     }
     // the clock ran out: the last buyer who still holds takes the pot
@@ -1905,7 +2020,7 @@ who you are, only for context: a pink pixel gift box on solana, not live yet. tr
   }
 
   /** Pays a clock or lucky win in SOL. Saved before signing and again with the signature. */
-  async gamesPay(kind: "clock" | "lucky", b: Buy, lamports: bigint, seed?: string) {
+  async gamesPay(kind: "clock" | "lucky" | "bond", b: Buy, lamports: bigint, seed?: string) {
     const g = this.gamesState();
     await this.guard?.();
     g.paying = { kind, to: b.buyer, lamports: lamports.toString(), at: Date.now(), buySig: b.sig, seed };
@@ -1938,7 +2053,10 @@ who you are, only for context: a pink pixel gift box on solana, not live yet. tr
     const g = this.gamesState();
     const p = g.paying!;
     const lam = BigInt(p.lamports);
-    if (p.kind === "clock") {
+    if (p.kind === "bond") {
+      g.bondPot = (BigInt(g.bondPot ?? "0") - lam > 0n ? BigInt(g.bondPot ?? "0") - lam : 0n).toString();
+      g.bondDone = true;
+    } else if (p.kind === "clock") {
       g.clockPot = (BigInt(g.clockPot) - lam > 0n ? BigInt(g.clockPot) - lam : 0n).toString();
       g.clock = undefined;
     } else {
@@ -1959,7 +2077,19 @@ who you are, only for context: a pink pixel gift box on solana, not live yet. tr
     ].slice(-30);
     g.paying = undefined;
     this.log(`${p.kind} paid ${sol(lam)} SOL to ${p.to} (${p.sig})`);
-    if (p.kind === "clock") {
+    if (p.kind === "bond") {
+      this.feed(
+        "win",
+        `bond race: ${short(p.to)} made the last buy before the bond and took the pot: ${sol(lam)} sol`,
+        p.sig,
+      );
+      await this.post(
+        `bond race won.\n\n${short(p.to)} made the last $PULLIT buy before the bond and took the pot: ${sol(lam)} sol.`,
+        ["pullit.fun"],
+        false,
+        "always",
+      );
+    } else if (p.kind === "clock") {
       this.feed(
         "win",
         `the clock hit zero. ${short(p.to)} was the last buyer and took the pot: ${sol(lam)} sol`,
@@ -2066,6 +2196,7 @@ who you are, only for context: a pink pixel gift box on solana, not live yet. tr
       }
     }
     await this.dexPaid(now);
+    await this.curveTick(now);
     await this.bondWatch(now);
     await this.gamesTick(now).catch((e) => this.log(`games: ${(e as Error).message}`));
     if (this.state.phase === "drawing") return this.finishBox();

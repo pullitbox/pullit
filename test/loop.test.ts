@@ -279,3 +279,55 @@ test("vote boost: the next 5 boxes are 0.3 sol", async () => {
   const { VOTE_BOX_LAMPORTS } = await import("../src/loop.ts");
   assert.equal(VOTE_BOX_LAMPORTS, 300_000_000n);
 });
+
+test("bond race: the pot fills only before the bond, then the last $50+ buyer who still holds takes it", async () => {
+  const b = new Bot(
+    { HELIUS_API_KEY: "x", JUP_API_KEY: "x", BOX_SECRET: "x", TEAM_WALLET: "T", MINT: "M" },
+    newState(),
+  );
+  const add = (l: bigint) => (b as unknown as { addToPots(l: bigint): bigint }).addToPots(l);
+  // before the bond: 20% clock + 10% lucky + 5% bond race
+  assert.equal(add(1_000_000_000n), 350_000_000n);
+  assert.equal(b.gamesState().bondPot, "50000000");
+  const now = Date.now();
+  b.state.bond = { at: now - 8 * 60_000 };
+  // after the bond nothing more goes in
+  assert.equal(add(1_000_000_000n), 300_000_000n);
+  assert.equal(b.gamesState().bondPot, "50000000");
+  b.state.mintSeen = "M";
+  const buy = (buyer: string, minAgo: number) => ({
+    sig: buyer + "s",
+    buyer,
+    tokens: 1,
+    at: now - minAgo * 60_000,
+    slot: 1,
+    usd: 60,
+  });
+  // newest first: A sold, B still holds, C bought after the bond and does not count
+  b.gamesState().bondLast = [buy("C", 2), buy("A", 9), buy("B", 10)];
+  (b as unknown as { stillHolds(x: { buyer: string }): Promise<boolean> }).stillHolds = async (x) => x.buyer !== "A";
+  const paid: [string, string, bigint][] = [];
+  (b as unknown as { gamesPay(k: string, x: { buyer: string }, l: bigint): Promise<void> }).gamesPay = async (
+    k,
+    x,
+    l,
+  ) => {
+    paid.push([k, x.buyer, l]);
+  };
+  await b.gamesTick(now);
+  assert.deepEqual(paid, [["bond", "B", 50_000_000n]]);
+});
+
+test("hints: next frenzy level and the volume for the next box size", () => {
+  const b = bot();
+  const now = Date.now();
+  // 1 sol of fees in the last hour, 75% to the box before the bond (unknown cap)
+  b.state.feeLedger = [{ at: now - 10 * 60_000, lamports: String(1e9) } as never];
+  const h = b.hints(40_000, 1, now);
+  // 0.75 sol/h to the box -> 0.31 fillable -> 0.3 now, 0.5 next needs 1.2 sol/h -> 64K of volume
+  assert.equal(h.boxNow, 0.3);
+  assert.equal(h.boxNext, 0.5);
+  assert.equal(h.boxNextVol, 64_000);
+  assert.equal(h.frenzyNextAt, 60_000);
+  assert.equal(h.frenzyNextEpic, 29.5);
+});
