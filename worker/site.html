@@ -425,7 +425,7 @@ html:has(dialog[open]),body:has(dialog[open]){overflow:hidden}
     <dt>box size</dt><dd>0.1 sol per box for now, so they open more often. later it grows with the volume again: the busier the last hour, the bigger the next box, up to 4 sol</dd>
     <dt>get in</dt><dd>hold the entry for 7 min. bigger bag, more tickets</dd>
     <dt>in the red</dt><dd>bag worth less than the sol you paid? 3x tickets until you are back up</dd>
-    <dt>vault</dt><dd>no longer filled, every lamport goes into the box. <a href="#" data-open="vaultSheet">now <span id="vault">0 sol</span></a>. a secret pull or the final box opens it</dd>
+    <dt>vault</dt><dd>open now: what was in it is split over 3 boxes, each takes its slice on top. <a href="#" data-open="vaultSheet">left <span id="vault">0 sol</span></a></dd>
     <dt>burn</dt><dd>10% of every box buys $pullit and burns it</dd>
     <dt>fees</dt><dd>100% of the trading fees go into the box. the dev takes nothing</dd>
     <dt>to bond</dt><dd>how far the pump.fun curve is. at 100% $pullit bonds and the next box is the bond box: epic or better</dd>
@@ -449,7 +449,7 @@ html:has(dialog[open]),body:has(dialog[open]){overflow:hidden}
     <dt>what</dt><dd>what was set aside from the first boxes. it is no longer filled: every lamport now goes into the box. it sits in the box wallet, on chain</dd>
     <dt>why</dt><dd>so some pulls are way bigger than the box. one lucky holder walks off with a chunk</dd>
     <dt>grows</dt><dd>every box adds to it. it only goes down when something opens it</dd>
-    <dt>opens</dt><dd>a secret pull, 0.5% per box, takes the whole vault on top of the box. if fees ever dry up, the final box pays it out</dd>
+    <dt>opens</dt><dd>now: split evenly over the next 3 boxes, each pays its slice on top of the box. before that only a secret pull or the final box could open it</dd>
   </dl>
 </div></dialog>
 
@@ -545,7 +545,7 @@ function render() {
   } else {
     setText('kick', `box #${id} is filling`);
     setText('big', down(have) + ' sol');
-    setText('sline', p.bondBox ? `bond box: epic or better` : p.milestoneBox ? `milestone box: epic or better` : "box agent picks the coin you'll get");
+    setText('sline', p.vaultSlice ? `+${fmt(sol(p.vaultSlice), 3)} sol from the vault inside · ${p.vaultDripLeft} of 3 left` : p.bondBox ? `bond box: epic or better` : p.milestoneBox ? `milestone box: epic or better` : "box agent picks the coin you'll get");
     $('fill').style.width = Math.round(pct * 100) + '%';
     setText('bl1', need ? `opens at ${fmt(need, 2)} sol` : 'opens when full');
     setText('bl2', Math.round(pct * 100) + '%');

@@ -193,6 +193,8 @@ export interface State {
   >;
   /** after a vote for boxes: the next `left` boxes are `lamports` (VOTE_BOX_LAMPORTS if unset) and pay out exactly that */
   voteBoost?: { left: number; lamports?: string };
+  /** the vault paid out over the next boxes: each takes `per` on top of its size */
+  vaultDrip?: { id: string; left: number; per: string };
   bond?: { at?: number; queued?: boolean; checkedAt?: number };
   /** the pump bonding curve: its owner account, how far it is (0-100) and the bond-progress posts already made */
   curve?: { owner?: string; pct?: number; at?: number; marks?: number[]; lookedAt?: number }; // migration to pumpswap: the next box is epic or better // the one "dex paid" post, once dexscreener confirms it
@@ -227,6 +229,8 @@ export interface State {
     entryUsd?: number; // bag needed to be in the draw for this box
     milestoneBox?: number; // the box that is filling is a milestone box for this market cap
     bondBox?: boolean; // the box that is filling is the bond box
+    vaultSlice?: string; // lamports from the vault on top of the box that is filling
+    vaultDripLeft?: number; // boxes left that take a slice of the vault
     curvePct?: number; // bonding curve progress, 0-100, until the bond
     hints?: {
       vol1h: number; // usd traded in the last hour
@@ -320,6 +324,8 @@ export const BOX_SIZES = [0.15, 0.2, 0.25, 0.3, 0.5, 0.75, 1, 1.5, 2, 2.75, 3.5,
 export const FIRST_BOX = 0.15;
 /** Box size while a community vote's extra SOL is being paid out over the next boxes. */
 export const VOTE_BOX_LAMPORTS = 300_000_000n;
+/** Opens the vault once per id: what is in it is split evenly over the next `boxes` boxes. */
+export const VAULT_DRIP = { id: "d1", boxes: 3 };
 /** While set, every box is this size no matter the volume. null turns the volume sizing back on. */
 export const FIXED_BOX: number | null = 0.1;
 const FILL_MINUTES = 40; // a box should fill in about this long at the current volume
@@ -687,6 +693,26 @@ export class Bot {
       boxNext,
       boxNextVol,
     };
+  }
+
+  /** Once per VAULT_DRIP id: what is in the vault is split over the next boxes. */
+  async openVault() {
+    if (this.state.vaultDrip?.id === VAULT_DRIP.id || this.state.pending) return;
+    const v = BigInt(this.state.vaultLamports ?? "0");
+    if (v <= 0n) return;
+    const per = v / BigInt(VAULT_DRIP.boxes);
+    this.state.vaultDrip = { id: VAULT_DRIP.id, left: VAULT_DRIP.boxes, per: per.toString() };
+    const n = VAULT_DRIP.boxes;
+    this.feed(
+      "boost",
+      `the vault opens: ${sol(v)} sol, split over the next ${n} boxes. each one gets +${sol(per)} sol on top`,
+    );
+    await this.post(
+      `the vault opens.\n\n${sol(v)} sol, split over the next ${n} boxes.\neach one gets +${sol(per)} sol on top.\n\nhold $${this.entry()}+ to be in the draw.`,
+      ["pullit.fun"],
+      false,
+      "always",
+    );
   }
 
   /** Bonding curve progress, read from the curve's own $PULLIT balance. Posts at 50, 75 and 90%. */
@@ -1215,9 +1241,14 @@ export class Bot {
       this.state.vaultLamports = vault.toString();
     }
     const boost = !final && (this.state.voteBoost?.left ?? 0) > 0;
-    const threshold = boost
-      ? BigInt(this.state.voteBoost!.lamports ?? VOTE_BOX_LAMPORTS)
-      : boxSize(this.state.history.length, this.state.boxTarget);
+    // the vault drip: this box takes its slice of the vault on top of its own size
+    const dripPer = !final && (this.state.vaultDrip?.left ?? 0) > 0 ? BigInt(this.state.vaultDrip!.per) : 0n;
+    const slice = dripPer > vault ? vault : dripPer;
+    vault -= slice;
+    const threshold =
+      (boost
+        ? BigInt(this.state.voteBoost!.lamports ?? VOTE_BOX_LAMPORTS)
+        : boxSize(this.state.history.length, this.state.boxTarget)) + slice;
     // one open never takes more than a few box sizes: SOL that lands in the box wallet by mistake
     // (or any other surprise) goes out slowly over many boxes, never in one pull
     const capMax = this.env.MAX_BOX_SOL ? BigInt(Math.round(Number(this.env.MAX_BOX_SOL) * 1e9)) : 0n;
@@ -1237,6 +1268,8 @@ export class Bot {
       this.state.pub.entryUsd = this.entry();
       this.state.pub.milestoneBox = this.state.milestoneQueue?.[0];
       this.state.pub.bondBox = !!this.state.bond?.queued || undefined;
+      this.state.pub.vaultSlice = slice > 0n ? slice.toString() : undefined;
+      this.state.pub.vaultDripLeft = slice > 0n ? this.state.vaultDrip!.left : undefined;
       this.state.pub.updatedAt = new Date().toISOString();
     }
     if (!final && budget < threshold) {
@@ -1244,6 +1277,11 @@ export class Bot {
       return;
     }
     if (boost) this.state.voteBoost!.left--;
+    if (slice > 0n) {
+      // the slice leaves the vault with this box
+      this.state.vaultLamports = vault.toString();
+      this.state.vaultDrip!.left--;
+    }
     if (available <= 0n) {
       this.state.phase = "done";
       this.log("final box: bank empty, done");
@@ -2238,6 +2276,7 @@ who you are, only for context: a pink pixel gift box on solana, not live yet. tr
       }
     }
     await this.dexPaid(now);
+    await this.openVault();
     await this.curveTick(now);
     await this.bondWatch(now);
     await this.gamesTick(now).catch((e) => this.log(`games: ${(e as Error).message}`));
