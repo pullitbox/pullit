@@ -20,8 +20,6 @@ export const BOOST = {
   reserveBurnPct: 10,
   reserveBurnAtUsd: [50_000, 125_000, 200_000, 350_000],
   milestoneBurnVaultPct: 0, // of what is left in the vault, bought back and burned on a milestone box
-  // dip box: the price fell this much in the last hour, so the next box is epic or better. at most once per cooldown
-  dip: { dropPct: 20, cooldownMin: 180 },
 };
 
 export type Odds = [number, number, number, number];

@@ -426,7 +426,7 @@ html:has(dialog[open]),body:has(dialog[open]){overflow:hidden}
     <dt>box size</dt><dd>0.1 sol per box for now, so they open more often. later it grows with the volume again: the busier the last hour, the bigger the next box, up to 4 sol</dd>
     <dt>get in</dt><dd>hold the entry for 7 min. bigger bag, more tickets</dd>
     <dt>fresh buy</dt><dd>bought in the last hour? +25% tickets for that hour. selling resets your multiplier</dd>
-    <dt>dip box</dt><dd>if $pullit drops 20% or more in an hour, the next box is epic or better. at most once every 3 hours</dd>
+    <dt>epic run</dt><dd>the next 3 boxes are epic or better, guaranteed</dd>
     <dt>in the red</dt><dd>bag worth less than the sol you paid? 3x tickets until you are back up</dd>
     <dt>vault</dt><dd>open now: what was in it is split over 3 boxes, each takes its slice on top. <a href="#" data-open="vaultSheet">left <span id="vault">0 sol</span></a></dd>
     <dt>burn</dt><dd>10% of every box buys $pullit and burns it</dd>
@@ -549,7 +549,7 @@ function render() {
   } else {
     setText('kick', `box #${id} is filling`);
     setText('big', down(have) + ' sol');
-    setText('sline', p.vaultSlice ? `+${fmt(sol(p.vaultSlice), 3)} sol from the vault inside · ${p.vaultDripLeft} of 3 left` : p.bondBox ? `bond box: epic or better` : p.dipBox ? `dip box: epic or better` : p.milestoneBox ? `milestone box: epic or better` : "box agent picks the coin you'll get");
+    setText('sline', p.vaultSlice ? `+${fmt(sol(p.vaultSlice), 3)} sol from the vault inside · ${p.vaultDripLeft} of 3 left` : p.bondBox ? `bond box: epic or better` : p.epicLeft ? `epic or better · ${p.epicLeft} of 3 left` : p.milestoneBox ? `milestone box: epic or better` : "box agent picks the coin you'll get");
     $('fill').style.width = Math.round(pct * 100) + '%';
     setText('bl1', need ? `opens at ${fmt(need, 2)} sol` : 'opens when full');
     setText('bl2', Math.round(pct * 100) + '%');
@@ -558,7 +558,7 @@ function render() {
     if (fresh) say(last.posts?.[last.posts.length - 1] || `${short(last.draw.winner)} pulled ${last.draw.tier}. next box is filling`);
     else say(n < 30 ? 'im mostly air right now. trades fill me' : n < 80 ? `${n}% full. i can feel it` : `${n}%. almost. dont leave`);
   }
-  const badge = won || !mint || pk ? '' : p.bondBox ? 'bond box · epic or better' : p.dipBox ? 'dip box · epic or better' : p.milestoneBox ? `milestone box · ${capShort(p.milestoneBox)} cap` : p.frenzy ? `frenzy ${p.frenzy}/3 · better odds` : '';
+  const badge = won || !mint || pk ? '' : p.bondBox ? 'bond box · epic or better' : p.epicLeft ? 'epic or better, guaranteed' : p.milestoneBox ? `milestone box · ${capShort(p.milestoneBox)} cap` : p.frenzy ? `frenzy ${p.frenzy}/3 · better odds` : '';
   $('badge').hidden = !badge; setText('badge', badge);
 
   // numbers
@@ -823,7 +823,7 @@ async function recompute(b) {
   const n = odds.some((o) => !Number.isInteger(o)) ? (parseInt(seed.slice(13, 21), 16) % 1000) / 10 : parseInt(seed.slice(13, 21), 16) % 100;
   let t = 0, tier = 'common';
   for (let i = 0; i < TIERS.length; i++) { t += odds[i]; if (n < t) { tier = TIERS[i].key; break; } }
-  if ((b.milestone || b.bond || b.dip) && (tier === 'common' || tier === 'rare')) tier = 'epic';
+  if ((b.milestone || b.bond || b.epic) && (tier === 'common' || tier === 'rare')) tier = 'epic';
   const seal = b.salt ? await sha256(`${b.plan.common.mint}|${b.plan.rare.mint}|${b.salt}`) : '';
   return { seed, winner, tier, total, seal };
 }
@@ -847,7 +847,7 @@ async function openBox(id) {
     el('dt', { textContent: 'blockhash' }), el('dd', { textContent: d.blockhash }),
     el('dt', { textContent: 'seed' }), el('dd', { textContent: d.seed }));
   const odds = (b.odds || TIERS.map((t) => t.pct)).join(' / ');
-  const how = el('pre', { textContent: `seal = sha256(common mint | rare mint | salt)\nseed = sha256(blockhash:${b.boxId})\nwinner = weighted pick by tickets, wallets sorted a-z\ntier = seed[13..21] mod 100 → ${odds}${b.frenzy ? ` (frenzy ${b.frenzy})` : ''}${b.milestone || b.bond || b.dip ? `\n${b.bond ? 'bond' : b.dip ? 'dip' : 'milestone'} box: common or rare becomes epic` : ''}` });
+  const how = el('pre', { textContent: `seal = sha256(common mint | rare mint | salt)\nseed = sha256(blockhash:${b.boxId})\nwinner = weighted pick by tickets, wallets sorted a-z\ntier = seed[13..21] mod 100 → ${odds}${b.frenzy ? ` (frenzy ${b.frenzy})` : ''}${b.milestone || b.bond || b.epic ? `\n${b.bond ? 'bond' : b.epic ? 'epic run' : 'milestone'} box: common or rare becomes epic` : ''}` });
   const res = el('div', { className: 'muted', textContent: b.rows.length ? '' : 'ticket list for this box isnt stored, cant recompute' });
   const btn = el('button', { className: 'pbtn px', type: 'button', textContent: 'check it myself', disabled: !b.rows.length });
   btn.onclick = async () => {

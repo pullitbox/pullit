@@ -334,17 +334,3 @@ test("hints: next frenzy level and the volume for the next box size", async (t) 
   assert.equal(h.frenzyNextAt, 60_000);
   assert.equal(h.frenzyNextEpic, 29.5);
 });
-
-test("dip box: a 20% drop in an hour queues it once, then waits out the cooldown", async () => {
-  const b = bot();
-  const now = Date.now();
-  await b.dipWatch(-12, now);
-  assert.equal(b.state.dip?.queued, undefined);
-  await b.dipWatch(-25, now);
-  assert.equal(b.state.dip?.queued, true);
-  b.state.dip!.queued = false; // the box took it
-  await b.dipWatch(-30, now + 60 * 60_000);
-  assert.equal(b.state.dip?.queued, false); // still in the cooldown
-  await b.dipWatch(-30, now + 181 * 60_000);
-  assert.equal(b.state.dip?.queued, true);
-});
