@@ -3,16 +3,31 @@
 import type { KVNamespace } from "./cloudflare.ts";
 
 export const VOTE = {
-  id: "v1",
-  question: "$100 from the dev wallet. where should it go?",
+  id: "v2",
+  usd: 300, // what the winning option gets, from the dev wallet
+  boxes: 10, // "boxes" spreads it over this many boxes
+  question: "$300 of trading fees landed in the dev wallet by mistake. where should it go?",
   options: [
-    { key: "boxes", label: "into the next 5 boxes", note: "+$20 in each" },
+    { key: "boxes", label: "into the next 10 boxes", note: "+$30 in each" },
     { key: "buyback", label: "buy back $pullit and burn it", note: "one market buy, then burned" },
   ],
-  endsAt: Date.parse("2026-10-13T13:30:00Z"),
+  endsAt: Date.parse("2026-10-13T22:00:00Z"),
 };
 
-const prefix = () => `vote:${VOTE.id}:`;
+/** Finished votes, newest first. Their counts stay in kv under their own id. */
+export const PAST_VOTES = [
+  {
+    id: "v1",
+    question: "$100 from the dev wallet. where should it go?",
+    options: [
+      { key: "boxes", label: "into the next 5 boxes", note: "+$20 in each" },
+      { key: "buyback", label: "buy back $pullit and burn it", note: "one market buy, then burned" },
+    ],
+    endsAt: Date.parse("2026-10-13T13:30:00Z"),
+  },
+];
+
+const prefix = (id = VOTE.id) => `vote:${id}:`;
 
 async function hashVoter(req: Request): Promise<string> {
   const ip = req.headers.get("cf-connecting-ip") ?? "";
@@ -24,13 +39,16 @@ async function hashVoter(req: Request): Promise<string> {
     .join("");
 }
 
-async function counts(kv: KVNamespace): Promise<Record<string, number>> {
-  const c: Record<string, number> = Object.fromEntries(VOTE.options.map((o) => [o.key, 0]));
+async function counts(
+  kv: KVNamespace,
+  v: { id: string; options: { key: string }[] } = VOTE,
+): Promise<Record<string, number>> {
+  const c: Record<string, number> = Object.fromEntries(v.options.map((o) => [o.key, 0]));
   let cursor: string | undefined;
   for (let page = 0; page < 20; page++) {
-    const r = await kv.list({ prefix: prefix(), cursor, limit: 1000 });
+    const r = await kv.list({ prefix: prefix(v.id), cursor, limit: 1000 });
     for (const k of r.keys) {
-      const choice = k.name.slice(prefix().length).split(":")[0];
+      const choice = k.name.slice(prefix(v.id).length).split(":")[0];
       if (choice in c) c[choice]++;
     }
     if (r.list_complete || !r.cursor) break;
@@ -68,4 +86,9 @@ export async function voteResult(kv: KVNamespace): Promise<string | null> {
   if (Date.now() < VOTE.endsAt) return null;
   const c = await counts(kv);
   return (c.buyback ?? 0) > (c.boxes ?? 0) ? "buyback" : "boxes";
+}
+
+/** The finished votes with their final counts, newest first. */
+export async function pastVotes(kv: KVNamespace) {
+  return Promise.all(PAST_VOTES.map(async (v) => ({ ...v, counts: await counts(kv, v), open: false })));
 }

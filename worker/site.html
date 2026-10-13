@@ -163,6 +163,13 @@ h3.h .hb{display:flex;gap:14px}
 .vnext b{color:var(--pink);font-size:15px}.vnext a{color:var(--pink)}
 .vlabel{font-size:11px;color:var(--muted);text-transform:lowercase;margin-bottom:-4px}
 .vlabel:empty{display:none}
+.vpast{display:flex;flex-direction:column;gap:12px;border-top:2px solid var(--line);padding-top:12px}
+.vpast:empty{display:none}
+.vpast .pq{font-size:12px;color:var(--text);line-height:1.4}
+.vpast .pr{display:flex;justify-content:space-between;gap:10px;font-size:12px;color:var(--muted);position:relative;padding:4px 8px;border:1px solid var(--line)}
+.vpast .pr i{position:absolute;left:0;top:0;bottom:0;background:rgba(255,141,192,.12)}
+.vpast .pr span{position:relative}.vpast .pr.won{color:var(--text);border-color:var(--pink)}
+.vpast .pm{font-size:11px;color:var(--muted)}.vpast .pm a{color:var(--pink);margin-left:6px}.vpast .pm b{color:var(--mint);font-weight:400}
 .vdone{font-size:12px;color:var(--muted);border-top:2px solid var(--line);padding-top:10px}
 .vdone b{color:var(--mint);font-weight:400}.vdone a{color:var(--pink);margin-left:6px}
 .votec.past{border-color:var(--line);color:var(--muted)}
@@ -386,6 +393,7 @@ html:has(dialog[open]),body:has(dialog[open]){overflow:hidden}
   <div class="vopts" id="vopts"></div>
   <div class="vmeta"><span id="vtotal"></span><span id="vends"></span></div>
   <div class="vdone" id="vdone" hidden></div>
+  <div class="vpast" id="vpast"></div>
 </div></dialog>
 
 <dialog id="xSheet"><div class="sheet">
@@ -718,6 +726,17 @@ function drawVote() {
   $('vdone').hidden = !closed || !d;
   if (d) $('vdone').replaceChildren(el('b', { textContent: d.status === 'done' ? 'done: ' : d.status === 'failed' ? 'failed: ' : 'in progress: ' }), d.note || d.choice,
     ...(d.sigs || []).slice(0, 3).map((x, i) => el('a', { href: 'https://solscan.io/tx/' + x, target: '_blank', rel: 'noopener', textContent: 'tx' + (d.sigs.length > 1 ? ' ' + (i + 1) : '') + ' ↗' })));
+  const past = (V.past || []).map((pv) => {
+    const tot = Object.values(pv.counts).reduce((a, b) => a + b, 0);
+    const win = pv.done ? pv.done.choice : Object.entries(pv.counts).sort((a, b) => b[1] - a[1])[0]?.[0];
+    const rows = pv.options.map((o) => { const pc = tot ? Math.round(((pv.counts[o.key] || 0) / tot) * 100) : 0; const r = el('div', { className: 'pr' + (o.key === win ? ' won' : '') });
+      const bar = el('i'); bar.style.width = pc + '%'; r.append(bar, el('span', { textContent: (o.key === win ? '✓ ' : '') + o.label }), el('span', { textContent: pc + '%' })); return r; });
+    const d = pv.done;
+    const meta = el('div', { className: 'pm' }, new Date(pv.endsAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).toLowerCase() + ' · ' + tot + ' votes',
+      ...(d ? [' · ', el('b', { textContent: d.status === 'done' ? 'done' : d.status }), ...(d.sigs || []).slice(0, 2).map((x, i) => el('a', { href: 'https://solscan.io/tx/' + x, target: '_blank', rel: 'noopener', textContent: 'tx' + (d.sigs.length > 1 ? ' ' + (i + 1) : '') + ' ↗' }))] : []));
+    return el('div', { style: 'display:flex;flex-direction:column;gap:6px' }, el('div', { className: 'pq', textContent: pv.question }), ...rows, meta);
+  });
+  $('vpast').replaceChildren(...(past.length ? [el('div', { className: 'vlabel', textContent: closed ? 'older' : 'past votes' }), ...past] : []));
   $('voteBtn').classList.toggle('live', V.open && !V.mine);
   $('voteBtn').classList.toggle('past', closed);
   $('voteBtn').textContent = closed ? 'votes' : 'vote';

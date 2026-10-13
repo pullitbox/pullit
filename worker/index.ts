@@ -10,7 +10,7 @@ import { keypairFromSecret, Rpc } from "../src/solana.ts";
 import { fetchToken } from "../src/jupiter.ts";
 import { HOLDERS } from "../src/holders.ts";
 import { findXAccount } from "../src/zernio.ts";
-import { voteState, castVote, voteResult, VOTE } from "./vote.ts";
+import { voteState, castVote, voteResult, pastVotes, VOTE } from "./vote.ts";
 import type { ExecutionContext, KVNamespace, ScheduledEvent } from "./cloudflare.ts";
 
 /** Checks every dependency from inside Cloudflare without moving money or posting. */
@@ -169,7 +169,7 @@ async function run(env: Env, claimOnly = false) {
     // a closed community vote is carried out once, by the minute tick
     if (!claimOnly && !state.votes?.[VOTE.id]) {
       const won = await voteResult(env.STATE);
-      if (won) await bot.settleVote(VOTE.id, won, 100);
+      if (won) await bot.settleVote(VOTE.id, won, VOTE.usd, VOTE.boxes);
     }
     if (claimOnly) await bot.claimTick();
     else await bot.tick();
@@ -450,12 +450,16 @@ export default {
         res.headers.set("cache-control", "no-store");
         return res;
       }
-      // a closed vote also shows what the bot did with the result
+      // a closed vote also shows what the bot did with the result; past votes stay readable
       const st = (await env.STATE.get("state", "json")) as State | null;
-      const done = st?.votes?.[VOTE.id];
+      const did = (id: string) => {
+        const d = st?.votes?.[id];
+        return d && { choice: d.choice, status: d.status, sigs: d.sigs, note: d.note };
+      };
       const res = json({
         ...(await voteState(env.STATE, req)),
-        done: done && { choice: done.choice, status: done.status, sigs: done.sigs, note: done.note },
+        done: did(VOTE.id),
+        past: (await pastVotes(env.STATE)).map((p) => ({ ...p, done: did(p.id) })),
       });
       res.headers.set("cache-control", "no-store");
       return res;
