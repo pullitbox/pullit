@@ -549,7 +549,7 @@ function render() {
   } else {
     setText('kick', `box #${id} is filling`);
     setText('big', down(have) + ' sol');
-    setText('sline', p.vaultSlice ? `+${fmt(sol(p.vaultSlice), 3)} sol from the vault inside · ${p.vaultDripLeft} of 3 left` : p.bondBox ? `bond box: epic or better` : p.epicLeft ? `epic or better · ${p.epicLeft} of 3 left` : p.milestoneBox ? `milestone box: epic or better` : "box agent picks the coin you'll get");
+    setText('sline', p.vaultSlice ? `+${fmt(sol(p.vaultSlice), 3)} sol from the vault${p.epicLeft ? ' · epic or better' : ''} · ${p.vaultDripLeft} of 3 left` : p.bondBox ? `bond box: epic or better` : p.epicLeft ? `epic or better · ${p.epicLeft} of 3 left` : p.milestoneBox ? `milestone box: epic or better` : "box agent picks the coin you'll get");
     $('fill').style.width = Math.round(pct * 100) + '%';
     setText('bl1', need ? `opens at ${fmt(need, 2)} sol` : 'opens when full');
     setText('bl2', Math.round(pct * 100) + '%');
@@ -611,7 +611,8 @@ function render() {
   // the bond race and the curve
   const G = s.games;
   const cp = p.curvePct, bonded = cp === 100 || !!G?.bondDone;
-  $('race').hidden = cp == null;
+  // once bonded and the bond box is out, the panel has nothing left to say
+  $('race').hidden = cp == null || (cp === 100 && !p.bondBox);
   if (!$('race').hidden) {
     const n = Math.floor((cp || 0) / 5), bar = $('cBar');
     if (bar.children.length !== 20) bar.replaceChildren(...Array.from({ length: 20 }, () => el('i')));
