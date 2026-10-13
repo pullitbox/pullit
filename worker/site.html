@@ -36,6 +36,21 @@ body{display:flex;flex-direction:column;min-height:100vh;min-height:100dvh}
 header{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 0}
 .cabuy{display:inline-flex;align-items:stretch}
 .cabuy .chip{border-right:0}
+.votec{border-color:var(--pink);color:var(--pink)}
+.votec.live{animation:vpulse 2.2s infinite}
+@keyframes vpulse{0%{box-shadow:0 0 0 0 rgba(255,141,192,.5)}70%{box-shadow:0 0 0 10px rgba(255,141,192,0)}100%{box-shadow:0 0 0 0 rgba(255,141,192,0)}}
+.vq{font-size:15px;line-height:1.4;color:var(--text)}
+.vopts{display:grid;gap:10px}
+.vopt{position:relative;text-align:left;background:var(--panel);border:2px solid var(--line);color:var(--text);padding:14px;cursor:pointer;font:inherit;overflow:hidden}
+.vopt:hover:not(:disabled),.vopt:focus-visible{border-color:var(--pink);outline:none}
+.vopt:disabled{cursor:default}
+.vopt.mine{border-color:var(--pink)}
+.vopt .bar{position:absolute;left:0;top:0;bottom:0;background:rgba(255,141,192,.14);width:0;transition:width .5s}
+.vopt .row{position:relative;display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.vopt b{font-size:15px}.vopt .pc{font-size:15px;color:var(--pink)}
+.vopt .nt{position:relative;display:block;color:var(--muted);font-size:12px;margin-top:4px}
+.vmeta{display:flex;justify-content:space-between;color:var(--muted);font-size:12px}
+@media (prefers-reduced-motion:reduce){.votec.live{animation:none}}
 .buyc{background:var(--pink);color:var(--ink);display:inline-flex;align-items:center;padding:0 12px;font-size:12px;box-shadow:3px 3px 0 var(--shadow)}
 .buyc:hover{background:#ffa6cf}
 .logo{font-size:20px}
@@ -264,6 +279,7 @@ html:has(dialog[open]),body:has(dialog[open]){overflow:hidden}
   <span></span>
   <nav>
     <span class="cabuy"><button class="chip" id="ca" type="button" title="copy contract address">ca <b id="caText">soon</b> ⧉</button><a class="buyc px" id="buy" href="https://x.com/Pullitbox" target="_blank" rel="noopener">buy</a></span>
+    <button class="chip votec px" type="button" data-open="voteSheet" id="voteBtn">vote</button>
     <a class="chip dk" href="https://x.com/Pullitbox" target="_blank" rel="noopener">x</a>
     <button class="chip dk" type="button" data-open="rules">rules</button>
     <a class="chip dk" href="https://github.com/pullitbox/pullit" target="_blank" rel="noopener">github</a>
@@ -328,6 +344,13 @@ html:has(dialog[open]),body:has(dialog[open]){overflow:hidden}
     <button type="submit" class="px">check</button>
   </form>
   <div class="answer" id="answer"></div><b id="entry2" hidden></b>
+</div></dialog>
+
+<dialog id="voteSheet" class="small"><div class="sheet">
+  <h2 class="px">community vote<button class="x" type="button" data-close aria-label="close">x</button></h2>
+  <div class="vq" id="vq">loading the vote…</div>
+  <div class="vopts" id="vopts"></div>
+  <div class="vmeta"><span id="vtotal"></span><span id="vends"></span></div>
 </div></dialog>
 
 <dialog id="logSheet"><div class="sheet">
@@ -612,6 +635,43 @@ function render() {
   for (const [k, v] of [['box', p.box], ['dev', p.dev]]) if (v) dl.append(el('dt', { textContent: k }), el('dd', {}, el('a', { href: acct(v), target: '_blank', rel: 'noopener', textContent: v })));
 }
 
+// community vote: one question, one vote per visitor, live results
+let V = null;
+function drawVote() {
+  if (!V) return;
+  setText('vq', V.question);
+  const total = Object.values(V.counts).reduce((a, b) => a + b, 0);
+  const box = $('vopts'); box.innerHTML = '';
+  for (const o of V.options) {
+    const n = V.counts[o.key] || 0, pc = total ? Math.round((n / total) * 100) : 0, show = !!V.mine || !V.open;
+    const b = el('button', { className: 'vopt' + (V.mine === o.key ? ' mine' : ''), type: 'button' });
+    b.disabled = !!V.mine || !V.open;
+    const bar = el('span', { className: 'bar' }); bar.style.width = show ? pc + '%' : '0';
+    const row = el('span', { className: 'row' }, el('b', { textContent: o.label }), el('span', { className: 'pc px', textContent: show ? pc + '%' : '' }));
+    b.append(bar, row, el('span', { className: 'nt', textContent: (V.mine === o.key ? 'your vote · ' : '') + o.note }));
+    b.onclick = () => castVote(o.key);
+    box.appendChild(b);
+  }
+  setText('vtotal', total + (total === 1 ? ' vote' : ' votes'));
+  const left = V.endsAt - Date.now();
+  setText('vends', !V.open ? 'closed' : left > 3600e3 ? 'ends in ' + Math.round(left / 3600e3) + 'h' : 'ends in ' + Math.max(1, Math.round(left / 60e3)) + 'm');
+  $('voteBtn').classList.toggle('live', V.open && !V.mine);
+}
+async function loadVote() { try { V = await api('/api/vote'); drawVote(); } catch { setText('vq', 'cant reach the vote. try again in a bit'); } }
+async function castVote(choice) {
+  try {
+    const r = await fetch('/api/vote' + (Q || ''), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ choice }) }).then((r) => r.json());
+    if (r.error) { setText('vq', r.error); return; }
+    V = r; drawVote();
+  } catch { setText('vq', 'that did not go through. try again'); }
+}
+// first visit: open the vote once
+(async () => {
+  await loadVote();
+  let seen = false; try { seen = localStorage.getItem('pullit_vote_' + (V && V.id)) === '1'; } catch {}
+  if (V && V.open && !V.mine && !seen) setTimeout(() => { if (!document.querySelector('dialog[open]')) { $('voteSheet').showModal(); try { localStorage.setItem('pullit_vote_' + V.id, '1'); } catch {} } }, 1500);
+})();
+
 async function load() { try { S = await api('/api/state'); render(); } catch { setText('bl1', 'cant reach the box. retrying'); } }
 function clock() { const e = render.clockEnds; const r = e ? Math.max(0, Math.round((e - Date.now()) / 1000)) : 0; $('clkBox').classList.toggle('hot', !!e && r > 0 && r <= 30); if (!e) { setText('clkTime', '--:--'); return; } setText('clkTime', r ? String(Math.floor(r / 60)).padStart(2, '0') + ':' + String(r % 60).padStart(2, '0') : '00:00'); }
 setInterval(clock, 1000);
@@ -637,7 +697,7 @@ $('check').onsubmit = async (e) => {
 
 document.addEventListener('click', (e) => {
   const o = e.target.closest('[data-open]');
-  if (o) { e.preventDefault(); document.querySelectorAll('dialog[open]').forEach((d) => d.id !== o.dataset.open && d.close()); $(o.dataset.open).showModal(); if (o.dataset.open === 'logSheet') $('feed').scrollTop = $('feed').scrollHeight; if (o.dataset.open === 'meSheet') $('wallet').focus(); if (o.dataset.open === 'topSheet') loadTop(); return; }
+  if (o) { e.preventDefault(); document.querySelectorAll('dialog[open]').forEach((d) => d.id !== o.dataset.open && d.close()); $(o.dataset.open).showModal(); if (o.dataset.open === 'logSheet') $('feed').scrollTop = $('feed').scrollHeight; if (o.dataset.open === 'meSheet') $('wallet').focus(); if (o.dataset.open === 'topSheet') loadTop(); if (o.dataset.open === 'voteSheet') loadVote(); return; }
   if (e.target.matches('[data-close]')) e.target.closest('dialog').close();
   if (e.target.tagName === 'DIALOG') e.target.close();
   const b = e.target.closest('a[href^="#box-"]');

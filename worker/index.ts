@@ -10,6 +10,7 @@ import { keypairFromSecret, Rpc } from "../src/solana.ts";
 import { fetchToken } from "../src/jupiter.ts";
 import { HOLDERS } from "../src/holders.ts";
 import { findXAccount } from "../src/zernio.ts";
+import { voteState, castVote } from "./vote.ts";
 import type { ExecutionContext, KVNamespace, ScheduledEvent } from "./cloudflare.ts";
 
 /** Checks every dependency from inside Cloudflare without moving money or posting. */
@@ -430,6 +431,17 @@ export default {
       // before the real coin runs there are no holders to check against
       if (!(await liveState(env, preview))) return json({ status: "out", minUsd: 20 });
       return json(await walletStatus(env, a));
+    }
+    if (url.pathname === "/api/vote") {
+      if (req.method === "POST") {
+        const r = await castVote(env.STATE, req);
+        const res = json(r, "error" in r ? 400 : 200);
+        res.headers.set("cache-control", "no-store");
+        return res;
+      }
+      const res = json(await voteState(env.STATE, req));
+      res.headers.set("cache-control", "no-store");
+      return res;
     }
     if (url.pathname === "/api/top") return json(await top(env, preview));
     const bm = url.pathname.match(/^\/box\/(\d+)\/?$/);
