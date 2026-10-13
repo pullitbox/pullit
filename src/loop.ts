@@ -677,11 +677,14 @@ export class Bot {
     );
   }
 
-  /** Share of claimed fees that goes to the box: after the bond FEES.boxSharePct; before it FEES.lowCapBoxPct under FEES.lowCapUsd, else FEES.preBondBoxPct. */
+  /** Share of claimed fees that goes to the box: after the bond FEES.boxSharePct; before it FEES.lowCapBoxPct under FEES.lowCapUsd, FEES.midCapBoxPct under FEES.midCapUsd, else FEES.preBondBoxPct. */
   boxPct() {
     if (this.state.bond?.at) return FEES.boxSharePct;
     const mcap = this.state.market?.mcap;
-    return mcap != null && mcap > 0 && mcap < FEES.lowCapUsd ? FEES.lowCapBoxPct : FEES.preBondBoxPct;
+    if (mcap == null || mcap <= 0) return FEES.preBondBoxPct;
+    if (mcap < FEES.lowCapUsd) return FEES.lowCapBoxPct;
+    if (mcap < FEES.midCapUsd) return FEES.midCapBoxPct;
+    return FEES.preBondBoxPct;
   }
 
   /** The clock and lucky pots take their share of what goes into the box. Returns the total set aside. */
