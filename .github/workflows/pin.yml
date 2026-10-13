@@ -1,0 +1,25 @@
+# Pins a tweet to the site's X feed. Run it from the Actions tab: paste the tweet link (or "clear").
+name: pin tweet
+on:
+  workflow_dispatch:
+    inputs:
+      tweet:
+        description: "tweet link, or clear"
+        required: true
+jobs:
+  pin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: pin
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          TWEET: ${{ github.event.inputs.tweet }}
+        run: |
+          if [ "$TWEET" = "clear" ]; then npm run tweet -- --clear; else npm run tweet -- "$TWEET"; fi
