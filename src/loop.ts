@@ -193,7 +193,6 @@ export interface State {
   >;
   /** after a vote for boxes: the next `left` boxes are `lamports` (VOTE_BOX_LAMPORTS if unset) and pay out exactly that */
   voteBoost?: { left: number; lamports?: string };
-  voteHeld?: boolean; // the closed vote waits: the cap was under the hold line
   bond?: { at?: number; queued?: boolean; checkedAt?: number };
   /** the pump bonding curve: its owner account, how far it is (0-100) and the bond-progress posts already made */
   curve?: { owner?: string; pct?: number; at?: number; marks?: number[]; lookedAt?: number }; // migration to pumpswap: the next box is epic or better // the one "dex paid" post, once dexscreener confirms it

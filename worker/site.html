@@ -722,9 +722,8 @@ function drawVote() {
     box.appendChild(b);
   }
   setText('vtotal', total + (total === 1 ? ' vote' : ' votes') + (V.minVotes && !closed ? ` · needs ${V.minVotes}` : ''));
-  const hk = V.holdBelowUsd ? '$' + V.holdBelowUsd / 1000 + 'k' : '';
-  setText('vrule', V.held ? `on hold: the cap is under ${hk}. the result is carried out once it is back above ${hk}, until then the money stays in the dev wallet`
-    : hk && !V.done ? `if the cap is under ${hk} when the vote closes, nothing moves until it is back above ${hk}` : '');
+  const kk = V.keepBelowUsd ? '$' + V.keepBelowUsd / 1000 + 'k' : '';
+  setText('vrule', kk && !closed ? `if the cap is under ${kk} when the vote closes, the dev keeps it, whatever the votes say` : '');
   const left = V.endsAt - Date.now();
   setText('vends', closed ? 'closed' : left > 3600e3 ? 'ends in ' + Math.round(left / 3600e3) + 'h' : 'ends in ' + Math.max(1, Math.round(left / 60e3)) + 'm');
   const d = V.done;

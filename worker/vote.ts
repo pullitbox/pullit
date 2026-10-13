@@ -7,12 +7,12 @@ export const VOTE = {
   usd: 300, // what the winning option gets, from the dev wallet
   boxes: 10, // "boxes" spreads it over this many boxes
   minVotes: 25, // fewer votes than this and "keep" wins
-  holdBelowUsd: 20_000, // closed while the market cap is under this: the result waits until it is back above
+  keepBelowUsd: 20_000, // closed while the market cap is under this: "keep" wins
   question: "$300 of trading fees landed in the dev wallet by mistake. where should it go?",
   options: [
     { key: "boxes", label: "into the next 10 boxes", note: "+$30 in each" },
     { key: "buyback", label: "buy back $pullit and burn it", note: "one market buy, then burned" },
-    { key: "keep", label: "the dev keeps it as a gift", note: "also wins if under 25 votes" },
+    { key: "keep", label: "the dev keeps it as a gift", note: "also wins under 25 votes or under $20k cap" },
   ],
   endsAt: Date.parse("2026-10-13T22:00:00Z"),
 };
