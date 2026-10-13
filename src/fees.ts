@@ -15,7 +15,7 @@ import {
 
 export const FEES = {
   boxSharePct: 80, // after the bond. the rest (20%) goes to the team wallet
-  preBondBoxPct: 20, // before the bond: 20% of fees to the box, 80% stays in the dev wallet
+  preBondBoxPct: 100, // before the bond: every lamport of fees goes to the box
   keepInDevLamports: 20_000_000n, // 0.02 SOL stays for tx fees
   minSplitLamports: 5_000_000n, // don't split dust, wait until 0.005 SOL accumulated
   priorityFeeSol: 0.0001, // claims kept dropping when the chain got busy at 0.00001

@@ -256,10 +256,10 @@ test("journal drops entries of commits that were rewritten", async () => {
   assert.equal(state.journal[1].text, "bigger coin pool");
 });
 
-test("fee share: 20% to the box before the bond, 80% after", () => {
+test("fee share: 100% to the box before the bond, 80% after", () => {
   const b = bot();
   const s = (b as unknown as { state: ReturnType<typeof newState> }).state;
-  assert.equal(b.boxPct(), 20);
+  assert.equal(b.boxPct(), 100);
   s.bond = { at: 1 };
   assert.equal(b.boxPct(), 80);
 });
