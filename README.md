@@ -36,7 +36,7 @@ Whatever a pull leaves in the box rolls into the next one.
 
 ### The box grows with the volume
 
-The first box opens at 0.15 SOL. After that every box is sized from the fees of the last hour, so it fills in about 25 minutes: 0.15, 0.3, 0.5, 0.75, 1, 1.5, 2, 2.75, 3.5 up to 4 SOL. Busy market, bigger boxes. The entry grows with the box (see below).
+The first box opens at 0.15 SOL. After that every box is sized from the fees of the last hour, so it fills in about 40 minutes: 0.15, 0.2, 0.25, 0.3, 0.5, 0.75, 1, 1.5, 2, 2.75, 3.5 up to 4 SOL. Busy market, bigger boxes. The entry grows with the box (see below).
 
 ### Every win gets a card
 

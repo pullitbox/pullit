@@ -65,14 +65,14 @@ test("next box size follows the last hour of fees", async (t) => {
   const at = (minAgo: number, sol: number) => ({ at: now - minAgo * 60_000, lamports: String(sol * 1e9) });
   // dead: 0.1 sol of fees in an hour -> smallest box
   assert.equal(nextBoxSize([at(10, 0.1)], now).lamports, 150_000_000n);
-  // hot: 20 sol of fees in an hour -> 20 * 0.8 * 25/60 = 6.7 -> capped at the biggest size, 4
+  // hot: 20 sol of fees in an hour -> 20 * 0.8 * 40/60 = 10.7 -> capped at the biggest size, 4
   assert.equal(nextBoxSize([at(5, 10), at(30, 10)], now).lamports, 4_000_000_000n);
-  // medium: 3 sol/h -> 1.0 fillable -> 1
-  assert.equal(nextBoxSize([at(20, 3)], now).lamports, 1_000_000_000n);
-  // the box share counts: at 20% only 0.25 fillable -> 0.15
-  assert.equal(nextBoxSize([at(20, 3)], now, 20).lamports, 150_000_000n);
-  // a little busy: 1 sol/h -> 0.33 fillable -> 0.3
-  assert.equal(nextBoxSize([at(20, 1)], now).lamports, 300_000_000n);
+  // medium: 3 sol/h -> 1.6 fillable -> 1.5
+  assert.equal(nextBoxSize([at(20, 3)], now).lamports, 1_500_000_000n);
+  // the box share counts: at 20% only 0.4 fillable -> 0.3
+  assert.equal(nextBoxSize([at(20, 3)], now, 20).lamports, 300_000_000n);
+  // a little busy: 0.5 sol/h -> 0.27 fillable -> 0.25
+  assert.equal(nextBoxSize([at(20, 0.5)], now).lamports, 250_000_000n);
   // fees older than an hour do not count
   assert.equal(nextBoxSize([at(90, 50)], now).lamports, 150_000_000n);
   assert.equal(boxSize(0), 150_000_000n);
@@ -325,10 +325,10 @@ test("hints: next frenzy level and the volume for the next box size", () => {
   // 1 sol of fees in the last hour, 75% to the box before the bond (unknown cap)
   b.state.feeLedger = [{ at: now - 10 * 60_000, lamports: String(1e9) } as never];
   const h = b.hints(40_000, 1, now);
-  // 0.75 sol/h to the box -> 0.31 fillable -> 0.3 now, 0.5 next needs 1.2 sol/h -> 64K of volume
-  assert.equal(h.boxNow, 0.3);
-  assert.equal(h.boxNext, 0.5);
-  assert.equal(h.boxNextVol, 64_000);
+  // 0.75 sol/h to the box -> 0.5 fillable -> 0.5 now, 0.75 next needs 1.125 sol/h -> 60K of volume
+  assert.equal(h.boxNow, 0.5);
+  assert.equal(h.boxNext, 0.75);
+  assert.equal(h.boxNextVol, 60_000);
   assert.equal(h.frenzyNextAt, 60_000);
   assert.equal(h.frenzyNextEpic, 29.5);
 });

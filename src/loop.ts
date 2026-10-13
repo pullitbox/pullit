@@ -141,6 +141,7 @@ export interface State {
   }; // what the agent already commented on
   mintSeen?: string;
   market?: { mcap: number; volume1h: number; at: string }; // $PULLIT, from the last holder snapshot
+  graduated?: string; // the pool jupiter says $PULLIT graduated to
   frenzy?: number; // current frenzy level, 0 = normal odds
   milestonesHit?: number[]; // market caps already celebrated
   milestoneQueue?: number[]; // market caps waiting for their milestone box, one box each
@@ -286,6 +287,7 @@ export interface Env {
   TEAM_WALLET: string;
   DRY_RUN?: string; // "1": no claims, no payouts, no posts (prints instead), simulated fees
   MAX_BOX_SOL?: string; // optional hard cap for one box, in SOL
+  BONDED?: string; // "1": treat $PULLIT as bonded now, when the automatic checks miss the migration
   BOND_SEED_SOL?: string; // SOL the dev sent to the box wallet for the bond race pot, added to it once
   DRY_SOL_PER_MIN?: string; // dry run: average fake fees per minute (default 0.05)
   X_PRELAUNCH?: string; // "1": before launch the box posts teasers on x by itself (test boxes are never posted)
@@ -314,17 +316,17 @@ export function criteria(c: Candidate | undefined, kind: "fresh" | "meta"): stri
 }
 
 /** The sizes a box can have, in SOL. The first box is always 0.15 so the launch sees one open fast. */
-export const BOX_SIZES = [0.15, 0.3, 0.5, 0.75, 1, 1.5, 2, 2.75, 3.5, 4];
+export const BOX_SIZES = [0.15, 0.2, 0.25, 0.3, 0.5, 0.75, 1, 1.5, 2, 2.75, 3.5, 4];
 export const FIRST_BOX = 0.15;
 /** Box size while a community vote's extra SOL is being paid out over the next boxes. */
 export const VOTE_BOX_LAMPORTS = 300_000_000n;
 /** While set, every box is this size no matter the volume. null turns the volume sizing back on. */
 export const FIXED_BOX: number | null = null;
-const FILL_MINUTES = 25; // a box should fill in about this long at the current volume
+const FILL_MINUTES = 40; // a box should fill in about this long at the current volume
 
 /**
  * Picks the next box size from how fast fees came in over the last hour: the biggest size that
- * fills in about 25 minutes at that pace. Hot volume, big box. Dead volume, small box.
+ * fills in about 40 minutes at that pace. Hot volume, big box. Dead volume, small box.
  */
 export function nextBoxSize(
   ledger: FeeLedgerEntry[],
@@ -615,6 +617,10 @@ export class Bot {
     const mcap = token.mcap ?? (token.usdPrice ?? 0) * (token.circSupply ?? token.totalSupply ?? 1e9);
     const vol = volume1h(token);
     this.state.market = { mcap, volume1h: vol, at: new Date().toISOString() };
+    if (token.graduatedPool && !this.state.graduated) {
+      this.state.graduated = token.graduatedPool;
+      this.log(`jupiter: graduated to ${token.graduatedPool}`);
+    }
     const prev = this.state.frenzy ?? 0;
     const level = frenzyLevel(vol);
     this.state.frenzy = level;
@@ -1921,7 +1927,8 @@ who you are, only for context: a pink pixel gift box on solana, not live yet. tr
   async bondWatch(now = Date.now()) {
     const b = (this.state.bond ??= {});
     if (b.at || this.dry || !this.env.MINT) return;
-    const full = (this.state.curve?.pct ?? 0) >= 100;
+    // a full curve, jupiter's graduated pool, or the BONDED switch all count without waiting for dexscreener
+    const full = (this.state.curve?.pct ?? 0) >= 100 || !!this.state.graduated || this.env.BONDED === "1";
     if (!full) {
       if (b.checkedAt && now - b.checkedAt < 60_000) return;
       b.checkedAt = now;
