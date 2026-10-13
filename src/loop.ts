@@ -158,6 +158,7 @@ export interface State {
     bondPot?: string; // the bond race: grows until the bond, then the last $50+ curve buyer who still holds takes it
     bondLast?: Buy[]; // the last $50+ buyers on the curve, newest first
     bondDone?: boolean; // the bond race was paid out (or rolled into the box)
+    bondSeed?: string; // lamports the dev added to the bond pot (BOND_SEED_SOL), counted once
     clock?: { endsAt: number; last: Buy[] }; // last qualifying buyers, newest first
     queue: Buy[]; // buys waiting for their lucky roll
     recent?: Buy[]; // the last qualifying buys, shown live on the site
@@ -285,6 +286,7 @@ export interface Env {
   TEAM_WALLET: string;
   DRY_RUN?: string; // "1": no claims, no payouts, no posts (prints instead), simulated fees
   MAX_BOX_SOL?: string; // optional hard cap for one box, in SOL
+  BOND_SEED_SOL?: string; // SOL the dev sent to the box wallet for the bond race pot, added to it once
   DRY_SOL_PER_MIN?: string; // dry run: average fake fees per minute (default 0.05)
   X_PRELAUNCH?: string; // "1": before launch the box posts teasers on x by itself (test boxes are never posted)
   X_PRELAUNCH_EVERY_MIN?: string; // minutes between teasers, default 480
@@ -685,6 +687,17 @@ export class Bot {
   async curveTick(now = Date.now()) {
     const c = (this.state.curve ??= {});
     if (this.dry || !this.env.MINT || this.state.bond?.at) return;
+    // SOL the dev sent to the box wallet for the bond race: set aside in the pot, once
+    const seed = BigInt(Math.round(Number(this.env.BOND_SEED_SOL || 0) * 1e9));
+    const g = this.gamesState();
+    if (seed > 0n && !g.bondSeed) {
+      g.bondSeed = seed.toString();
+      g.bondPot = (BigInt(g.bondPot ?? "0") + seed).toString();
+      this.feed(
+        "boost",
+        `the dev put ${sol(seed)} sol into the bond pot. last $50+ buy before the bond takes ${sol(BigInt(g.bondPot))} sol`,
+      );
+    }
     if (c.at && now - c.at < 60_000) return;
     c.at = now;
     try {
@@ -708,18 +721,21 @@ export class Bot {
       const pct = Math.max(0, Math.min(100, ((CURVE.supply - left) / CURVE.sellable) * 100));
       c.pct = Math.round(pct * 10) / 10;
       if (this.state.pub) this.state.pub.curvePct = c.pct;
-      const pot = sol(BigInt(this.gamesState().bondPot ?? "0"));
-      for (const m of CURVE.marks) {
-        if (pct < m || (c.marks ?? []).includes(m)) continue;
-        c.marks = [...(c.marks ?? []), m];
+      const potL = BigInt(this.gamesState().bondPot ?? "0");
+      const pot = sol(potL);
+      const crossed = CURVE.marks.filter((m) => pct >= m && !(c.marks ?? []).includes(m));
+      // several at once (first read, or a fast pump): only the highest is called out
+      if (crossed.length) c.marks = [...(c.marks ?? []), ...crossed];
+      for (const m of crossed.slice(-1)) {
+        const potLine = potL > 0n ? ` and the last $50+ buy before the bond takes the bond pot, ${pot} sol now` : "";
         await this.line(
           "boost",
-          `the bonding curve of $PULLIT is ${m}% done. at 100% it bonds: the next box is the bond box (epic or better) and the last $50+ buy before the bond takes the bond pot, ${pot} sol now`,
+          `the bonding curve of $PULLIT is ${m}% done. at 100% it bonds: the next box is the bond box (epic or better)${potLine}`,
           [`${m}%`],
-          `curve ${m}%. last $50+ buy before the bond takes ${pot} sol`,
+          potL > 0n ? `curve ${m}%. last $50+ buy before the bond takes ${pot} sol` : `curve ${m}%. bond box is close`,
         );
         await this.post(
-          `$PULLIT bonding curve: ${m}%\n\nthe last $50+ buy before the bond takes the bond pot (${pot} sol now).\nthen the bond box: epic or better.`,
+          `$PULLIT bonding curve: ${m}%\n\n${potL > 0n ? `the last $50+ buy before the bond takes the bond pot (${pot} sol now).\n` : ""}then the bond box: epic or better.`,
           ["pullit.fun"],
           false,
           m >= 90 ? "always" : true,
