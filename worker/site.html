@@ -163,7 +163,10 @@ h3.h .hb{display:flex;gap:14px}
 .vnext b{color:var(--pink);font-size:15px}.vnext a{color:var(--pink)}
 .vlabel{font-size:11px;color:var(--muted);text-transform:lowercase;margin-bottom:-4px}
 .vlabel:empty{display:none}
-.vrule{margin:0;font-size:11px;color:var(--muted);line-height:1.45}.vrule:empty{display:none}
+.vrule{border:2px solid var(--gold);background:rgba(255,201,77,.08);box-shadow:3px 3px 0 #4a3a10;padding:10px 12px;display:flex;flex-direction:column;gap:4px;font-size:12px;line-height:1.45;color:var(--text)}
+.vrule b{color:var(--gold);font-size:14px}
+.vrule .vcap{font-size:11px;color:var(--muted)}.vrule .vcap i{font-style:normal;color:var(--text)}
+.vrule.under .vcap i{color:#ff6b6b}.vrule.over .vcap i{color:var(--mint)}
 .vpast{display:flex;flex-direction:column;gap:12px;border-top:2px solid var(--line);padding-top:12px}
 .vpast:empty{display:none}
 .vpast .pq{font-size:12px;color:var(--text);line-height:1.4}
@@ -391,9 +394,9 @@ html:has(dialog[open]),body:has(dialog[open]){overflow:hidden}
   <div class="vnext" id="vnext" hidden><b class="px">next vote soon</b><span>the box posts every new vote on x first. <a href="https://x.com/Pullitbox" target="_blank" rel="noopener">follow →</a></span></div>
   <div class="vlabel" id="vlabel"></div>
   <div class="vq" id="vq">loading the vote…</div>
+  <div class="vrule" id="vrule" hidden><b class="px" id="vruleT"></b><span id="vruleS"></span><span class="vcap" id="vcap"></span></div>
   <div class="vopts" id="vopts"></div>
   <div class="vmeta"><span id="vtotal"></span><span id="vends"></span></div>
-  <p class="vrule" id="vrule"></p>
   <div class="vdone" id="vdone" hidden></div>
   <div class="vpast" id="vpast"></div>
 </div></dialog>
@@ -723,7 +726,15 @@ function drawVote() {
   }
   setText('vtotal', total + (total === 1 ? ' vote' : ' votes') + (V.minVotes && !closed ? ` · needs ${V.minVotes}` : ''));
   const kk = V.keepBelowUsd ? '$' + V.keepBelowUsd / 1000 + 'k' : '';
-  setText('vrule', kk && !closed ? `if the cap is under ${kk} when the vote closes, the dev keeps it, whatever the votes say` : '');
+  $('vrule').hidden = !kk || closed;
+  if (kk && !closed) {
+    setText('vruleT', `! under ${kk} cap = the dev keeps it`);
+    setText('vruleS', `if $pullit is under ${kk} market cap when the vote closes, the dev keeps the money, whatever the votes say. also if fewer than ${V.minVotes || 25} vote.`);
+    const cap = S && S.pub && S.pub.mcap;
+    $('vcap').replaceChildren(...(cap ? ['cap right now: ', el('i', { textContent: '$' + (cap / 1000).toFixed(1) + 'k' }), cap < V.keepBelowUsd ? ` · needs ${kk}+ at close` : ` · above ${kk}`] : []));
+    $('vrule').classList.toggle('under', !!cap && cap < V.keepBelowUsd);
+    $('vrule').classList.toggle('over', !!cap && cap >= V.keepBelowUsd);
+  }
   const left = V.endsAt - Date.now();
   setText('vends', closed ? 'closed' : left > 3600e3 ? 'ends in ' + Math.round(left / 3600e3) + 'h' : 'ends in ' + Math.max(1, Math.round(left / 60e3)) + 'm');
   const d = V.done;
@@ -760,7 +771,7 @@ async function castVote(choice) {
   if (V && V.open && !V.mine && !seen) setTimeout(() => { if (!document.querySelector('dialog[open]')) { $('voteSheet').showModal(); try { localStorage.setItem('pullit_vote_' + V.id, '1'); } catch {} } }, 1500);
 })();
 
-async function load() { try { S = await api('/api/state'); render(); } catch { setText('bl1', 'cant reach the box. retrying'); } }
+async function load() { try { S = await api('/api/state'); render(); if (V && $('voteSheet').open) drawVote(); } catch { setText('bl1', 'cant reach the box. retrying'); } }
 function clock() { const e = render.clockEnds; const r = e ? Math.max(0, Math.round((e - Date.now()) / 1000)) : 0; $('clkBox').classList.toggle('hot', !!e && r > 0 && r <= 30); if (!e) { setText('clkTime', '--:--'); return; } setText('clkTime', r ? String(Math.floor(r / 60)).padStart(2, '0') + ':' + String(r % 60).padStart(2, '0') : '00:00'); }
 setInterval(clock, 1000);
 load(); setInterval(load, 5_000); setInterval(() => S && (S.pending || Won.until > Date.now() - 2000) && render(), 1000);
