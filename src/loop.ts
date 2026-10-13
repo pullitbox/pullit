@@ -321,7 +321,7 @@ export const FIRST_BOX = 0.15;
 /** Box size while a community vote's extra SOL is being paid out over the next boxes. */
 export const VOTE_BOX_LAMPORTS = 300_000_000n;
 /** While set, every box is this size no matter the volume. null turns the volume sizing back on. */
-export const FIXED_BOX: number | null = null;
+export const FIXED_BOX: number | null = 0.1;
 const FILL_MINUTES = 40; // a box should fill in about this long at the current volume
 
 /**

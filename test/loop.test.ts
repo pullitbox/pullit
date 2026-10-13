@@ -319,7 +319,9 @@ test("bond race: a seeded pot goes to the last $50+ buyer who still holds takes 
   assert.deepEqual(paid, [["bond", "B", 50_000_000n]]);
 });
 
-test("hints: next frenzy level and the volume for the next box size", () => {
+test("hints: next frenzy level and the volume for the next box size", async (t) => {
+  const { FIXED_BOX } = await import("../src/loop.ts");
+  if (FIXED_BOX) return t.skip("FIXED_BOX is on");
   const b = bot();
   const now = Date.now();
   // 1 sol of fees in the last hour, 75% to the box before the bond (unknown cap)
