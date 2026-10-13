@@ -14,7 +14,9 @@ import {
 } from "./solana.ts";
 
 export const FEES = {
-  boxSharePct: 100, // after the bond: every lamport of fees goes to the box, nothing to the dev
+  boxSharePct: 100, // after the bond, under highCapUsd: every lamport of fees goes to the box, nothing to the dev
+  highCapUsd: 20_000, // after the bond, from this market cap up...
+  highCapBoxPct: 70, // ...70% goes to the box, 30% stays in the dev wallet
   preBondBoxPct: 75, // before the bond: 75% of fees to the box, 25% stays in the dev wallet
   lowCapUsd: 10_000, // before the bond and under this market cap...
   lowCapBoxPct: 20, // ...only 20% goes to the box, 80% stays in the dev wallet

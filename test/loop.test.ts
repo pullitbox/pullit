@@ -272,7 +272,9 @@ test("fee share: 75% to the box before the bond, 20% under $10k, 80% under $20k,
   assert.equal(b.boxPct(), 75);
   s.market = { mcap: 12_000, volume1h: 0, at: "" };
   s.bond = { at: 1 };
-  assert.equal(b.boxPct(), 100);
+  assert.equal(b.boxPct(), 100); // bonded, under $20k
+  s.market = { mcap: 25_000, volume1h: 0, at: "" };
+  assert.equal(b.boxPct(), 70); // bonded, $20k and up
 });
 
 test("vote boost: the next 5 boxes are 0.3 sol", async () => {

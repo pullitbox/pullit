@@ -843,8 +843,8 @@ export class Bot {
 
   /** Share of claimed fees that goes to the box: after the bond FEES.boxSharePct; before it FEES.lowCapBoxPct under FEES.lowCapUsd, FEES.midCapBoxPct under FEES.midCapUsd, else FEES.preBondBoxPct. */
   boxPct() {
-    if (this.state.bond?.at) return FEES.boxSharePct;
     const mcap = this.state.market?.mcap;
+    if (this.state.bond?.at) return (mcap ?? 0) >= FEES.highCapUsd ? FEES.highCapBoxPct : FEES.boxSharePct;
     if (mcap == null || mcap <= 0) return FEES.preBondBoxPct;
     if (mcap < FEES.lowCapUsd) return FEES.lowCapBoxPct;
     if (mcap < FEES.midCapUsd) return FEES.midCapBoxPct;
