@@ -9,7 +9,7 @@ export const VOTE = {
     { key: "boxes", label: "into the next 5 boxes", note: "+$20 in each" },
     { key: "buyback", label: "buy back $pullit and burn it", note: "one market buy, then burned" },
   ],
-  endsAt: Date.parse("2026-10-14T18:00:00Z"),
+  endsAt: Date.parse("2026-10-13T15:00:00Z"),
 };
 
 const prefix = () => `vote:${VOTE.id}:`;
