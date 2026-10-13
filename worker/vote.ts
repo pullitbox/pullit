@@ -8,6 +8,8 @@ export const VOTE = {
   boxes: 10, // "boxes" spreads it over this many boxes
   minVotes: 25, // fewer votes than this and "keep" wins
   keepBelowUsd: 20_000, // closed while the market cap is under this: "keep" wins
+  // the dev voted 3 times by mistake (incognito tabs), all for "keep": taken out of the count
+  adjust: { keep: -3 } as Record<string, number>,
   question: "$300 of trading fees landed in the dev wallet by mistake. where should it go?",
   options: [
     { key: "boxes", label: "into the next 10 boxes", note: "+$30 in each" },
@@ -44,7 +46,7 @@ async function hashVoter(req: Request): Promise<string> {
 
 async function counts(
   kv: KVNamespace,
-  v: { id: string; options: { key: string }[] } = VOTE,
+  v: { id: string; options: { key: string }[]; adjust?: Record<string, number> } = VOTE,
 ): Promise<Record<string, number>> {
   const c: Record<string, number> = Object.fromEntries(v.options.map((o) => [o.key, 0]));
   let cursor: string | undefined;
@@ -57,6 +59,7 @@ async function counts(
     if (r.list_complete || !r.cursor) break;
     cursor = r.cursor;
   }
+  for (const [k, d] of Object.entries(v.adjust ?? {})) if (k in c) c[k] = Math.max(0, c[k] + d);
   return c;
 }
 
