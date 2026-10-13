@@ -295,22 +295,26 @@ export function criteria(c: Candidate | undefined, kind: "fresh" | "meta"): stri
 }
 
 /** The sizes a box can have, in SOL. The first box is always 0.15 so the launch sees one open fast. */
-export const BOX_SIZES = [0.3, 0.5, 0.75, 1, 1.5, 2, 2.75, 3.5, 4];
+export const BOX_SIZES = [0.15, 0.3, 0.5, 0.75, 1, 1.5, 2, 2.75, 3.5, 4];
 export const FIRST_BOX = 0.15;
 /** Box size while a community vote's extra SOL is being paid out over the next boxes. */
 export const VOTE_BOX_LAMPORTS = 300_000_000n;
 /** While set, every box is this size no matter the volume. null turns the volume sizing back on. */
-export const FIXED_BOX: number | null = 0.15;
+export const FIXED_BOX: number | null = null;
 const FILL_MINUTES = 25; // a box should fill in about this long at the current volume
 
 /**
  * Picks the next box size from how fast fees came in over the last hour: the biggest size that
  * fills in about 25 minutes at that pace. Hot volume, big box. Dead volume, small box.
  */
-export function nextBoxSize(ledger: FeeLedgerEntry[], now = Date.now()): { lamports: bigint; perHour: bigint } {
+export function nextBoxSize(
+  ledger: FeeLedgerEntry[],
+  now = Date.now(),
+  boxPct = 80,
+): { lamports: bigint; perHour: bigint } {
   const hour = ledger.filter((e) => e.at >= now - 3_600_000).reduce((a, e) => a + BigInt(e.lamports), 0n);
-  // what reaches the box: 80% of fees, minus the vault's tenth
-  const perHour = (hour * 80n * BigInt(100 - LOOP.vaultPct)) / 10_000n;
+  // what reaches the box: its share of the fees (boxPct), minus the vault's cut
+  const perHour = (hour * BigInt(boxPct) * BigInt(100 - LOOP.vaultPct)) / 10_000n;
   const fillable = (Number(perHour) / 1e9) * (FILL_MINUTES / 60);
   const sol = FIXED_BOX ?? [...BOX_SIZES].reverse().find((x) => x <= fillable) ?? BOX_SIZES[0];
   return { lamports: BigInt(Math.round(sol * 1e9)), perHour };
@@ -1590,7 +1594,7 @@ export class Bot {
     if (!p.final) {
       // compare box sizes, not what was inside: leftovers from the last pull would make every box look "smaller"
       const prevSize = boxSize(this.state.history.length - 1, this.state.boxTarget);
-      const { lamports: size, perHour } = nextBoxSize(this.state.feeLedger);
+      const { lamports: size, perHour } = nextBoxSize(this.state.feeLedger, Date.now(), this.boxPct());
       this.state.boxTarget = size.toString();
       const mood =
         size > prevSize

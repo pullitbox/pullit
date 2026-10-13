@@ -18,7 +18,7 @@ The vault grows every box. Only a secret pull opens it.
 
 ## Box size
 
-The first box is 0.15 SOL. After that, every time a box opens, the bot looks at the fees of the last hour and picks the biggest size that would fill in about 25 minutes at that pace: 0.3, 0.5, 0.75, 1, 1.5, 2, 2.75, 3.5 or 4 SOL. Busy market, big box. Quiet market, small box.
+The first box is 0.15 SOL. After that, every time a box opens, the bot looks at the fees of the last hour and picks the biggest size that would fill in about 25 minutes at that pace: 0.15, 0.3, 0.5, 0.75, 1, 1.5, 2, 2.75, 3.5 or 4 SOL. Busy market, big box. Quiet market, small box.
 
 ## Prizes, buyback and burn
 

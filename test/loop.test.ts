@@ -64,13 +64,17 @@ test("next box size follows the last hour of fees", async (t) => {
   const now = Date.now();
   const at = (minAgo: number, sol: number) => ({ at: now - minAgo * 60_000, lamports: String(sol * 1e9) });
   // dead: 0.1 sol of fees in an hour -> smallest box
-  assert.equal(nextBoxSize([at(10, 0.1)], now).lamports, 300_000_000n);
-  // hot: 20 sol of fees in an hour -> 20 * 0.72 * 25/60 = 6 -> capped at the biggest size, 4
+  assert.equal(nextBoxSize([at(10, 0.1)], now).lamports, 150_000_000n);
+  // hot: 20 sol of fees in an hour -> 20 * 0.8 * 25/60 = 6.7 -> capped at the biggest size, 4
   assert.equal(nextBoxSize([at(5, 10), at(30, 10)], now).lamports, 4_000_000_000n);
-  // medium: 3 sol/h -> 0.9 fillable -> 0.75
-  assert.equal(nextBoxSize([at(20, 3)], now).lamports, 750_000_000n);
+  // medium: 3 sol/h -> 1.0 fillable -> 1
+  assert.equal(nextBoxSize([at(20, 3)], now).lamports, 1_000_000_000n);
+  // the box share counts: at 20% only 0.25 fillable -> 0.15
+  assert.equal(nextBoxSize([at(20, 3)], now, 20).lamports, 150_000_000n);
+  // a little busy: 1 sol/h -> 0.33 fillable -> 0.3
+  assert.equal(nextBoxSize([at(20, 1)], now).lamports, 300_000_000n);
   // fees older than an hour do not count
-  assert.equal(nextBoxSize([at(90, 50)], now).lamports, 300_000_000n);
+  assert.equal(nextBoxSize([at(90, 50)], now).lamports, 150_000_000n);
   assert.equal(boxSize(0), 150_000_000n);
   assert.equal(boxSize(3, "2000000000"), 2_000_000_000n);
 });
