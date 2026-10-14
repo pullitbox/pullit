@@ -363,6 +363,27 @@ function boxPage(d: CardData, origin: string): string {
   return HTML.replace(/<meta property="og:title"[^>]*>\n<meta property="og:description"[^>]*>/, () => tags);
 }
 
+/** The site with a link preview: the card of the last opened box, so a bare pullit.fun link unfolds too. */
+async function homePage(env: Env, preview: boolean, origin: string): Promise<string> {
+  const state = await liveState(env, preview);
+  const opened = (state?.history ?? []).filter((b) => b.draw && b.prize);
+  if (!opened.length) return HTML;
+  const last = opened.reduce((a, b) => (b.boxId > a.boxId ? b : a));
+  const esc = (t: string) => t.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+  const img = `${origin}/card/${last.boxId}.png`;
+  const desc = `fees fill a box, a random holder opens it. ${opened.length} boxes opened so far. last one: ${solStr(last.prize!.lamports)} sol of $${last.prize!.symbol}`;
+  const tags = [
+    `<meta property="og:title" content="pullit">`,
+    `<meta property="og:description" content="${esc(desc)}">`,
+    `<meta property="og:image" content="${img}">`,
+    `<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">`,
+    `<meta property="og:url" content="${origin}/">`,
+    `<meta name="twitter:card" content="summary_large_image">`,
+    `<meta name="twitter:image" content="${img}">`,
+  ].join("\n");
+  return HTML.replace(/<meta property="og:title"[^>]*>\n<meta property="og:description"[^>]*>/, () => tags);
+}
+
 /** Holder leaderboards: biggest winners, longest in the draw, longest without a win. */
 async function top(env: Env, preview: boolean) {
   const state = await liveState(env, preview);
@@ -495,7 +516,7 @@ export default {
       return d ? json(d) : json({ error: "no such box" }, 404);
     }
     if (url.pathname === "/" || url.pathname === "/index.html")
-      return new Response(HTML, {
+      return new Response(await homePage(env, preview, url.origin), {
         headers: { "content-type": "text/html; charset=utf-8", "cache-control": "public, max-age=60" },
       });
     return new Response("not found", { status: 404 });
