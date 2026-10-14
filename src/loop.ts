@@ -121,6 +121,7 @@ export interface State {
   claimSigs?: string[]; // claim txs whose amount is not counted yet
   splitInflight?: { sig: string; at: number; total: string; box: string; team: string }; // a split sent, not confirmed
   lastClaimOkAt?: number; // last time a claim went through (even with no fees), for the final box rule
+  resumed?: string; // id of the last RESUME applied, so a closed box reopens once
   feeLedger: FeeLedgerEntry[];
   excluded: string[]; // pools, curves, our own wallets
   history: BoxRecord[];
@@ -338,11 +339,16 @@ export const VOTE_BOX_LAMPORTS = 300_000_000n;
 /** Opens the vault once per id: what is in it is split evenly over the next `boxes` boxes. */
 /** A rush: buys in a short window get x times the tickets for a while (set with RUSH_AT). */
 export const RUSH = { minutes: 15, x: 3, hours: 24 };
+/** Reopens the box once after a final box (bump the id to reopen again). */
+export const RESUME = {
+  id: "r1",
+  text: "false alarm. a quiet night tripped the final box rule. that rule is gone now. box is back, 0.05 sol per box until volume comes back",
+};
 export const VAULT_DRIP = { id: "d1", boxes: 3 };
 /** Once per id: the next `boxes` boxes are epic or better. */
 export const EPIC_RUN = { id: "e1", boxes: 3 };
 /** While set, every box is this size no matter the volume. null turns the volume sizing back on. */
-export const FIXED_BOX: number | null = 0.1;
+export const FIXED_BOX: number | null = 0.05;
 const FILL_MINUTES = 40; // a box should fill in about this long at the current volume
 
 /**
@@ -2310,6 +2316,15 @@ who you are, only for context: a pink pixel gift box on solana, not live yet. tr
       this.state.mintSeen = this.env.MINT;
       this.state.launchedAt = now; // grace period for the Final Box counts from launch
       this.log(`mint set: ${this.env.MINT}`);
+    }
+    if (this.state.phase === "done" && this.state.resumed !== RESUME.id) {
+      // the final box fired on a quiet night: open the box again, fees that came in since are claimed as usual
+      this.state.resumed = RESUME.id;
+      this.state.phase = "filling";
+      this.state.pending = undefined;
+      this.state.prepack = undefined;
+      this.log(`resume ${RESUME.id}: the box is filling again`);
+      this.feed("info", RESUME.text);
     }
     if (this.state.phase === "done") return;
     await this.recordReserve();

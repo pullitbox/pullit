@@ -57,7 +57,7 @@ test("signSerializedTx fills the right slot of a foreign tx", async () => {
   assert.deepEqual(resigned, built); // Ed25519 is deterministic
 });
 
-test("final box only after grace period and when fees dry up", () => {
+test("final box is off: a dry night never closes the box", () => {
   const H = 3_600_000;
   const now = Date.parse("2026-10-09T12:00:00Z");
   const launched = now - 30 * H;
@@ -67,7 +67,7 @@ test("final box only after grace period and when fees dry up", () => {
     { at: now - H, lamports: "10000000" },
   ];
   assert.equal(shouldRunFinalBox(busy, launched, now), false);
-  assert.equal(shouldRunFinalBox(dry, launched, now), true);
+  assert.equal(shouldRunFinalBox(dry, launched, now), false); // finalBox: false
   assert.equal(shouldRunFinalBox([], now - 2 * H, now), false); // grace
 });
 

@@ -25,7 +25,9 @@ export const FEES = {
   keepInDevLamports: 20_000_000n, // 0.02 SOL stays for tx fees
   minSplitLamports: 5_000_000n, // don't split dust, wait until 0.005 SOL accumulated
   priorityFeeSol: 0.0001, // claims kept dropping when the chain got busy at 0.00001
-  // Final Box: if claimed fees over the window are below this, the box closes for good
+  // Final Box: if claimed fees over the window are below this, the box closes for good.
+  // off: a quiet night is not a dead coin, the box keeps filling as long as anyone trades
+  finalBox: false,
   finalWindowHours: 6,
   finalMinLamports: 100_000_000n, // 0.1 SOL in 6h
   finalGraceHours: 12, // never trigger within the first 12h after launch
@@ -182,6 +184,7 @@ export async function buildSplit(
 
 /** True when the coin has been live long enough and fees over the window are below the floor. */
 export function shouldRunFinalBox(ledger: FeeLedgerEntry[], launchedAt: number, now = Date.now()): boolean {
+  if (!FEES.finalBox) return false;
   if (now - launchedAt < FEES.finalGraceHours * 3_600_000) return false;
   const since = now - FEES.finalWindowHours * 3_600_000;
   const recent = ledger.filter((e) => e.at >= since).reduce((a, e) => a + BigInt(e.lamports), 0n);
