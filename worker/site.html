@@ -900,7 +900,7 @@ async function openBox(id) {
       el('div', {}, el('span', { className: okDraw ? 'ok' : 'bad', textContent: okDraw ? 'draw matches. ' : 'draw mismatch. ' }), `${b.rows.length} wallets, ${Math.round(r.total).toLocaleString()} tickets → ${short(r.winner)}, ${r.tier}`));
   };
   const shareUrl = location.origin + '/box/' + b.boxId;
-  const img = el('img', { className: 'card-img', src: '/card/' + b.boxId + '.png' + Q, alt: `box #${b.boxId}: ${d.tier}, ${fmt(sol(pr.lamports))} sol of $${pr.symbol || '?'}`, width: 1200, height: 630 });
+  const img = el('img', { className: 'card-img', src: '/card/' + b.boxId + '.png' + (Q ? Q + '&v=2' : '?v=2'), alt: `box #${b.boxId}: ${d.tier}, ${fmt(sol(pr.lamports))} sol of $${pr.symbol || '?'}`, width: 1200, height: 630 });
   const copyBtn = el('button', { type: 'button', textContent: 'copy link to this box' });
   copyBtn.onclick = () => { const ok = () => { copyBtn.textContent = 'copied'; setTimeout(() => (copyBtn.textContent = 'copy link to this box'), 1200); };
     if (navigator.clipboard) navigator.clipboard.writeText(shareUrl).then(ok, () => prompt('link', shareUrl)); else prompt('link', shareUrl); };

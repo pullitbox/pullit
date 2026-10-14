@@ -172,10 +172,11 @@ export function drawCard(d: CardData, sprite: ReturnType<typeof spriteRects>): I
   if (tail) im.text(tail, x, y, 3, MUTED);
 
   // the pink strip
+  // x lays the link title over the bottom left corner, so the strip keeps it empty
   im.rect(0, 544, W, H - 544, PINK);
-  im.text("pullit.fun", 36, 544 + (86 - 7 * 5) / 2, 5, INK);
+  im.text("pullit.fun", W - 36 - textW("pullit.fun", 5), 544 + (86 - 7 * 5) / 2, 5, INK);
   const blk = `block ${d.slot.toLocaleString("en-US")} picked it`;
-  im.text(blk, W - 36 - textW(blk, 3), 544 + (86 - 21) / 2, 3, INK);
+  im.text(blk, W - 36 - textW(blk, 3), 544 - 21 - 18, 3, MUTED);
   return im;
 }
 

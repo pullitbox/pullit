@@ -349,7 +349,7 @@ async function cardData(env: Env, id: number, preview: boolean): Promise<CardDat
 function boxPage(d: CardData, origin: string): string {
   const title = `box #${d.boxId}: ${d.tier} pull, ${d.sol} sol of $${d.symbol}`;
   const esc = (t: string) => t.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
-  const img = `${origin}/card/${d.boxId}.png`;
+  const img = `${origin}/card/${d.boxId}.png?v=2`;
   const tags = [
     `<meta property="og:title" content="${esc(title)}">`,
     `<meta property="og:description" content="${esc(`${d.winner} pulled it. 1 of ${d.eligible} in the draw. block ${d.slot} picked them.`)}">`,
@@ -370,7 +370,7 @@ async function homePage(env: Env, preview: boolean, origin: string): Promise<str
   if (!opened.length) return HTML;
   const last = opened.reduce((a, b) => (b.boxId > a.boxId ? b : a));
   const esc = (t: string) => t.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
-  const img = `${origin}/card/${last.boxId}.png`;
+  const img = `${origin}/card/${last.boxId}.png?v=2`;
   const desc = `fees fill a box, a random holder opens it. ${opened.length} boxes opened so far. last one: ${solStr(last.prize!.lamports)} sol of $${last.prize!.symbol}`;
   const tags = [
     `<meta property="og:title" content="pullit">`,
