@@ -101,6 +101,13 @@ h3.h button:hover{color:var(--pink)}
 h3.h .hb{display:flex;gap:14px}
 .card-img{width:100%;height:auto;image-rendering:pixelated;border:2px solid var(--line);display:block}
 .share{display:flex;gap:8px;flex-wrap:wrap}
+.wins{margin-top:12px;display:grid;gap:6px}
+.wins .win{display:flex;justify-content:space-between;gap:10px;align-items:center;border:2px solid var(--line);padding:8px 10px}
+.wins .win a{color:var(--text);text-decoration:none}
+.wins .win .post{color:var(--pink);white-space:nowrap}
+.mine{position:fixed;left:50%;bottom:52px;transform:translateX(-50%);z-index:60;display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:center;background:#141216;border:2px solid var(--pink);padding:10px 14px;max-width:calc(100% - 32px);box-shadow:0 10px 30px rgba(0,0,0,.6)}
+.mine a{color:var(--text)}.mine #minePost{background:var(--pink);color:#141216;padding:6px 10px;text-decoration:none}
+.mine .x{background:none;border:0;color:var(--muted);cursor:pointer;font:inherit}
 .share button{background:none;border:2px solid var(--line);color:var(--muted);padding:8px 12px;cursor:pointer;font:inherit;font-size:12px}
 .share button:hover{border-color:var(--pink);color:var(--text)}
 .top h3{font:400 13px 'Silkscreen',monospace;margin:4px 0 6px;color:var(--pink)}
@@ -381,6 +388,8 @@ html:has(dialog[open]),body:has(dialog[open]){overflow:hidden}
 </div>
 <div class="tick" id="tick"><div class="run" id="tickRun"><span>nothing opened yet. the first box opens soon</span></div></div>
 
+<div class="mine" id="mine" hidden><span id="mineTxt"></span><a id="minePost" class="px" target="_blank" rel="noopener">post your win on x</a><a id="mineCard">see the card</a><button type="button" class="x" aria-label="close" onclick="this.parentNode.hidden=true">x</button></div>
+
 <dialog id="meSheet" class="small"><div class="sheet">
   <h2 class="px">check eligibility<button class="x" type="button" data-close aria-label="close">x</button></h2>
   <form class="check" id="check">
@@ -535,6 +544,12 @@ function render() {
     $('fill').style.width = '100%';
     setText('bl1', 'next box is filling'); setText('bl2', '');
     say(won.posts?.[won.posts.length - 1] || `${short(won.draw.winner)} pulled ${won.draw.tier}. next box is filling`);
+    if (won.draw.winner === me() && $('mine').dataset.box !== String(won.boxId)) {
+      const w = { boxId: won.boxId, tier: won.draw.tier, sol: fmt(sol(won.prize?.lamports), 2), symbol: won.prize?.symbol || '?', eligible: won.eligible || 0 };
+      $('mine').dataset.box = String(won.boxId);
+      setText('mineTxt', `thats you. ${w.sol} sol of $${w.symbol} just landed in your wallet`);
+      $('minePost').href = xIntent(w); $('mineCard').href = '#box-' + w.boxId; $('mine').hidden = false;
+    }
   } else if (!mint) {
     setText('kick', 'box #1'); setText('big', 'soon'); setText('sline', "box agent picks the coin you'll get");
     $('fill').style.width = '0'; setText('bl1', 'not live yet'); setText('bl2', '');
@@ -812,6 +827,14 @@ $('check').onsubmit = async (e) => {
     else if (r.status === 'excluded') out.append('pool or our wallet. not in the draw');
     else if (r.short) out.append(`your bag is under $${r.minUsd} for this box. top it up`, ...tip);
     else out.append(`not in yet. hold $${r.minUsd || 20}+ for 7 min`, ...tip);
+    try { localStorage.setItem(ME_KEY, a); } catch {}
+    if (r.wins && r.wins.length) {
+      const list = el('div', { className: 'wins' }, el('b', { className: 'px', textContent: r.wins.length === 1 ? 'you pulled a box' : `you pulled ${r.wins.length} boxes` }));
+      for (const w of r.wins) list.append(el('div', { className: 'win' },
+        el('a', { href: '#box-' + w.boxId, textContent: `box #${w.boxId} · ${w.tier} · ${w.sol} sol of $${w.symbol}` }),
+        el('a', { className: 'post', href: xIntent(w), target: '_blank', rel: 'noopener', textContent: 'post on x' })));
+      out.append(list);
+    }
   } catch { out.textContent = 'couldnt check right now'; }
 };
 
@@ -881,9 +904,14 @@ async function openBox(id) {
   const copyBtn = el('button', { type: 'button', textContent: 'copy link to this box' });
   copyBtn.onclick = () => { const ok = () => { copyBtn.textContent = 'copied'; setTimeout(() => (copyBtn.textContent = 'copy link to this box'), 1200); };
     if (navigator.clipboard) navigator.clipboard.writeText(shareUrl).then(ok, () => prompt('link', shareUrl)); else prompt('link', shareUrl); };
-  const xBtn = el('a', { href: 'https://x.com/intent/post?text=' + encodeURIComponent(`pulled ${d.tier} from the pullit box\n${shareUrl}`), target: '_blank', rel: 'noopener' }, el('button', { type: 'button', textContent: 'post on x', tabIndex: -1 }));
+  const xBtn = el('a', { href: 'https://x.com/intent/post?text=' + encodeURIComponent(d.winner === me() ? winText({ sol: fmt(sol(pr.lamports), 2), symbol: pr.symbol || '?', eligible: b.rows.length || b.eligible, boxId: b.boxId }) : `box #${b.boxId} of the $PULLIT box: ${fmt(sol(pr.lamports), 2)} sol of $${pr.symbol || '?'} to a holder\n\n${shareUrl}`), target: '_blank', rel: 'noopener' }, el('button', { type: 'button', textContent: 'post on x', tabIndex: -1 }));
   body.replaceChildren(el('h2', { className: 'px' }, 'box #' + b.boxId, el('button', { className: 'x', type: 'button', textContent: 'x', ariaLabel: 'close', onclick: () => $('boxSheet').close() })), img, el('div', { className: 'share' }, copyBtn, xBtn), dl, how, btn, res);
 }
+// what a winner posts: the amount, the coin, the odds, and the box link that unfolds into its card
+const winText = (w) => `won ${w.sol} sol of $${w.symbol} from the $PULLIT box\n\n${w.eligible ? `1 of ${w.eligible} holders in the draw. ` : ''}it went straight to my wallet\n\n${location.origin}/box/${w.boxId}`;
+const xIntent = (w) => 'https://x.com/intent/post?text=' + encodeURIComponent(winText(w));
+const ME_KEY = 'pullit_me';
+const me = () => { try { return localStorage.getItem(ME_KEY) || ''; } catch { return ''; } };
 const heldTxt = (m) => m < 60 ? m + ' min' : m < 2880 ? Math.round(m / 60) + 'h' : Math.round(m / 1440) + 'd';
 async function loadTop() {
   let t; try { t = await api('/api/top'); } catch { return; }

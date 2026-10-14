@@ -443,7 +443,13 @@ export default {
       if (!ADDR.test(a)) return json({ error: "not a solana address" }, 400);
       // before the real coin runs there are no holders to check against
       if (!(await liveState(env, preview))) return json({ status: "out", minUsd: 20 });
-      return json(await walletStatus(env, a));
+      const st = await walletStatus(env, a);
+      // the boxes this wallet already pulled, so a winner can post them
+      const hist = (await liveState(env, preview))?.history ?? [];
+      const wins = hist
+        .filter((b) => b.draw?.winner === a && b.prize)
+        .map((b) => ({ boxId: b.boxId, tier: b.draw!.tier, sol: solStr(b.prize!.lamports), symbol: b.prize!.symbol, eligible: b.eligible }));
+      return json({ ...st, wins });
     }
     if (url.pathname === "/api/vote") {
       if (req.method === "POST") {
