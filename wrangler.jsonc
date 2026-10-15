@@ -15,6 +15,6 @@
     "REPO_URL": "https://github.com/syanovee/pullit",
     "PUBLIC": "1",
     "DRY_RUN": "",
-    "SPAWN": "1",
+    "SPAWN": "",
   },
 }
