@@ -41,6 +41,7 @@ import {
 } from "./executor.ts";
 import { BOOST, frenzyLevel, oddsAt, newMilestones, usdShort, volume1h } from "./boost.ts";
 import { findXAccount, zernioPost } from "./zernio.ts";
+import { SPAWN, skipReason, launchCoin, coinSymbol, type SpawnState } from "./spawn.ts";
 
 export const LOOP = {
   prepackAtPct: 60, // pick the coins once the box is this full
@@ -144,6 +145,7 @@ export interface State {
     holders?: number;
   }; // what the agent already commented on
   mintSeen?: string;
+  spawn?: SpawnState; // the flywheel: coins launched by opened boxes
   market?: { mcap: number; volume1h: number; at: string }; // $PULLIT, from the last holder snapshot
   graduated?: string; // the pool jupiter says $PULLIT graduated to
   frenzy?: number; // current frenzy level, 0 = normal odds
@@ -310,6 +312,8 @@ export interface Env {
   X_MAX_PER_DAY?: string; // most posts on x in any 24 hours, default 3
   RUSH_AT?: string; // ISO time: buys in the next RUSH.minutes get RUSH.x tickets for RUSH.hours (until they sell)
   BUILD_COMMITS?: string; // set by `npm run deploy`: base64 JSON of recent commits, for the journal
+  SPAWN?: string; // "1": every opened box launches its own coin from the dev wallet (the flywheel)
+  SPAWN_DEV_BUY_SOL?: string; // dev buy on each box coin, default 0
 }
 
 /** Why a coin was picked, in words that do not give away which coin it is. */
@@ -383,6 +387,7 @@ export class Bot {
   private box!: Keypair;
   private dev?: Keypair;
   private xAccountId?: string;
+  coinImage?: (boxId: number) => Promise<Uint8Array>; // set by the worker: the picture of a box coin
   env: Env;
   state: State;
   constructor(env: Env, state: State) {
@@ -2360,11 +2365,60 @@ who you are, only for context: a pink pixel gift box on solana, not live yet. tr
     await this.openBox(final);
     if ((this.state.phase as State["phase"]) === "drawing") return this.drawSoon();
     if (this.state.phase === "filling") {
+      await this.spawnTick(now).catch((e) => this.log(`spawn: ${(e as Error).message}`));
       await this.prepackSoon(now);
       await this.watch(now);
       await this.shitpost(now);
       await this.chatter(now);
     }
+  }
+
+
+  /**
+   * The flywheel: right after a box opens it launches its own coin ($BOX38 for box #38) from the dev wallet.
+   * Its creator fees are claimed with everything else and fill the next boxes, and every box buys $PULLIT.
+   * Each box is looked at once. Gap, daily cap and the volume of the last coin decide if it launches.
+   */
+  async spawnTick(now = Date.now()) {
+    if (this.env.SPAWN !== "1" || this.dry || !this.dev || !this.coinImage) return;
+    const last = this.state.history.at(-1);
+    if (!last || last.final) return;
+    const s = (this.state.spawn ??= { coins: [] });
+    if (s.triedBox === last.boxId || s.coins.some((c) => c.boxId === last.boxId)) return;
+    const id = last.boxId;
+    // only a box that just opened, never an old one right after a deploy
+    if (now - Date.parse(last.at) > 30 * 60_000) {
+      s.triedBox = id;
+      return;
+    }
+    const prev = s.coins.at(-1);
+    let vol: number | null = null;
+    if (prev) {
+      const t = await fetchToken(this.env.JUP_API_KEY, prev.mint); // throws on a network error: try again next tick
+      vol = t ? (t.stats24h?.buyVolume ?? 0) + (t.stats24h?.sellVolume ?? 0) : 0;
+    }
+    const why = skipReason(s, id, now, vol);
+    if (why) {
+      s.triedBox = id;
+      this.log(`spawn: box #${id} launches no coin: ${why}`);
+      return;
+    }
+    const devBuy = Math.max(0, Number(this.env.SPAWN_DEV_BUY_SOL) || 0);
+    const bal = await this.rpc.balance(this.dev.publicKey);
+    const need = SPAWN.minDevLamports + SPAWN.maxOutLamports + BigInt(Math.round(devBuy * 1e9));
+    s.triedBox = id; // decided: a crash after this never launches a second coin for the same box
+    if (bal < need) {
+      this.log(`spawn: box #${id} launches no coin: dev wallet has ${sol(bal)} sol, needs ${sol(need)}`);
+      return;
+    }
+    await this.checkpoint?.();
+    const img = await this.coinImage(id);
+    const { mint, sig } = await launchCoin(this.rpc, this.dev, id, img, devBuy);
+    const symbol = coinSymbol(id);
+    s.coins = [...s.coins, { boxId: id, mint, symbol, at: now, sig }].slice(-50);
+    this.log(`spawn: box #${id} launched $${symbol} ${mint} (${sig})`);
+    this.feed("box", `box #${id} opened, so $${symbol} is live. every fee it makes fills the next boxes, and every box buys $PULLIT`, sig);
+    await this.post(`box #${id} opened. $${symbol} is live\n\nevery fee it makes goes back into the box, and every box buys $PULLIT\n\n${mint}`);
   }
 
   /**

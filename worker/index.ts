@@ -6,12 +6,13 @@
 import { Bot, newState, type Env as BotEnv, type State } from "../src/loop.ts";
 import { HTML, SOON, BOXSVG } from "./site.ts";
 import { renderCard, type CardData } from "./card.ts";
+import { coinImage } from "./coinimg.ts";
 import { keypairFromSecret, Rpc } from "../src/solana.ts";
 import { fetchToken } from "../src/jupiter.ts";
 import { HOLDERS } from "../src/holders.ts";
 import { findXAccount } from "../src/zernio.ts";
 import { voteState, castVote, voteResult, pastVotes, VOTE } from "./vote.ts";
-import type { ExecutionContext, KVNamespace, ScheduledEvent } from "./cloudflare.ts";
+import type { DurableObjectNamespace, DurableObjectState, ExecutionContext, KVNamespace, ScheduledEvent } from "./cloudflare.ts";
 
 /** Checks every dependency from inside Cloudflare without moving money or posting. */
 async function selftest(env: Env) {
@@ -50,6 +51,7 @@ async function selftest(env: Env) {
 
 interface Env extends BotEnv {
   STATE: KVNamespace;
+  LOCK?: DurableObjectNamespace; // the tick lock: one tick at a time, for real (kv reads can be stale)
   PREVIEW_KEY?: string;
   REPO_URL?: string; // e.g. https://github.com/syanovee/pullit, set once the repo is public
   PUBLIC?: string;
@@ -137,15 +139,24 @@ async function pinTweet(env: Env, url: string): Promise<Pin> {
 }
 
 async function run(env: Env, claimOnly = false) {
-  const lock = await env.STATE.get("lock");
-  if (lock && Date.now() - Number(lock.split(":")[0]) < LOCK_MS) return; // previous tick still running
   const token = `${Date.now()}:${crypto.randomUUID()}`;
-  await env.STATE.put("lock", token);
+  // kv is eventually consistent: two ticks (e.g. old and new code during a deploy) could both read "no lock"
+  // and pay the same win twice. a durable object answers one request at a time, so only one tick gets it
+  const lockObj = env.LOCK ? env.LOCK.get(env.LOCK.idFromName("tick")) : null;
+  const ask = async (op: string) => (await (await lockObj!.fetch(`https://lock/${op}?t=${encodeURIComponent(token)}&ttl=${LOCK_MS}`)).text()) === "1";
+  if (lockObj) {
+    if (!(await ask("acquire"))) return; // previous tick still running
+  } else {
+    const lock = await env.STATE.get("lock");
+    if (lock && Date.now() - Number(lock.split(":")[0]) < LOCK_MS) return; // previous tick still running
+    await env.STATE.put("lock", token);
+  }
   const state = ((await env.STATE.get("state", "json")) as State | null) ?? newState();
   const bot = new Bot(env, state);
+  bot.coinImage = (n) => coinImage(n, BOXSVG);
   // the sealed box is saved (and visible on the site) before the draw block exists
   // a tick that lost the lock must never write: its state is older than the one that took over
-  const mine = async () => (await env.STATE.get("lock")) === token;
+  const mine = async () => (lockObj ? await ask("holds") : (await env.STATE.get("lock")) === token);
   // kv allows about one write per second per key: retry instead of losing the state
   const put = async (k: string, v: string) => {
     for (let i = 0; ; i++)
@@ -162,7 +173,7 @@ async function run(env: Env, claimOnly = false) {
   };
   // before any payment: stop if another tick has taken the lock
   bot.guard = async () => {
-    if ((await env.STATE.get("lock")) !== token) throw new Error("lost the lock, another tick is running");
+    if (!(await mine())) throw new Error("lost the lock, another tick is running");
   };
   try {
     await bot.init();
@@ -187,7 +198,8 @@ async function run(env: Env, claimOnly = false) {
     delete state.outbox;
     if (await mine()) {
       await put("state", JSON.stringify(state));
-      await env.STATE.delete("lock");
+      if (lockObj) await ask("release");
+      else await env.STATE.delete("lock");
     } else console.log("lost the lock during the tick, state not written");
   }
 }
@@ -524,3 +536,29 @@ export default {
     return new Response("not found", { status: 404 });
   },
 };
+
+/** One lock for all ticks. A durable object handles one request at a time, so acquire is atomic. */
+export class TickLock {
+  state: DurableObjectState;
+  constructor(state: DurableObjectState) {
+    this.state = state;
+  }
+  async fetch(req: Request): Promise<Response> {
+    const u = new URL(req.url);
+    const t = u.searchParams.get("t") ?? "";
+    const ttl = Number(u.searchParams.get("ttl")) || 240_000;
+    const cur = await this.state.storage.get<string>("lock");
+    const alive = !!cur && Date.now() - Number(cur.split(":")[0]) < ttl;
+    if (u.pathname === "/acquire") {
+      if (alive && cur !== t) return new Response("0");
+      await this.state.storage.put("lock", t);
+      return new Response("1");
+    }
+    if (u.pathname === "/holds") return new Response(cur === t ? "1" : "0");
+    if (u.pathname === "/release") {
+      if (cur === t) await this.state.storage.delete("lock");
+      return new Response("1");
+    }
+    return new Response("0", { status: 404 });
+  }
+}

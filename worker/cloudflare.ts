@@ -20,3 +20,19 @@ export interface ScheduledEvent {
 export interface ExecutionContext {
   waitUntil(promise: Promise<unknown>): void;
 }
+
+export interface DurableObjectStorage {
+  get<T = unknown>(key: string): Promise<T | undefined>;
+  put(key: string, value: unknown): Promise<void>;
+  delete(key: string): Promise<boolean>;
+}
+export interface DurableObjectState {
+  storage: DurableObjectStorage;
+}
+export interface DurableObjectStub {
+  fetch(url: string): Promise<Response>;
+}
+export interface DurableObjectNamespace {
+  idFromName(name: string): unknown;
+  get(id: unknown): DurableObjectStub;
+}
