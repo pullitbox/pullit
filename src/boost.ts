@@ -5,7 +5,7 @@
 import type { JupToken } from "./jupiter.ts";
 
 export const BOOST = {
-  burnPct: 10, // of every box, spent on $PULLIT that is burned right away
+  burnPct: 50, // of every box, spent on $PULLIT that is burned right away (the prize is $PULLIT too)
   // frenzy: more volume in the last hour, better odds for the next box. odds are common/rare/epic/secret
   frenzy: [
     { minVolume1h: 0, odds: [50, 30, 19.5, 0.5] },

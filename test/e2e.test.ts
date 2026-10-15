@@ -309,7 +309,7 @@ class Chain {
         return {
           keys: [o.receiver, ata],
           deltas: new Map([[o.taker, -o.lamports]]),
-          kind: `swap ${o.mint === this.mint ? "buyback" : "prize"} ${o.receiver.slice(0, 4)}`,
+          kind: `swap ${o.mint === this.mint && o.receiver === o.taker ? "buyback" : "prize"} ${o.receiver.slice(0, 4)}`,
         };
       });
       return json({ transaction: b64(tx), requestId: id, outAmount: String(o.lamports * 1000n) });

@@ -19,7 +19,7 @@ import { hotCandidates, scan, type Candidate } from "./scanner.ts";
 import { HOT } from "./config.ts";
 import { say, remember } from "./voice.ts";
 import { TEASERS, TEASE_TOPICS } from "./teasers.ts";
-import { packBox, quip, similar, fillQuip, type BoxPlan } from "./agent.ts";
+import { quip, similar, fillQuip, type BoxPlan } from "./agent.ts";
 import { fetchNewBuys, luckyRoll, mustHold, GAMES, type Buy } from "./games.ts";
 import { buildSplit, claimedBy, claimPumpCreatorFees, shouldRunFinalBox, FEES, type FeeLedgerEntry } from "./fees.ts";
 import {
@@ -1504,31 +1504,19 @@ export class Bot {
   checkpoint?: () => Promise<void>;
 
   /** After sealing, waits for the draw block in the same tick instead of the next one, so a box opens in ~30s. */
-  /** Scans the market and lets the agent pick the box coins. */
+  /** Every box is $PULLIT now: half the box buys $PULLIT and burns it, the prize is $PULLIT bought from the market. */
   async pack(boxId: number) {
-    const universe = await fetchUniverse(this.env.JUP_API_KEY);
-    const result = scan(universe);
-    result.hot = await this.hotCoins();
-    const thrown = Object.values(result.rejected).reduce((a, b) => a + b, 0);
-    await this.line(
-      "scan",
-      `scanned ${universe.length.toLocaleString("en-US")} coins for the box and threw out ${thrown}: devs holding too much, top holders too heavy, fake volume, mint not revoked`,
-      [String(thrown)],
-      say.scan(universe.length.toLocaleString("en-US"), thrown),
-    );
-    const recent = this.state.history.slice(-8).flatMap((b) => [b.plan.common.symbol, b.plan.rare.symbol]);
-    const { plan, problems } = await packBox(
-      this.env.OPENROUTER_API_KEY,
-      result,
+    const coin = { mint: this.env.MINT!, symbol: "PULLIT", why: "every box buys $PULLIT" };
+    const plan: BoxPlan = {
       boxId,
-      recent,
-      this.env.OPENROUTER_MODEL,
-    );
-    if (problems.length) this.log(`agent problems: ${problems.join("; ")}`);
-    // the scan rows of the two picks, for the teasers at seal time
-    const common = result.fresh.find((x) => x.mint === plan.common.mint);
-    const rare = [...result.established, ...(result.hot ?? [])].find((x) => x.mint === plan.rare.mint);
-    return { plan, common, rare };
+      common: coin,
+      rare: coin,
+      post: `box #${boxId} is packed. what's inside? $PULLIT. it's always $PULLIT now`,
+      reveal: "$PULLIT bought off the market. half of the box burned, the winner got the rest",
+      hints: { common: "you already know what's inside", rare: "same coin. bigger bag" },
+      source: "fallback",
+    };
+    return { plan, common: undefined, rare: undefined };
   }
 
   /** While the box fills, pick its coins ahead of time so a full box seals right away. */

@@ -344,7 +344,7 @@ html:has(dialog[open]),body:has(dialog[open]){overflow:hidden}
       <div>
         <span class="k px" id="kick">box #1 is filling</span><span class="badge px" id="badge" hidden></span>
         <span class="big px" id="big">0 sol</span>
-        <span class="s" id="sline">box agent picks the coin you'll get</span>
+        <span class="s" id="sline">every box buys $PULLIT</span>
         <div class="bar"><i id="fill" style="width:0"></i><b id="barTag"></b></div>
         <div class="bl"><span id="bl1">opens when full</span><span id="bl2"></span></div>
       </div>
@@ -432,7 +432,7 @@ html:has(dialog[open]),body:has(dialog[open]){overflow:hidden}
 <dialog id="rules" class="small"><div class="sheet">
   <h2 class="px">rules<button class="x" type="button" data-close aria-label="close">x</button></h2>
   <dl class="rg">
-    <dt>the box</dt><dd>trading fees fill it. the agent picks the coins. a future solana block picks the holder and the tier</dd>
+    <dt>the box</dt><dd>trading fees fill it. half of every box buys $PULLIT and burns it, the prize is $PULLIT too. a future solana block picks the holder and the tier</dd>
     <dt>odds</dt><dd class="odds" id="oddsLine"><b class="t-common">common 50</b><b class="t-rare">rare 30</b><b class="t-epic">epic 19.5</b><b class="t-secret">secret 0.5</b></dd>
     <dt>box size</dt><dd>0.05 sol per box for now, so they open more often. later it grows with the volume again: the busier the last hour, the bigger the next box, up to 4 sol</dd>
     <dt>get in</dt><dd>hold the entry for 7 min. bigger bag, more tickets</dd>
@@ -551,7 +551,7 @@ function render() {
       $('minePost').href = xIntent(w); $('mineCard').href = '#box-' + w.boxId; $('mine').hidden = false;
     }
   } else if (!mint) {
-    setText('kick', 'box #1'); setText('big', 'soon'); setText('sline', "box agent picks the coin you'll get");
+    setText('kick', 'box #1'); setText('big', 'soon'); setText('sline', "every box buys $PULLIT");
     $('fill').style.width = '0'; setText('bl1', 'not live yet'); setText('bl2', '');
     say('not live yet. soon');
   } else if (s.phase === 'done') {
@@ -569,7 +569,7 @@ function render() {
   } else {
     setText('kick', `box #${id} is filling`);
     setText('big', down(have) + ' sol');
-    setText('sline', p.vaultSlice ? `+${fmt(sol(p.vaultSlice), 3)} sol from the vault${p.epicLeft ? ' · epic or better' : ''} · ${p.vaultDripLeft} of 3 left` : p.bondBox ? `bond box: epic or better` : p.epicLeft ? `epic or better · ${p.epicLeft} of 3 left` : p.milestoneBox ? `milestone box: epic or better` : "box agent picks the coin you'll get");
+    setText('sline', p.vaultSlice ? `+${fmt(sol(p.vaultSlice), 3)} sol from the vault${p.epicLeft ? ' · epic or better' : ''} · ${p.vaultDripLeft} of 3 left` : p.bondBox ? `bond box: epic or better` : p.epicLeft ? `epic or better · ${p.epicLeft} of 3 left` : p.milestoneBox ? `milestone box: epic or better` : "every box buys $PULLIT");
     $('fill').style.width = Math.round(pct * 100) + '%';
     setText('bl1', need ? `opens at ${fmt(need, 2)} sol` : 'opens when full');
     setText('bl2', Math.round(pct * 100) + '%');

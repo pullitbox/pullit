@@ -19,16 +19,16 @@ Trading fees of $PULLIT fill a box. When it is full, an AI picks what goes insid
 A Solana block about 20 seconds in the future decides which holder opens it and what tier they pull.
 Nobody knows the result in advance. Not the holders, not the AI, not us.
 
-The bot can only buy. It buys the prize for the winner and buys $PULLIT to burn it. It has no code to sell anything.
+The bot can only buy. It buys $PULLIT for the winner and buys $PULLIT to burn it. It has no code to sell anything.
 
 ## How it works
 
 1. **Fees fill the box.** Every 15 seconds the bot claims the creator fees of $PULLIT. Until $PULLIT bonds, 75% goes to the box wallet and 25% stays in the dev wallet; while the market cap is under $10K, 20% goes to the box and 80% stays in the dev wallet; under $20K, 80% goes to the box and 20% stays in the dev wallet. After the bond, 100% goes to the box while the market cap is under $20K; from $20K, 70% goes to the box and 30% stays in the dev wallet. A small part of the box share is set aside in the vault.
-2. **The AI packs it.** When the box is full, the agent scans the market, throws out anything that looks unsafe, and picks two coins: a fresh runner and a runner of the meta. It writes a joke about its picks on the site log, never the names.
+2. **Every box is $PULLIT.** Half of the box buys $PULLIT and burns it. The prize is $PULLIT too, bought off the market and sent to the winner. Whatever the tier leaves rolls into the next box, so in the end every lamport of the box buys $PULLIT.
 3. **The box is sealed.** The bot publishes a seal: `sha256(common mint | rare mint | salt)`. The contents cannot change after that without the seal breaking.
 4. **A future block decides.** The bot commits to a slot about 20 seconds ahead. When that block exists, its hash picks the winner (weighted by tickets) and the tier.
 5. **The prize goes straight to the winner.** The bot swaps SOL from the box into the prize coin with Jupiter and delivers it to the winner's wallet in the same transaction. The seal and the draw are published so anyone can check them.
-6. **Buyback and burn.** A tenth of every box buys $PULLIT and burns it. Each burn is a transaction on the site log.
+6. **Buyback and burn.** Half of every box buys $PULLIT and burns it. Each burn is a transaction on the site log.
 
 Whatever a pull leaves in the box rolls into the next one.
 
