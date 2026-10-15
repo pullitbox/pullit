@@ -25,6 +25,7 @@ export const FEES = {
   keepInDevLamports: 20_000_000n, // 0.02 SOL stays for tx fees
   minSplitLamports: 5_000_000n, // don't split dust, wait until 0.005 SOL accumulated
   priorityFeeSol: 0.0001, // claims kept dropping when the chain got busy at 0.00001
+  minClaimLamports: 2_000_000n, // a claim is only sent when it nets at least 0.002 SOL (dust claims burned ~0.3 SOL a day in fees)
   // Final Box: if claimed fees over the window are below this, the box closes for good.
   // off: a quiet night is not a dead coin, the box keeps filling as long as anyone trades
   finalBox: false,
@@ -94,6 +95,32 @@ export function checkClaimTx(tx: Uint8Array): string | null {
   return null;
 }
 
+/** Simulates the unsigned claim tx and says whether it nets at least FEES.minClaimLamports for the dev wallet. */
+export async function worthClaiming(rpc: Rpc, unsigned: Uint8Array, wallet: string): Promise<boolean> {
+  try {
+    const pre = await rpc.balance(wallet);
+    const sim = await rpc.call<{ value: { err: unknown; accounts: ({ lamports: number } | null)[] | null } }>(
+      "simulateTransaction",
+      [
+        b64(unsigned),
+        { encoding: "base64", sigVerify: false, replaceRecentBlockhash: true, commitment: "confirmed", accounts: { encoding: "base64", addresses: [wallet] } },
+      ],
+    );
+    if (sim.value.err) return false; // would fail anyway: nothing to claim
+    const post = sim.value.accounts?.[0]?.lamports;
+    if (post == null) return true; // no answer: claim as before
+    return BigInt(post) - pre >= FEES.minClaimLamports;
+  } catch {
+    return true; // simulation unavailable: behave as before rather than stop claiming
+  }
+}
+
+function b64(bytes: Uint8Array): string {
+  let s = "";
+  for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]!);
+  return btoa(s);
+}
+
 /** Ask PumpPortal for an unsigned claim tx (claims all pump creator fees of this wallet). */
 export async function claimPumpCreatorFees(rpc: Rpc, dev: Keypair): Promise<string | null> {
   const res = await fetch("https://pumpportal.fun/api/trade-local", {
@@ -115,6 +142,9 @@ export async function claimPumpCreatorFees(rpc: Rpc, dev: Keypair): Promise<stri
   const unsigned = new Uint8Array(await res.arrayBuffer());
   const bad = checkClaimTx(unsigned);
   if (bad) throw new Error(`refused to sign the claim tx: ${bad}`);
+  // PumpPortal builds a claim tx even when the vault is (almost) empty, and each one costs ~0.0001 SOL.
+  // Simulate first: only send when the claim brings in at least FEES.minClaimLamports after its own fee.
+  if (!(await worthClaiming(rpc, unsigned, dev.publicKey))) return null;
   const signed = await signSerializedTx(unsigned, dev);
   return rpc.sendAndConfirm(signed);
 }

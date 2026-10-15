@@ -9,6 +9,8 @@ export const SPAWN = {
   minGapMin: 120, // at least 2 hours between two launches
   maxPerDay: 8, // at most 8 launches in any 24 hours
   minPrevVolumeUsd: 2_000, // the last coin must have traded this much (24h) before the next one launches
+  retryAfterH: 12, // ...or be at least this old: then the wheel tries again
+  activeUtc: [14, 4] as const, // only launch from 14:00 to 04:00 UTC (17:00 to 07:00 msk), when the us trades
   minDevLamports: 50_000_000n, // the dev wallet keeps at least 0.05 SOL, a launch never eats into it
   priorityFeeSol: 0.0005,
   maxOutLamports: 30_000_000n, // a create tx may move at most 0.03 SOL out of the dev wallet (plus the dev buy)
@@ -41,10 +43,14 @@ export function skipReason(
   prevVolumeUsd: number | null, // 24h volume of the last launched coin, null if unknown
 ): string | null {
   if (s.triedBox === boxId || s.coins.some((c) => c.boxId === boxId)) return "already decided";
+  const h = new Date(now).getUTCHours();
+  const [from, to] = SPAWN.activeUtc;
+  if (from > to ? h < from && h >= to : h < from || h >= to) return `quiet hours (${h}:00 utc), no traders to snipe it`;
   const last = s.coins.at(-1);
   if (last && now - last.at < SPAWN.minGapMin * 60_000) return "too soon after the last launch";
   if (s.coins.filter((c) => now - c.at < 86_400_000).length >= SPAWN.maxPerDay) return "daily cap reached";
-  if (last && prevVolumeUsd != null && prevVolumeUsd < SPAWN.minPrevVolumeUsd)
+  // a flop pauses the wheel for retryAfterH, then it tries again (one dead coin must not stop it forever)
+  if (last && now - last.at < SPAWN.retryAfterH * 3_600_000 && prevVolumeUsd != null && prevVolumeUsd < SPAWN.minPrevVolumeUsd)
     return `last coin $${last.symbol} only traded $${Math.round(prevVolumeUsd)}, the wheel waits`;
   return null;
 }
